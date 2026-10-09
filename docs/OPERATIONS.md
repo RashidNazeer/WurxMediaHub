@@ -2018,6 +2018,39 @@ The catalogue is fetched ONCE per brand and shared with the product groups
 below, via `wxProductPics` — a module-level promise cache in `WurxUI.jsx`. A
 failed fetch is dropped from it so the next mount asks again.
 
+### A demo creator with a full history
+
+```bash
+SUPABASE_SERVICE_KEY=... node scripts/seed-demo-creator.mjs          # make her
+SUPABASE_SERVICE_KEY=... node scripts/seed-demo-creator.mjs --clean  # remove it all
+```
+
+`rudely@wurxmedia.com` / `1234567890`, a Rising creator with three jobs across
+three brands at three different stages — paid, awaiting payment, still filming
+— so the money card has something in every cell instead of two zeros. Sixteen
+videos, fourteen approved and two with the team, with real ad figures behind
+them so My numbers shows GMV, spend, orders and ROI.
+
+**It walks the real path.** Every row comes from the function the product
+itself calls: `review_application`, `save_offer`, `apply_for_offer`,
+`review_offer_application`, `set_offer_stage`, `submit_content`,
+`review_content`. A creator assembled by direct inserts looks right in the
+tables and wrong on the screens — no audit trail, no stage events, no committed
+budget.
+
+**IT LEAVES PENETREX ALONE.** Penetrex is the only brand with real commercials
+and it has $350 free of a $23,000 budget that is the actual August retainer.
+The demo creates its own brands instead (Aurelia, Dr Tobias, Swisse, marked
+`client_name = 'Demo data (seed-demo-creator)'` and `store_id` prefixed
+`demo-`), and `--clean` removes them again — but only if nobody else's work has
+arrived against them since.
+
+**`--clean` recomputes `brand_commercials.budget_used`.** Deleting offers leaves
+the committed money behind; that has already cost this project once.
+
+Re-running is safe: the account, the brands and the offers are all reused
+rather than duplicated.
+
 ### "A brand is missing" / "it is not syncing"
 
 ```bash
