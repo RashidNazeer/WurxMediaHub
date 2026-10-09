@@ -2018,6 +2018,40 @@ The catalogue is fetched ONCE per brand and shared with the product groups
 below, via `wxProductPics` — a module-level promise cache in `WurxUI.jsx`. A
 failed fetch is dropped from it so the next mount asks again.
 
+### "A brand is missing" / "it is not syncing"
+
+```bash
+pnpm verify:brand-visibility   # 24 checks, needs SUPABASE_SERVICE_KEY + preview
+```
+
+**Check the MONTH before anything else, and check it on the machine that cannot
+see the brand.** The Brands screen lists the brands with a creator or a budget
+in the selected month, and that month is remembered per browser in
+`wurx_ui_state_v1`. A brand with a budget and no creators lives in one month
+only.
+
+**The tell that it is not permissions:** the same account behaving differently
+on two laptops. Policies follow the account. If the account is not the variable,
+stop looking at RLS.
+
+To confirm from the outside, read `wurxbase.brand_monthly_budgets` for the brand
+and note its `month`; then read it again signed in AS the person who cannot see
+it, which proves the row is readable to them. Both were true for HoneySticks on
+2026-10-09, which is what pointed at the browser.
+
+A month chosen today still sticks; one chosen on an earlier day no longer does.
+
+### A platform that answers for some brands and not others
+
+`collab-products` returns **200 with an empty list and a `note`** when EUKA or
+Reacher cannot answer — it is not an error from our side and must not be read as
+one. The note is a sentence for the person; `upstreamStatus` carries the code.
+
+**Always run a control brand in the same breath.** EUKA 503s for HoneySticks on
+every attempt while returning ten products for Penetrex seconds later, so "EUKA
+is down" and "our key is wrong" were both wrong. One brand failing is their
+store, not their service.
+
 ### The creator contract PDF
 
 ```bash

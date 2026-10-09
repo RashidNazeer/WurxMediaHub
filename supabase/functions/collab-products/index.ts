@@ -122,7 +122,7 @@ Deno.serve(async (req: Request) => {
         if (auth) {
           const brandId = await storeBrandPair(auth, store.id, store.name);
           if (brandId) {
-            const r = await fetch(`${EUKA_V1}/dashboard/products-performance`, {
+            const askEuka = () => fetch(`${EUKA_V1}/dashboard/products-performance`, {
               method: 'POST',
               headers: { ...auth, 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -136,6 +136,18 @@ Deno.serve(async (req: Request) => {
               }),
               signal: AbortSignal.timeout(30_000),
             });
+
+            /* ONE RETRY, AND ONLY ON A 5xx. A momentary blip from EUKA should
+               not send somebody to the type-it-yourself fallback and leave the
+               brand looking like it has no catalogue. A 4xx is an answer and
+               asking again would only waste the drawer's time. One retry, not
+               three: HoneySticks fails every time, and making a person wait
+               twelve seconds to be told the same thing is its own bug. */
+            let r = await askEuka();
+            if (!r.ok && r.status >= 500) {
+              await new Promise((s) => setTimeout(s, 600));
+              r = await askEuka();
+            }
             if (r.ok) {
               const j = await r.json().catch(() => null) as Record<string, any> | null;
               const rows = (j?.products ?? j?.data?.products ?? j?.data ?? []) as Record<string, any>[];
@@ -166,7 +178,34 @@ Deno.serve(async (req: Request) => {
               });
               return json({ source: 'euka', store: store.name, products }, 200, req);
             }
-            return json({ source: 'euka', store: store.name, products: [], note: `Euka answered ${r.status}` }, 200, req);
+            /*
+             * SAY WHAT HAPPENED IN WORDS SOMEBODY CAN ACT ON.
+             *
+             * Rashid, 2026-10-09: "when adding creator for honeysticks,
+             * fetching product from euka shows 503 error". It did, and the
+             * 503 was EUKA'S, not ours — their catalogue answers 503 for that
+             * brand every time while answering normally for Penetrex in the
+             * same second, so it is one store on their side, not an outage and
+             * not our key. This function was already handling it correctly; it
+             * just repeated the number, and the drawer prints the note
+             * verbatim, so "Euka answered 503" is what the person onboarding a
+             * creator read. That tells them nothing about what to do next.
+             *
+             * A 5xx is Euka being unable to answer; a 4xx is Euka refusing to.
+             * Both end in the same place for the person at the keyboard — type
+             * the product — so both say so, and differ only in whether it is
+             * worth trying again later.
+             */
+            const theirFault = r.status >= 500;
+            return json({
+              source: 'euka',
+              store: store.name,
+              products: [],
+              note: theirFault
+                ? `EUKA’s catalogue is not answering for ${store.name} right now (their error ${r.status}). Type the product name and press Enter — you can carry on without it.`
+                : `EUKA will not return a catalogue for ${store.name} (error ${r.status}). Type the product name and press Enter.`,
+              upstreamStatus: r.status,
+            }, 200, req);
           }
           return json({ source: 'euka', store: store.name, products: [], note: 'Euka has no brand id for this store' }, 200, req);
         }

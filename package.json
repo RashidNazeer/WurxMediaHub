@@ -108,7 +108,8 @@
     "verify:product-groups": "node scripts/check-product-groups.mjs",
     "verify:deal-complete": "node scripts/check-deal-complete.mjs",
     "verify:video-thumbs": "node scripts/check-video-thumbs.mjs",
-    "verify:contract-pdf": "node scripts/check-contract-pdf.mjs"
+    "verify:contract-pdf": "node scripts/check-contract-pdf.mjs",
+    "verify:brand-visibility": "node scripts/check-brand-visibility.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.9",

@@ -4,10 +4,17 @@
 
 **Updated 2026-09-29, after the product groups shipped.**
 
-Nothing is queued. The last things done were the **contract redesign** and the
-**thumbnail backfill across every brand** (entry below); before them, two Irwin
-Naturals fixes and product groups on a brand's creator table. All on dev,
-waiting on Rashid to look.
+Nothing is queued. The last thing done was **the missing-brand bug** (entry
+below). Before that: the creator Home UI brief, the contract redesign, the
+thumbnail backfill, two Irwin fixes and product groups. All on dev.
+
+**Waiting on Rashid:** the creator Home redesign. The prompt is written
+(`docs/CREATOR_HOME_UI_BRIEF.md`, also copied to
+`Downloads\Creator Home - current\`) and he is running it through a UI model.
+When the design comes back, the job is to judge whether it is buildable against
+the data the brief lists — that is where these usually go wrong. **One decision
+is open: the Prism kit is light-only and `check:contrast` demands dark/light
+parity.**
 
 **ONE QUESTION IS OPEN AND HE RAISED IT HIMSELF — SIGNATURES.** Rashid: *"for
 usman signature i am not sure how asad's is being generated but i can get the
@@ -84,6 +91,86 @@ Built for TikTok's second rejection, live on dev at `65e9872`.
 - **Proven:** `verify:site` 74/74 against the live dev site.
 - **Next:** he reads the words, answers the support@ and noindex questions,
   then the public pages go to production on their own and he resubmits.
+
+### The brand nobody else could see (2026-10-09)
+
+Rashid: *"Asad added a new brand Honeysticks and other users like me or admin is
+unable to see this ... asad is able to see the brand on his laptop but even he
+can't see on my laptop with his own account."* Reported more than once before as
+a "syncing issue".
+
+**IT WAS NEVER A SYNCING OR A PERMISSIONS PROBLEM.** HoneySticks was in the
+shared database the whole time — `brand_monthly_budgets`, October 2026, $5,000,
+saved at 17:27 that afternoon. Every `wurxbase` table has the same policy,
+`is_staff()`, and ops accounts could read the row over the API. The clue was the
+sentence everyone found baffling: **the same account behaved differently on two
+laptops.** Permissions follow the account. Something else was following the
+MACHINE.
+
+**The Brands screen lists the brands with a creator or a budget IN THE SELECTED
+MONTH, and the selected month was remembered in that browser's localStorage for
+ever** (`wurx_ui_state_v1`). HoneySticks has an October budget and no creators.
+Everyone else's browser was still parked on September from weeks earlier. Asad
+signing in on Rashid's laptop inherited Rashid's September.
+
+Proved before anything was changed — one account, one machine, one build, only
+the saved month different:
+
+| Browser last used in | HoneySticks |
+|---|---|
+| September | missing |
+| October | visible |
+| fresh browser (defaults to today) | visible |
+
+**Both halves of the fix:**
+
+1. **A month remembered on an earlier DAY is no longer restored**
+   (`rememberedMonth`, `WurxUI.jsx`). It is stamped with the day it was chosen.
+   Within a working day it still sticks — that is the convenience it exists for
+   — but a browser can no longer show September in November.
+2. **The screen now says where a missing brand is.** Looking at an earlier
+   month, a notice names the brands set up in a later one and offers a
+   one-click switch: *"2 brands are set up in a later month, not in Sep 2026:
+   HoneySticks, JOYMODE. [Show Oct 2026]"*. **This is the half that fixes the
+   class** — the screen previously could not distinguish "no such brand" from
+   "not in this month", and the team concluded the former twice.
+
+   Only the present and the future are listed. The first cut named every brand
+   from every month and read "6 brands are not here" on an ordinary day; a
+   notice that is always on screen is wallpaper, and wallpaper is how the real
+   one would be missed.
+
+**And the notice's own button did nothing at first.** `BrandsTab` takes `month`
+as a prop but not the setter, so the click threw a ReferenceError into a console
+nobody reads — the exact failure this screen is prone to. The new suite caught
+it. It now takes `onPickMonth`, which is already this file's convention.
+
+### The Euka 503 (2026-10-09)
+
+Rashid, same message: *"when adding creator for honeysticks, fetching product
+from euka shows 503 error"*.
+
+**The 503 is EUKA'S, and it is persistent and brand-specific.** Measured: three
+attempts, HoneySticks 503 every time while Penetrex returned ten products in the
+same seconds. So not an outage, not our key — one store on their side. Nothing
+to fix in our data.
+
+What was wrong was the message. `collab-products` already handled the failure
+correctly (200, empty list, a note) and the note said `Euka answered 503`, which
+the picker prints verbatim. The note is now a sentence that names the brand and
+says what to do: *"EUKA's catalogue is not answering for HoneySticks right now
+(their error 503). Type the product name and press Enter — you can carry on
+without it."* A 5xx is also retried once, so a real blip does not send somebody
+to the typing fallback.
+
+**Suite:** `pnpm verify:brand-visibility`, 24 checks. It seeds
+`wurx_ui_state_v1` directly, because the bug lived in persisted browser state
+and that is the only place a guard can stand. It also refuses to run if no brand
+currently has the shape of the bug, rather than passing on nothing.
+
+**Also fixed:** `verify:october-product` was failing on Aqua Sonic for the same
+date reason as the three suites fixed on 2026-10-02 — it now uses
+`ensureAllTime`. That is the fourth suite in this class; see the memory note.
 
 ### The contract, redrawn — and thumbnails everywhere (2026-10-02)
 

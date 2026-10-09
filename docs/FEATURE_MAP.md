@@ -5075,3 +5075,56 @@ isolation ok, vite builds.
 above is from the code, not from looking at it. The figures are the real ones
 from the screen (0 of 10 approved, 10 still to film) — the brief quoted 4/10,
 which does not match the data.
+
+
+## Which brands the Brands screen lists (2026-10-09)
+
+`src/vendor/wurxbase/WurxUI.jsx` · `rememberedMonth`, `wxElsewhere`, the
+`brands-elsewhere` notice, `BrandsTab`'s `onPickMonth`.
+Guard: `pnpm verify:brand-visibility`.
+
+**THE LIST IS MONTH-SCOPED AND THE MONTH IS REMEMBERED IN THE BROWSER.**
+`brandRows` is built from the creators hired in the selected month plus the
+budget rows for that month. A brand with a budget and no creators therefore
+exists in exactly one month, and a browser parked on another month cannot see
+it — which is indistinguishable, on screen, from the brand never having been
+saved.
+
+That cost the team two bug reports. The giveaway each time was that **the same
+account behaved differently on two laptops**: permissions follow the account, so
+whatever differs must be machine-local. It was `wurx_ui_state_v1.month`.
+
+**The month is now stamped with the day it was chosen** and only restored on
+that day. Deliberate month-switching still survives a reload; a month does not
+survive into the next one.
+
+**And the screen names what it is not showing.** `wxElsewhere` finds brands with
+a budget in a LATER month that are absent from the current list, and the notice
+offers a one-click switch. Deliberately limited to the present and the future:
+listing every brand from every month made the notice permanent furniture.
+
+**`BrandsTab` has `month` but not `setMonth`.** Anything in it that needs to
+change the month takes `onPickMonth` from the parent — the existing convention,
+also used by `LeaderboardTab`. A bare `setMonth` inside `BrandsTab` compiles and
+throws at click time into a console nobody reads.
+
+## When a platform cannot answer for one brand (2026-10-09)
+
+`supabase/functions/collab-products/index.ts`.
+
+**A 5xx from EUKA is EUKA's, and it can be specific to one store.** HoneySticks
+503s on every attempt while Penetrex answers normally in the same second — so
+"is the platform down" and "is our key wrong" are both the wrong question. The
+way to tell is a control brand in the same run.
+
+**Never pass an upstream status code to a person.** The picker prints the note
+verbatim, so `Euka answered 503` is what somebody onboarding a creator read. The
+note now names the brand, says whose fault it is, and says what to do instead
+(type the product and press Enter — which the October product rule already
+allows for exactly this case). `upstreamStatus` carries the number for anything
+that wants it.
+
+**One retry, on 5xx only.** A blip should not send somebody to the fallback; a
+4xx is an answer and retrying it only spends the drawer's time. Not three
+retries — HoneySticks fails every time and making a person wait twelve seconds
+to be told the same thing is its own bug.

@@ -226,6 +226,35 @@ function patchUIState(patch) {
     localStorage.setItem(UI_STATE_KEY, JSON.stringify({ ...cur, ...patch }));
   } catch {}
 }
+
+/* WURX-ADDED · THE REMEMBERED MONTH EXPIRES AT THE END OF THE DAY.
+   Rashid, 2026-10-09: Asad added HoneySticks and nobody else could see it —
+   "asad is able to see the brand on his laptop but even he can't see on my
+   laptop with his own account".
+
+   THE MONTH IS REMEMBERED PER BROWSER, AND IT WAS REMEMBERED FOR EVER. The
+   Brands screen lists the brands with a creator or a budget IN THE SELECTED
+   MONTH, so a brand added for October is invisible to a browser still parked
+   on September. Proved by experiment: one account, one machine, one build,
+   only the saved month different — September hides HoneySticks, October shows
+   it. Nothing to do with permissions, which is why signing in as the person
+   who could see it changed nothing: the month came from the LAPTOP, not the
+   login.
+
+   Remembering it within a working day is the convenience it was added for.
+   Remembering it across weeks is how a browser ends up showing September in
+   November and quietly disagreeing with everybody else's. So it is stamped,
+   and a stamp from another day is ignored. Anyone deliberately working in a
+   past month still gets it back on every reload that day. */
+function todayStamp() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function rememberedMonth(state) {
+  if (!state || !state.month) return null;
+  return state.monthSavedOn === todayStamp() ? state.month : null;
+}
+/* WURX-END */
 function hiredByPalette(name) {
   switch ((name || '').trim()) {
     case 'Aris':   return { fg: '#171717', bg: '#F4F4F5', border: 'var(--wx-border-strong)' };  // soft black on warm gray
@@ -1537,7 +1566,9 @@ export default function WurxUI({
       }
     })();
   }, [eukaL30, creators, isSuper, perms, onUpdateCreator]);
-  const [month, setMonth] = useState(__initialState.month || currentMonthKey()); // default = current month
+  /* WURX-ADDED · a month remembered on another day is not restored. See
+     `rememberedMonth`. WURX-END */
+  const [month, setMonth] = useState(rememberedMonth(__initialState) || currentMonthKey()); // default = current month
   const [allTime, setAllTime] = useState(__initialState.allTime === true);
   useEffect(() => { patchUIState({ tab }); }, [tab]);
   /* God Mode writes to localStorage from a different component tree, so
@@ -1548,7 +1579,9 @@ export default function WurxUI({
     window.addEventListener('wurx-god-changed', bump);
     return () => window.removeEventListener('wurx-god-changed', bump);
   }, []);
-  useEffect(() => { patchUIState({ month }); }, [month]);
+  /* WURX-ADDED · stamped with the day, so tomorrow starts on the real month. */
+  useEffect(() => { patchUIState({ month, monthSavedOn: todayStamp() }); }, [month]);
+  /* WURX-END */
   useEffect(() => { patchUIState({ allTime }); }, [allTime]);
   // Afflix-style creator editor state: { mode: 'add'|'edit', creator?, defaultBrand? }
   const [editorState, setEditorState] = useState(null);
@@ -1899,7 +1932,13 @@ export default function WurxUI({
         </div>
 
         {tab === 'brands' && (
-          <BrandsTab creators={filtered} allCreators={creators} budgets={budgets} refetchBudgets={refetchBudgets} month={allTime ? '' : month} allTime={allTime} isSuper={isSuper} perms={perms} eukaL30={eukaL30} currentUser={currentUser} onSelectCreator={onSelectCreator} onAddCreator={openAddCreator} onEditCreator={openEditCreator} onDeleteBrand={onDeleteBrand} onSetCreatorStatus={onSetCreatorStatus} onUpdateCreator={onUpdateCreator} />
+          <BrandsTab creators={filtered} allCreators={creators} budgets={budgets} refetchBudgets={refetchBudgets} month={allTime ? '' : month} allTime={allTime} isSuper={isSuper} perms={perms} eukaL30={eukaL30} currentUser={currentUser} onSelectCreator={onSelectCreator} onAddCreator={openAddCreator} onEditCreator={openEditCreator} onDeleteBrand={onDeleteBrand} onSetCreatorStatus={onSetCreatorStatus} onUpdateCreator={onUpdateCreator}
+            /* WURX-ADDED · the "brand is in another month" notice needs to be
+               able to take you there. The month lives up here, so the setter
+               has to come down — without it the button rendered, looked
+               clickable, and threw a ReferenceError into the console that
+               nobody would ever read. WURX-END */
+            onPickMonth={(m) => { setAllTime(false); setMonth(m); }} />
         )}
         {tab === 'creators' && (
           <CreatorsTab
@@ -2006,7 +2045,7 @@ export default function WurxUI({
 }
 
 /* ════════ BRANDS TAB ════════ */
-function BrandsTab({ creators, allCreators, budgets, refetchBudgets, month, allTime, isSuper, perms, eukaL30, currentUser, onSelectCreator, onAddCreator, onEditCreator, onDeleteBrand, onSetCreatorStatus, onUpdateCreator, onDeleteCreator }) {
+function BrandsTab({ creators, allCreators, budgets, refetchBudgets, month, allTime, isSuper, perms, eukaL30, currentUser, onSelectCreator, onAddCreator, onEditCreator, onDeleteBrand, onSetCreatorStatus, onUpdateCreator, onDeleteCreator, onPickMonth }) {
   const [search, setSearch] = useState('');
   // Track only brand name (string), so re-renders pick up live data from brandRows automatically
   const [drillBrandName, setDrillBrandName] = useState(() => loadUIState().brandsDrill || null);
@@ -2072,6 +2111,42 @@ function BrandsTab({ creators, allCreators, budgets, refetchBudgets, month, allT
     });
     return Object.values(map).sort((a, b) => b.allocated - a.allocated);
   }, [creators, budgets, month, allTime]);
+
+  /* WURX-ADDED · BRANDS THAT EXIST, BUT NOT IN THE MONTH ON SCREEN.
+     The list above is built from this month's creators and this month's budget
+     rows, so a brand set up for another month is simply absent — and absent is
+     exactly what "it was never saved" looks like. This finds them so the screen
+     can say where they are.
+
+     Budget rows only: a brand with CREATORS in another month is a brand that
+     was worked then and is not news. A brand with a BUDGET and nowhere to be
+     seen is somebody wondering where their brand went. Matched
+     case-insensitively, because a budget saved as "HoneySticks" and a creator
+     row saying "Honeysticks" are the same brand to everyone but a string
+     comparison.
+
+     AND ONLY THE PRESENT OR THE FUTURE. The first cut of this listed every
+     brand from every month and read "6 brands are not here" on an ordinary
+     September — Aqua Sonic, Bentgo, Flywell and three more that nobody had
+     lost. A notice that is on the screen every day is wallpaper, and wallpaper
+     is exactly how the real one would be missed. Somebody hunting for a brand
+     is hunting for one that was set up NOW; history is not news. */
+  const wxElsewhere = useMemo(() => {
+    if (allTime || !month) return [];
+    const now = currentMonthKey();
+    const here = new Set(brandRows.map((r) => r.brand.trim().toLowerCase()));
+    const out = new Map();
+    (budgets || []).forEach((b) => {
+      const name = (b?.brand || '').trim();
+      const key = name.toLowerCase();
+      if (!name || !b.month || b.month === month || here.has(key)) return;
+      if (b.month < now) return;                 /* history is not news */
+      const prev = out.get(key);
+      if (!prev || b.month < prev.month) out.set(key, { brand: name, month: b.month });
+    });
+    return [...out.values()].sort((a, b) => a.month.localeCompare(b.month) || a.brand.localeCompare(b.brand));
+  }, [budgets, brandRows, month, allTime]);
+  /* WURX-END */
 
   const filteredBrands = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -2303,6 +2378,60 @@ function BrandsTab({ creators, allCreators, budgets, refetchBudgets, month, allT
           </button>
         )}
       </div>
+
+      {/* WURX-ADDED · A BRAND THAT EXISTS IN ANOTHER MONTH SAYS SO.
+          Rashid, 2026-10-09: Asad added HoneySticks and nobody else could find
+          it. It was never missing — it has an October budget and no creators,
+          and everyone else's browser was still on September, so the list it
+          belongs to was not the list they were looking at.
+
+          The screen had no way to say that. It showed eleven brands and no
+          hint that a twelfth existed one month over, which is indistinguishable
+          from the brand never having been saved — and that is what the whole
+          team concluded, twice. So: name them, say which month, and switch on
+          a click. One line, and only when there is something to say. */}
+      {!allTime && wxElsewhere.length > 0 && (
+        <div
+          data-wx="brands-elsewhere"
+          style={{
+            display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+            margin: '0 0 12px', padding: '10px 14px',
+            border: '1px solid color-mix(in srgb, var(--wx-accent) 32%, transparent)',
+            background: 'color-mix(in srgb, var(--wx-accent) 7%, transparent)',
+            borderRadius: 12, fontSize: 13, color: 'var(--pc-text)',
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--pc-accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+          <span>
+            {wxElsewhere.length === 1 ? (
+              <><b>{wxElsewhere[0].brand}</b> is set up in {monthLabel(wxElsewhere[0].month)}, not in {monthLabel(month)}.</>
+            ) : (
+              <>
+                <b>{wxElsewhere.length} brands</b> are set up in a later month, not in {monthLabel(month)}
+                {': '}
+                {wxElsewhere.map((b) => b.brand).slice(0, 4).join(', ')}
+                {wxElsewhere.length > 4 ? ` +${wxElsewhere.length - 4}` : ''}.
+              </>
+            )}
+          </span>
+          {[...new Set(wxElsewhere.map((b) => b.month))].sort().slice(0, 3).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => onPickMonth && onPickMonth(m)}
+              title={`Show ${monthLabel(m)}`}
+              style={{
+                border: '1px solid var(--pc-accent)', background: 'transparent',
+                color: 'var(--pc-accent)', borderRadius: 999, padding: '2px 10px',
+                fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              Show {monthLabel(m)}
+            </button>
+          ))}
+        </div>
+      )}
+      {/* WURX-END */}
 
       {filteredBrands.length === 0 ? (
         <EmptyState icon="brands" title="No active brands this month" text={search ? 'Try a different search' : 'Switch to a different month or enable All time'} />

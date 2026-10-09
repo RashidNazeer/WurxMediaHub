@@ -26,7 +26,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { launchBrowser } from './browser.mjs';
+import { launchBrowser, ensureAllTime } from './browser.mjs';
 import { assertDevProject } from './lib/dev-guard.mjs';
 const require = createRequire(import.meta.url);
 const { createClient } = require('@supabase/supabase-js');
@@ -92,6 +92,14 @@ try {
     const back0 = page.locator('.pc-back');
     if (await back0.first().isVisible().catch(() => false)) { await back0.first().click(); await page.waitForTimeout(2500); }
     await page.waitForSelector('.pc-bt-row', { timeout: 30000 }).catch(() => {});
+    /* ALL TIME, OR THE CALENDAR DECIDES WHAT THIS FILE CAN TEST. The Brands
+       screen lists the brands active in the selected month, and this check
+       needs two specific ones — a brand with a catalogue and a brand without.
+       Aqua Sonic has no October work, so on 1 October the no-catalogue half
+       started reporting "Aqua Sonic is not on the Brands screen" about a brand
+       that is simply not being worked this month. Nothing here is about the
+       month. */
+    await ensureAllTime(page);
     await page.waitForTimeout(800);
     const row = page.locator('.pc-bt-row')
       .filter({ has: page.locator('.pc-brandname', { hasText: new RegExp(`^\\s*${brand}\\s*$`) }) }).first();
