@@ -61,19 +61,41 @@ export function launchBrowser(options = {}) {
  *
  * Active state is read the way the button draws it: accent fill, white text.
  */
-export async function ensureAllTime(page, { timeout = 15000 } = {}) {
+export async function ensureAllTime(page, { timeout = 20000 } = {}) {
   const btn = page.getByRole('button', { name: /^all time$/i }).first();
-  if (!(await btn.count().catch(() => 0))) return false;
   const isOn = async () => {
     const color = await btn.evaluate((el) => getComputedStyle(el).color).catch(() => '');
     return /rgb\(255,\s*255,\s*255\)/.test(color);
   };
-  if (await isOn()) return true;
-  await btn.click().catch(() => {});
+
+  /*
+   * IT TAKES AS MANY CLICKS AS IT TAKES, up to three.
+   *
+   * One click and a wait was not enough and the way it failed was nasty: the
+   * button is present the moment the brands table paints, but a click landing
+   * before React has wired its handler does nothing at all. The suite then ran
+   * against the CURRENT MONTH without saying so, and a brand whose creators
+   * were hired this month and have not filmed yet has no products — so
+   * `verify:product-groups` reported "Penetrex: 0 product groups" perhaps one
+   * run in three. A flaky guard is worse than no guard: it teaches people to
+   * re-run until it is green.
+   *
+   * Returning false is a real answer and callers should treat it as a failure,
+   * not shrug: everything measured afterwards would be about a month nobody
+   * chose.
+   */
   const until = Date.now() + timeout;
-  while (Date.now() < until) {
+  for (let attempt = 1; attempt <= 3 && Date.now() < until; attempt += 1) {
+    if (!(await btn.count().catch(() => 0))) {
+      await page.waitForTimeout(800);
+      continue;
+    }
     if (await isOn()) { await page.waitForTimeout(1200); return true; }
-    await page.waitForTimeout(250);
+    await btn.click({ timeout: 5000 }).catch(() => {});
+    for (let i = 0; i < 12 && Date.now() < until; i += 1) {
+      await page.waitForTimeout(250);
+      if (await isOn()) { await page.waitForTimeout(1200); return true; }
+    }
   }
-  return false;
+  return await isOn().catch(() => false);
 }
