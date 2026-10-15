@@ -13,11 +13,31 @@
 
 ## NEXT ACTION
 
-**Updated 2026-09-29, after the product groups shipped.**
+**Updated 2026-10-15, on a NEW LAPTOP.** Rashid replaced the machine and copied
+the repo and the memory folder across. Memory arrived complete (38 indexed
+files, none missing). **What did NOT come across: every CLI and every
+credential** — see "Setting this machine up" below before running anything.
 
-Nothing is queued. The last thing done was **the missing-brand bug** (entry
-below). Before that: the creator Home UI brief, the contract redesign, the
-thumbnail backfill, two Irwin fixes and product groups. All on dev.
+**Two things are open and both are waiting on him:**
+
+1. **Irwin's October video count.** Nothing is missing — Reacher's 37 October
+   videos for our creators are all stored. The brand screen shows **13** because
+   it counts creators HIRED that month, not videos POSTED that month; 26 of
+   October's videos belong to September's creators. He was asked whether to
+   count by posted date instead — it would read 39 rather than 13 and match
+   TikTok, but it changes figures the team reads daily, so it was not done. He
+   also said "28 to be exact", which matches none of 13 / 26 / 37 / 39 — **ask
+   where he is reading 28.** Full detail in the memory note
+   `a-month-means-the-hiring-month`.
+2. **The creator Home redesign.** See below.
+
+A demo creator exists for looking at the creator screens with data in them:
+`rudely@wurxmedia.com` / `1234567890` (OPERATIONS, "A demo creator with a full
+history").
+
+Before that: the missing-brand bug, the creator Home UI brief, the contract
+redesign, the thumbnail backfill, two Irwin fixes and product groups. All on
+dev, at `5e7a1fc`.
 
 **Waiting on Rashid:** the creator Home redesign. The prompt is written
 (`docs/CREATOR_HOME_UI_BRIEF.md`, also copied to
@@ -42,6 +62,51 @@ worked. Do NOT start step 4 or 5 of the signup plan unprompted; step 4 needs a
 TikTok scope he has not applied for yet.
 
 Everything below is context, not instructions.
+
+## Setting this machine up (2026-10-15)
+
+The laptop was replaced. The repo, `.env.local`, `node_modules`, `.vercel/` and
+the whole memory folder were copied across. **Nothing else was.**
+
+**Installed:** git only.
+**Missing:** Node, npm, pnpm, Python, the Supabase CLI, the Vercel CLI, `gh`.
+
+**`.env.local` DID come across** and still carries `VITE_SUPABASE_URL`,
+`VITE_SUPABASE_PUBLISHABLE_KEY`, `STITCH_API`, `RESEND_API`, `REACHER_API` and
+`CRUVA`. So the browser build and the Reacher/Cruva probes work as soon as Node
+is installed.
+
+**What is genuinely gone is `~\.wurx\cli-secrets.env`**, the file every CLI
+command loads. It is not in the repo and never was — it is deliberately the one
+place those secrets live. It has to be recreated with:
+
+| Key | Where it comes from |
+|---|---|
+| `SUPABASE_ACCESS_TOKEN` | Supabase → Account → Access Tokens |
+| `SUPABASE_DB_PASSWORD_DEV` / `_PROD` | Supabase → Project → Database settings |
+| `VERCEL_TOKEN` | Vercel → Account Settings → Tokens |
+| `GH_TOKEN`, `GITHUB_USERNAME` | GitHub → Developer settings |
+| `TWENTYFIRST_API_KEY` | 21st.dev |
+
+The two project refs are NOT secret and are already known: dev
+`npznoiotslruqovorrec` (it is inside `VITE_SUPABASE_URL`), prod
+`isqepjioowzqoyhlusqo`. **The service-role key is never stored anywhere** — it
+is fetched at run time, OPERATIONS §2.
+
+Also missing: the user environment variables `STITCH_API` and
+`TWENTYFIRST_API_KEY`, which `.mcp.json` reads as `${...}`. They live in the
+ENVIRONMENT, not in `.env.local`, so both MCP servers fail to authenticate until
+they are set.
+- The old paths were `C:\Users\RA_shid\...`; this machine is
+  `C:\Users\Rashid\...`. Any helper script carrying the old path needs editing
+  — `scratchpad\wurx-env.ps1` is recreated per session from OPERATIONS §2 and
+  will carry the old path if copied verbatim.
+
+Where each secret comes from: Supabase tokens from the Supabase dashboard
+(Account → Access Tokens) and the project settings; `VERCEL_TOKEN` from Vercel
+→ Account Settings → Tokens; `GH_TOKEN` from GitHub → Developer settings; the
+Reacher and 21st keys from their own dashboards. **The service-role key is never
+stored** — it is fetched at run time, see OPERATIONS §2.
 
 ## Standing reminders for Rashid
 
