@@ -198,7 +198,7 @@ the browser. Route-level code splitting. Sensible `staleTime` per resource.
 
 ## Environments
 
-`dev` branch → wurxmediahubdev.vercel.app → Supabase `wurxmediahub-dev`
+`dev` branch → wurxmediahubdev.vercel.app → Supabase `CreatorHub` (`qinxwfdwvpkzfhcijuqw`, org Prism, moved 2026-10-27; the old `wurxmediahub-dev` is retired, see OPERATIONS)
 `main` branch → wurxmediahub.vercel.app → Supabase `wurxmediahub-prod`
 
 **PRISM has its own home: prismwurx.vercel.app**, and Rashid asked that it not

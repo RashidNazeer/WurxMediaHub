@@ -158,7 +158,7 @@ So a function's dependencies cannot be installed or audited by `pnpm`. Deploy
 with the Supabase CLI:
 
 ```powershell
-supabase functions deploy <name> --project-ref npznoiotslruqovorrec
+supabase functions deploy <name> --project-ref qinxwfdwvpkzfhcijuqw
 ```
 
 Service-role keys live in Edge Function secrets and nowhere else. They never

@@ -13,6 +13,28 @@
 
 ## NEXT ACTION
 
+**Updated 2026-10-27, by the database move.** The Hub's dev database is now **CreatorHub** (`qinxwfdwvpkzfhcijuqw`, org Prism,
+ap-southeast-1). The old `wurxmediahub-dev` (`npznoiotslruqovorrec`, org WurxMedia) is retired: only ever paused, never deleted.
+Everything that moved, why, how it was proven and the traps are in `docs/OPERATIONS.md` under "The Hub moved to CreatorHub".
+
+**State at the moment of the switch:** `wurxmediahubdev.vercel.app` was switched to CreatorHub. **The `prism` Vercel project
+(`prismwurx.vercel.app`, the separate Prism repo) was NOT changed and still points at the OLD database**, because Rashid had not
+said to move it. Ask him. Until it moves, anything entered there lands in the retired database.
+
+**Open, in this order:**
+1. Move the Prism site off the old database (needs Rashid's yes), or leave it for the Prism rebuild.
+2. The values only Rashid has: Euka keys (`EUKA_API_KEY` main account, `EUKA_API_KEYS` extra accounts), `AUDIT_API_URL` / `AUDIT_API_KEY`,
+   and the TikTok values if TikTok comes back. Put them in `~\.wurx\cli-secrets.env`, then I set them as function secrets and switch on
+   `euka-ads-cycle`, `collab-angles-cycle` and `tiktok-nightly` (all INACTIVE on CreatorHub; only `reacher-cycle` runs).
+3. Move the 20 Edge Functions and 92 scripts to the `sb_secret` / `sb_publishable` keys, then disable the legacy keys and revoke the legacy
+   signing key (closes the JWT-secret exposure of 2026-10-27).
+4. Several browser suites are stale against the redesigned screens (the apply form is on `/apply`, `/signup` is a different page, the creator
+   Home was redesigned): `verify:rls` passes 22 of 22; `contests` money logic passes; fix the screen checks.
+5. Token expiry: GitHub 2027-01-24, Vercel 2027-10-27.
+
+**Before starting any of it, ask him:** "Compaction done. Shall I move ahead with the Prism site and the Euka keys?" Wait for a yes.
+
+## Earlier next action (2026-10-15, setting up a new laptop)
 **Updated 2026-10-15, on a NEW LAPTOP.** Rashid replaced the machine and copied
 the repo and the memory folder across. Memory arrived complete (38 indexed
 files, none missing). **What did NOT come across: every CLI and every

@@ -161,7 +161,7 @@ is applying this one.
 ```powershell
 git fetch origin
 git checkout feature/creative-angle-auto-categorise
-supabase db push          # dev project, npznoiotslruqovorrec
+supabase db push          # dev project, qinxwfdwvpkzfhcijuqw
 ```
 
 Then three checks, in the SQL editor or `supabase db query`. **The second one

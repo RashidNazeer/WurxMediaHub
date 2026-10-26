@@ -133,7 +133,7 @@ applies — there is nothing to disturb — so log in once, then stop.
 Then link the repository to the DEV project:
 
 ```powershell
-supabase link --project-ref npznoiotslruqovorrec
+supabase link --project-ref qinxwfdwvpkzfhcijuqw
 ```
 
 This writes `supabase/.temp/`, which is gitignored. **A git worktree does not
@@ -202,7 +202,7 @@ pnpm shots            # retina screenshots for design review
 environment. Fetch it at run time; never write it to a file:
 
 ```powershell
-$keys = supabase projects api-keys --project-ref npznoiotslruqovorrec --output json | ConvertFrom-Json
+$keys = supabase projects api-keys --project-ref qinxwfdwvpkzfhcijuqw --output json | ConvertFrom-Json
 foreach ($k in $keys) { if ($k.name -eq 'service_role') { $env:SUPABASE_SERVICE_KEY = $k.api_key } }
 ```
 
@@ -238,7 +238,8 @@ so all three now serve PRISM.
 
 | Project             | Ref                    | Status                              |
 | ------------------- | ---------------------- | ----------------------------------- |
-| `wurxmediahub-dev`  | `npznoiotslruqovorrec` | ACTIVE, and this is the one you use |
+| `CreatorHub` (dev)  | `qinxwfdwvpkzfhcijuqw` | ACTIVE, ap-southeast-1, org Prism. Dev since 2026-10-27, the one you use |
+| `wurxmediahub-dev`  | `npznoiotslruqovorrec` | RETIRED 2026-10-27 (org WurxMedia went over its free quota). Only ever paused, never deleted. |
 | `wurxmediahub-prod` | `isqepjioowzqoyhlusqo` | **INACTIVE / paused**               |
 
 **There is only one dev database and both PRISM sites share it.** `prismwurx`
@@ -420,7 +421,7 @@ Several bugs were only ever found by asking the browser what it painted:
 [ ] pnpm build          -> passes (this runs the token guards too)
 [ ] git config user.name / user.email set globally
 [ ] git push to a throwaway branch, confirm GitHub auth works, delete it
-[ ] supabase login, then supabase link --project-ref npznoiotslruqovorrec
+[ ] supabase login, then supabase link --project-ref qinxwfdwvpkzfhcijuqw
 [ ] supabase migration list  -> connects and lists ~93 applied migrations
 [ ] sign in at /login as a creator account -> you see real numbers
 [ ] read CLAUDE.md, then PARKED.md

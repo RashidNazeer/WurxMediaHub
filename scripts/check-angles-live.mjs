@@ -22,7 +22,7 @@
  * project ref is fixed below and never read from the environment.
  */
 
-const REF = 'npznoiotslruqovorrec';
+const REF = 'qinxwfdwvpkzfhcijuqw';
 const BASE = `https://${REF}.supabase.co`;
 const KEY = process.env.SUPABASE_SERVICE_KEY ?? '';
 const SECRET = process.env.COLLAB_ANGLES_SYNC_SECRET ?? '';

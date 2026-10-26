@@ -15,7 +15,8 @@ previous sessions. If something here is wrong, fix it here first.
 | Vercel projects   | `wurxmediahub` (main), `wurxmediahubdev` (dev)                                                        |
 | Dev URL           | https://wurxmediahubdev.vercel.app                                                                    |
 | Prod URL          | https://wurxmediahub.vercel.app                                                                       |
-| Supabase dev ref  | `npznoiotslruqovorrec`                                                                                |
+| Supabase dev ref  | `qinxwfdwvpkzfhcijuqw` (CreatorHub, org Prism, ap-southeast-1; moved 2026-10-27, see "The Hub moved to CreatorHub" below) |
+| Supabase OLD dev  | `npznoiotslruqovorrec` (`wurxmediahub-dev`, org WurxMedia): RETIRED, only ever paused, never deleted |
 | Supabase prod ref | `isqepjioowzqoyhlusqo`                                                                                |
 | Supabase org      | `ivvtjbvjviwqotlwrqeh` ("Wurx Media")                                                                 |
 | Commit identity   | `Rashid Nazeer <286085480+RashidNazeer@users.noreply.github.com>`                                     |
@@ -500,6 +501,12 @@ the Edge Function. Never treat the URL as a security boundary.
 - `System.Drawing` cannot save over a file it has open. Save to temp, then copy.
 - Wildcard `Remove-Item` is sometimes blocked by the sandbox. Delete by explicit
   path.
+- **npm 11 skips postinstall scripts unless you allow them.** Seen 2026-10-19
+  installing `@anthropic-ai/claude-code` globally: npm printed
+  `install-scripts ... not yet covered by allowScripts` as a *warning* and exited
+  0, with the postinstall (`node install.cjs`) not run. Re-running with
+  `npm install -g --allow-scripts=<pkg> <pkg>` fixed it. Read the warning block,
+  not the exit code. Not yet checked for the Supabase or Vercel CLIs.
 
 **`PGRST303: JWT issued at future`, a 401 you can ignore ONCE.** Seen on
 2026-08-25 on the first request after a scripted sign-in, and not again in
@@ -879,7 +886,7 @@ would otherwise sail through. Pointing `.env.local` anywhere else produces:
 ```
 REFUSING TO RUN.
 check-tiktok.mjs creates and deletes data, so it only ever runs against the DEV
-project (npznoiotslruqovorrec).
+project (qinxwfdwvpkzfhcijuqw).
 ```
 
 **WurxBase's and Paid Collaborations' databases are unreachable from here.**
@@ -907,7 +914,7 @@ project.** Separation by project is gone; separation by schema replaces it.
 
 | what | where | reached by |
 | --- | --- | --- |
-| WurxMediaHub | `public` on `npznoiotslruqovorrec` | our code |
+| WurxMediaHub | `public` on `qinxwfdwvpkzfhcijuqw` | our code |
 | WurxBase | `wurxbase` on the same project | the vendored app, through one seam |
 | ~~WurxBase's old project~~ | `bnevtdezskftlrjjgbsg` | retired, data copied out |
 | ~~Paid Collaborations~~ | `pfkpgmpicjcirnogxkac` | the project no longer exists |
@@ -2250,3 +2257,74 @@ supabase inspect db table-sizes --linked
 
 Run `calls` twice a minute apart and subtract: that is a rate, and a runaway loop shows as hundreds of calls a minute on one statement. A paused project (prod, today) uses nothing. Realtime messages, egress and log ingestion all scale with how many times a row is written AND how many sessions listen: a table in the `supabase_realtime` publication that is written often is the first suspect. The 2026-10-27 case is in DECISIONS.md ("The shared settings row looped through every open session").
 
+## The Hub moved to CreatorHub (2026-10-27)
+
+**Why.** The WurxMedia Supabase organisation went over its free quota (the `wurxbase.app_settings` echo loop, fixed in
+commit 398a372: 6.5M reads and 2.7M writes of one row in 90 days). Projects cannot be transferred while an
+organisation is in its grace period, so the Hub was REBUILT in a new project instead.
+
+| | ref | where | state |
+| --- | --- | --- | --- |
+| **CreatorHub** (dev from now on) | `qinxwfdwvpkzfhcijuqw` | org **Prism**, ap-southeast-1 | ACTIVE. The Hub is internal-team-only now, so Singapore suits the team. Rashid chose both the region and the org. |
+| `wurxmediahub-dev` (old dev) | `npznoiotslruqovorrec` | org WurxMedia, us-east-1 | RETIRED. Only ever paused, **never deleted**. |
+| `wurxmediahub-prod` | `isqepjioowzqoyhlusqo` | org WurxMedia | INACTIVE, not part of this move. |
+
+**What was proven before the switch** (all by comparing, not by trusting a count): 66 tables, 180,299 rows, identical row for
+row to the old project (with sorted keys and UTC); 58 storage files identical by hash; 121 policies, 160 functions, every
+grant and every column identical in `public`, `wurxbase`, `auth` and `storage`; a throwaway user created BEFORE the backup
+signs in on the new project with its original password (the bcrypt hash survived). `verify:rls` passes 22 of 22 there.
+
+**Which Vercel project points at what** (found by reading each live site's public code, since sensitive variables cannot be read back):
+
+| site | Vercel project | repo | database |
+| --- | --- | --- | --- |
+| wurxmediahubdev.vercel.app | `wurxmediahubdev` | WurxMediaHub, branch `dev` | **CreatorHub** (switched 2026-10-27) |
+| prismwurx.vercel.app | `prism` | the separate **Prism** repo, `main` | **STILL THE OLD DEV DATABASE. NOT CHANGED**: it is a different project and Rashid had not said to move it. It shares data with the Hub, so until it is moved, anything entered there lands in the retired database. |
+| prism.wurxmedia.com | `prism-wurxmedia` | none (CLI deploys) | the old Prism project, already paused |
+| wurxmediahub.vercel.app | `wurxmediahub` | WurxMediaHub, `main` | prod, paused |
+
+### What a new Supabase project needs BEFORE the first migration (this order matters)
+
+1. **Default privileges.** A fresh project gives `anon` and `authenticated` blanket read, insert, update and delete on every
+   NEW table, which silently defeats the column-level grants that stop people editing their own role and tier. Make them match
+   the old project first: `alter default privileges for role postgres in schema public revoke select, insert, update, delete on
+   tables from anon, authenticated; ... revoke all on sequences from anon, authenticated; ... revoke execute on functions from
+   anon, authenticated, service_role;`
+2. **`public.rls_auto_enable()` and the `ensure_rls` event trigger** (the "automatic RLS" setting). No migration creates them.
+3. **Push migrations by address, never by `supabase link`:** `supabase db push --db-url postgresql://postgres.<ref>:<password>@<pooler host>:5432/postgres`,
+   checking the ref in the URL first. The repo is now linked to CreatorHub, so a plain `supabase db push` also targets it.
+4. **A marker** (`comment on database postgres is 'WURX_HUB_RESTORE_TARGET <ref>'`) that the restore script must read back
+   before it truncates anything, so it can never run against the wrong project.
+5. After the data: set the auth hook, `mailer_autoconfirm`, `site_url`, `uri_allow_list` and `password_min_length`
+   (the Management API `config/auth`), and expose the `wurxbase` schema (`postgrest` `db_schema`).
+
+### Secrets: Supabase will not give them back
+
+`supabase secrets list` and the Management API return only a SHA-256 fingerprint of each Edge Function secret, never the value,
+so they cannot be copied from one project to another. On CreatorHub: the 4 `*_SYNC_SECRET` values were generated fresh and set in
+BOTH the function secrets and the vault; `REACHER_API_KEY` was copied from `.env.local` (matched by fingerprint). **NOT SET YET:**
+`EUKA_API_KEY` and `EUKA_API_KEYS` (one key per Euka account: the main one covers about ten stores, Nutra's account has its own),
+the seven `TIKTOK_*` values, and `AUDIT_API_URL` / `AUDIT_API_KEY`. Until they exist the cron jobs `euka-ads-cycle`, `tiktok-nightly`
+and `collab-angles-cycle` are INACTIVE on CreatorHub (only `reacher-cycle` runs), or they would fail every few minutes. Vault `*_url`
+values hold the project address, so they were REWRITTEN to CreatorHub, not copied.
+
+### Tools and backups (outside the repo on purpose)
+
+`D:\Milestone\backup-tools\`: `backup.mjs`, `verify.mjs`, `catalog-diff.mjs`, `restore.mjs` (dry run unless `--confirm`),
+`verify-restore.mjs`, `restore-storage.mjs`, `relink.mjs`, `topup.sh`. `D:\Milestone\backups\hub-dev-*` hold the backups, **with password
+hashes and private files: never commit, upload or paste them.** The restore is repeatable (it truncates and reloads in one transaction).
+
+### Tokens expire. Write the date down.
+
+The Vercel and GitHub tokens were 90-day tokens and both died on 2026-10-26, mid-migration. Now: GitHub fine-grained token expires
+**2027-01-24**; Vercel token (scope **All Projects**; this form lets you pick ONE project, and a token made for one project cannot see
+the others) expires **2027-10-27**. The Supabase token has no expiry.
+
+### Still to do
+
+* Move the Prism site (`prism` project) off the old database, once Rashid says so.
+* **Legacy keys.** All 20 Edge Functions read `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_ANON_KEY` and 92 scripts use a legacy service key. Move them
+  to the `sb_secret` / `sb_publishable` keys, then disable the legacy keys and revoke the legacy signing key. A comparison script printed
+  70 characters of CreatorHub's legacy JWT secret on 2026-10-27; only that revoke closes it fully (CreatorHub already signs every new login
+  with an ES256 key). **Mask `jwt_secret` and anything secret-like in every printout.**
+* The Euka, TikTok and Audit values above.

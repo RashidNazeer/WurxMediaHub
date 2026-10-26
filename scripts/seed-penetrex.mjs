@@ -46,7 +46,7 @@ const URL_ = env.VITE_SUPABASE_URL ?? '';
 // Creates and deletes data. Dev only, checked before anything runs.
 assertDevProject(URL_, 'seed-penetrex.mjs');
 const SERVICE = process.env.SUPABASE_SERVICE_KEY;
-const DEV_REF = 'npznoiotslruqovorrec';
+const DEV_REF = 'qinxwfdwvpkzfhcijuqw';
 
 if (!SERVICE) throw new Error('SUPABASE_SERVICE_KEY must be set');
 if (!URL_.includes(DEV_REF)) {

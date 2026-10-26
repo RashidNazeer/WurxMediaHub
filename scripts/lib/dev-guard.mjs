@@ -17,8 +17,14 @@
  * through, which is the failure mode a blocklist always has.
  */
 
-/** The dev project. Changing this is a deliberate act, not a convenience. */
-export const DEV_REF = 'npznoiotslruqovorrec';
+/**
+ * The dev project. Changing this is a deliberate act, not a convenience.
+ *
+ * MOVED 2026-10-27: dev is CreatorHub (ap-southeast-1, org Prism) now. The old
+ * `wurxmediahub-dev` project (npznoiotslruqovorrec, org WurxMedia) went over its
+ * free quota and is retired, only ever paused, never deleted.
+ */
+export const DEV_REF = 'qinxwfdwvpkzfhcijuqw';
 
 export function assertDevProject(url, what = 'This script') {
   const u = String(url ?? '');

@@ -164,7 +164,7 @@ console.log('\nWired into the screen:');
 
 /* ─────────────────────────── the data half ─────────────────────────── */
 const KEY = process.env.SUPABASE_SERVICE_KEY ?? '';
-const BASE = 'https://npznoiotslruqovorrec.supabase.co';
+const BASE = 'https://qinxwfdwvpkzfhcijuqw.supabase.co';
 
 if (!KEY) {
   console.log('\nPer-brand product coverage:');
