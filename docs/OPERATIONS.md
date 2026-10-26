@@ -2307,10 +2307,11 @@ remote is not configured on this laptop, so only `origin` was pushed. Do not pus
 
 `supabase secrets list` and the Management API return only a SHA-256 fingerprint of each Edge Function secret, never the value,
 so they cannot be copied from one project to another. On CreatorHub: the 4 `*_SYNC_SECRET` values were generated fresh and set in
-BOTH the function secrets and the vault; `REACHER_API_KEY` was copied from `.env.local` (matched by fingerprint). **NOT SET YET:**
-`EUKA_API_KEY` and `EUKA_API_KEYS` (one key per Euka account: the main one covers about ten stores, Nutra's account has its own),
-the seven `TIKTOK_*` values, and `AUDIT_API_URL` / `AUDIT_API_KEY`. Until they exist the cron jobs `euka-ads-cycle`, `tiktok-nightly`
-and `collab-angles-cycle` are INACTIVE on CreatorHub (only `reacher-cycle` runs), or they would fail every few minutes. Vault `*_url`
+BOTH the function secrets and the vault; `REACHER_API_KEY` was copied from `.env.local` (matched by fingerprint). **Euka (2026-10-27):** `EUKA_API_KEY` is set on CreatorHub from a NEW "all brands" key Rashid created. It sees 12 of the 13 stores (everything except
+NUTRAHARMONY STORE, which has its OWN Euka account) and the function reports `eukaAccountsUnavailable: 0`. `euka-ads-cycle` is ACTIVE; its first run
+processed 5 units, 3 ok and 2 failed, both NUTRAHARMONY ("no Euka key we hold owns this store any more"). **Still missing: Nutra's own key**, which goes in
+`EUKA_API_KEYS`. **Not set:** the seven `TIKTOK_*` values (TikTok is not needed for now) and `AUDIT_API_URL` / `AUDIT_API_KEY`. Until those exist
+`tiktok-nightly` and `collab-angles-cycle` are INACTIVE on CreatorHub, or they would fail every few minutes. Vault `*_url`
 values hold the project address, so they were REWRITTEN to CreatorHub, not copied.
 
 ### Tools and backups (outside the repo on purpose)
@@ -2331,4 +2332,4 @@ the others) expires **2027-10-27**. The Supabase token has no expiry.
   to the `sb_secret` / `sb_publishable` keys, then disable the legacy keys and revoke the legacy signing key. A comparison script printed
   70 characters of CreatorHub's legacy JWT secret on 2026-10-27; only that revoke closes it fully (CreatorHub already signs every new login
   with an ES256 key). **Mask `jwt_secret` and anything secret-like in every printout.**
-* The Euka, TikTok and Audit values above.
+* Nutra's Euka key (`EUKA_API_KEYS`), the Audit values, and the TikTok values if TikTok returns. Revoke the OLD Euka keys in Euka once the old project is retired for good.

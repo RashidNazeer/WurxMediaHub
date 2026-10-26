@@ -22,9 +22,9 @@ Prism repo; switched by redeploying its last production build, no code change). 
 
 **Open, in this order:**
 1. The Prism repo is behind the Hub repo (it lacks 398a372 and 1af0014). Push `dev` to the `prism` remote once that remote is configured and Rashid says which branch.
-2. The values only Rashid has: Euka keys (`EUKA_API_KEY` main account, `EUKA_API_KEYS` extra accounts), `AUDIT_API_URL` / `AUDIT_API_KEY`,
-   and the TikTok values if TikTok comes back. Put them in `~\.wurx\cli-secrets.env`, then I set them as function secrets and switch on
-   `euka-ads-cycle`, `collab-angles-cycle` and `tiktok-nightly` (all INACTIVE on CreatorHub; only `reacher-cycle` runs).
+2. Nutra's own Euka key (`EUKA_API_KEY` is set from the new all-brands key and covers 12 of 13 stores; NUTRAHARMONY needs `EUKA_API_KEYS`), then
+   `AUDIT_API_URL` / `AUDIT_API_KEY` (switches on `collab-angles-cycle`), and the TikTok values only if TikTok returns. `euka-ads-cycle` and
+   `reacher-cycle` are ACTIVE on CreatorHub; `tiktok-nightly` and `collab-angles-cycle` are inactive.
 3. Move the 20 Edge Functions and 92 scripts to the `sb_secret` / `sb_publishable` keys, then disable the legacy keys and revoke the legacy
    signing key (closes the JWT-secret exposure of 2026-10-27).
 4. Several browser suites are stale against the redesigned screens (the apply form is on `/apply`, `/signup` is a different page, the creator
