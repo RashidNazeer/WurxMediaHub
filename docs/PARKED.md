@@ -2423,3 +2423,29 @@ real, and it is the address used to pay and contact them.
 **Trigger:** when Rashid raises verification. Needs SMTP proven FIRST, then
 confirmation switched on LAST — turning it on breaks both signup paths unless
 the flow survives it, which it is built to.
+
+
+## 45. Retire the old Supabase project `wurxmediahub-dev` (the checks, then Rashid deletes it)
+
+**Status:** PAUSED, on purpose. Rashid pauses the old project on 2026-10-27 and chose to come back to this **two weeks later, on or after 2026-11-10**.
+
+**Raise it when:** that date arrives, in the first session on or after it. Say it yourself, do not wait to be asked: "It is two weeks since the move, shall
+I run the checks before you delete the old project?" Do not delete anything. **Rashid deletes the project himself; the project rules say never to delete a project without asking.**
+
+**The old project** is `npznoiotslruqovorrec` (org WurxMedia, us-east-1). The Hub now runs on CreatorHub (`qinxwfdwvpkzfhcijuqw`). See OPERATIONS, "The Hub moved to CreatorHub".
+
+**The checks, ALL of which must be true before he deletes it:**
+1. **Two weeks of normal running on CreatorHub** with nothing missing: the cron jobs (`reacher-cycle`, `euka-ads-cycle`) succeeding, the team using the Hub, the Prism site working. Look at
+   `cron.job_run_details`, `reacher_sync_runs`, and the Euka function's answer in `net._http_response`.
+2. **The secrets that exist ONLY in the old project.** Supabase never returns a function secret's value, so these are in no file here: **`AUDIT_API_URL` and `AUDIT_API_KEY`**
+   (Rashid did not have them to hand), the seven **`TIKTOK_*`** values (TikTok is not needed for now), and the old project's own Euka main key. Ask whether he now has
+   the Audit values. If not, THEY ARE LOST FOR GOOD the moment the project is deleted, so say that plainly. A paused project still holds them.
+3. **A second copy of the backups off this laptop.** `D:\Milestone\backups\hub-dev-*` is the only other copy of the data. It holds password hashes and private files: a USB stick, not a shared drive.
+4. **Free paused projects may expire.** My understanding (unverified) is that a free project paused for about 90 days can no longer be restored. Check Supabase's current rule and, if it applies,
+   take any final copy before that date. A pause is not a permanent shelf.
+5. **Euka keys.** The all-brands key is NEW. Nutra's key is the SAME key the old project had, and it is in use on CreatorHub now. When revoking old Euka keys, revoke only the **old main key**
+   (the old project's `EUKA_API_KEY`), NEVER Nutra's.
+6. Re-run `catalog-diff` / `verify` style checks only if something looks off; the old project is read-only reference now.
+
+**Related, same trigger:** the legacy Supabase keys (all 20 Edge Functions and 92 scripts still use them) and the 70 characters of CreatorHub's legacy JWT secret that a script printed on 2026-10-27:
+move to the `sb_secret` / `sb_publishable` keys, then disable the legacy keys and revoke the legacy signing key. Also: the Prism repo is behind the Hub repo (lacks 398a372 and the later commits).

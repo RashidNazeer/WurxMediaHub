@@ -20,11 +20,13 @@ Everything that moved, why, how it was proven and the traps are in `docs/OPERATI
 **State:** both live sites now run on CreatorHub: `wurxmediahubdev.vercel.app` (Hub repo, `dev`) and `prismwurx.vercel.app` (the `prism` Vercel project,
 Prism repo; switched by redeploying its last production build, no code change). `prism.wurxmedia.com` is on the old Prism project, already paused, and is not ours.
 
+**ON OR AFTER 2026-11-10, raise PARKED 45 yourself:** Rashid paused the old project on 2026-10-27 and asked to come back to deleting it two weeks later. Run the checks in PARKED 45
+(especially the Audit and TikTok values that exist ONLY in the old project, and a second copy of the backups); he deletes it himself.
+
 **Open, in this order:**
 1. The Prism repo is behind the Hub repo (it lacks 398a372 and 1af0014). Push `dev` to the `prism` remote once that remote is configured and Rashid says which branch.
-2. Nutra's own Euka key (`EUKA_API_KEY` is set from the new all-brands key and covers 12 of 13 stores; NUTRAHARMONY needs `EUKA_API_KEYS`), then
-   `AUDIT_API_URL` / `AUDIT_API_KEY` (switches on `collab-angles-cycle`), and the TikTok values only if TikTok returns. `euka-ads-cycle` and
-   `reacher-cycle` are ACTIVE on CreatorHub; `tiktok-nightly` and `collab-angles-cycle` are inactive.
+2. The Audit values (`AUDIT_API_URL` / `AUDIT_API_KEY`, which switch on `collab-angles-cycle`), and the TikTok values only if TikTok returns. **Euka is complete**: the new
+   all-brands key plus Nutra's key cover 13 of 13 stores. `euka-ads-cycle` and `reacher-cycle` are ACTIVE; `tiktok-nightly` and `collab-angles-cycle` are inactive.
 3. Move the 20 Edge Functions and 92 scripts to the `sb_secret` / `sb_publishable` keys, then disable the legacy keys and revoke the legacy
    signing key (closes the JWT-secret exposure of 2026-10-27).
 4. Several browser suites are stale against the redesigned screens (the apply form is on `/apply`, `/signup` is a different page, the creator
