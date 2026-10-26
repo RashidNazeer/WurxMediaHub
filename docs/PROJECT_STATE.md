@@ -17,12 +17,11 @@
 ap-southeast-1). The old `wurxmediahub-dev` (`npznoiotslruqovorrec`, org WurxMedia) is retired: only ever paused, never deleted.
 Everything that moved, why, how it was proven and the traps are in `docs/OPERATIONS.md` under "The Hub moved to CreatorHub".
 
-**State at the moment of the switch:** `wurxmediahubdev.vercel.app` was switched to CreatorHub. **The `prism` Vercel project
-(`prismwurx.vercel.app`, the separate Prism repo) was NOT changed and still points at the OLD database**, because Rashid had not
-said to move it. Ask him. Until it moves, anything entered there lands in the retired database.
+**State:** both live sites now run on CreatorHub: `wurxmediahubdev.vercel.app` (Hub repo, `dev`) and `prismwurx.vercel.app` (the `prism` Vercel project,
+Prism repo; switched by redeploying its last production build, no code change). `prism.wurxmedia.com` is on the old Prism project, already paused, and is not ours.
 
 **Open, in this order:**
-1. Move the Prism site off the old database (needs Rashid's yes), or leave it for the Prism rebuild.
+1. The Prism repo is behind the Hub repo (it lacks 398a372 and 1af0014). Push `dev` to the `prism` remote once that remote is configured and Rashid says which branch.
 2. The values only Rashid has: Euka keys (`EUKA_API_KEY` main account, `EUKA_API_KEYS` extra accounts), `AUDIT_API_URL` / `AUDIT_API_KEY`,
    and the TikTok values if TikTok comes back. Put them in `~\.wurx\cli-secrets.env`, then I set them as function secrets and switch on
    `euka-ads-cycle`, `collab-angles-cycle` and `tiktok-nightly` (all INACTIVE on CreatorHub; only `reacher-cycle` runs).

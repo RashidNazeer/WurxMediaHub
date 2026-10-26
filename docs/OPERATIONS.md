@@ -2279,9 +2279,14 @@ signs in on the new project with its original password (the bcrypt hash survived
 | site | Vercel project | repo | database |
 | --- | --- | --- | --- |
 | wurxmediahubdev.vercel.app | `wurxmediahubdev` | WurxMediaHub, branch `dev` | **CreatorHub** (switched 2026-10-27) |
-| prismwurx.vercel.app | `prism` | the separate **Prism** repo, `main` | **STILL THE OLD DEV DATABASE. NOT CHANGED**: it is a different project and Rashid had not said to move it. It shares data with the Hub, so until it is moved, anything entered there lands in the retired database. |
+| prismwurx.vercel.app | `prism` | the separate **Prism** repo, `main` | **CreatorHub** (switched 2026-10-27 by redeploying its last production build with the new settings; no code and no repo change). Proven by reading its live code and by a real sign-in. |
 | prism.wurxmedia.com | `prism-wurxmedia` | none (CLI deploys) | the old Prism project, already paused |
 | wurxmediahub.vercel.app | `wurxmediahub` | WurxMediaHub, `main` | prod, paused |
+
+**The Prism repo has drifted from the Hub repo.** `prismwurx` was built from the Prism repo at commit 9dbdc1a, so it lacks the Hub commits
+398a372 (the app-side `app_settings` fix) and 1af0014. That does not re-open the loop on CreatorHub: migration 20261028090000 (a trigger that
+skips updates which change nothing) is in the database and ends the loop by itself even for old code. CLAUDE.md says push both remotes; the `prism`
+remote is not configured on this laptop, so only `origin` was pushed. Do not push to Prism `main` without Rashid saying so: it deploys `prismwurx`.
 
 ### What a new Supabase project needs BEFORE the first migration (this order matters)
 
@@ -2322,7 +2327,6 @@ the others) expires **2027-10-27**. The Supabase token has no expiry.
 
 ### Still to do
 
-* Move the Prism site (`prism` project) off the old database, once Rashid says so.
 * **Legacy keys.** All 20 Edge Functions read `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_ANON_KEY` and 92 scripts use a legacy service key. Move them
   to the `sb_secret` / `sb_publishable` keys, then disable the legacy keys and revoke the legacy signing key. A comparison script printed
   70 characters of CreatorHub's legacy JWT secret on 2026-10-27; only that revoke closes it fully (CreatorHub already signs every new login
