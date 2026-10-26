@@ -29,6 +29,7 @@
     "verify:tiktok": "node scripts/check-tiktok.mjs",
     "verify:performance": "node scripts/check-performance.mjs",
     "verify:session": "node scripts/check-session.mjs",
+    "verify:settings-sync": "node scripts/verify-settings-sync.mjs",
     "verify:apply": "node scripts/check-apply.mjs",
     "verify:review": "node scripts/check-review.mjs",
     "verify:brands": "node scripts/check-brands.mjs",

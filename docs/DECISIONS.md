@@ -2757,3 +2757,18 @@ throughout. Flag on under `prefers-reduced-motion`: Lenis does not mount at all.
 **Not proved:** cost on a real phone (every browser suite runs `--disable-gpu`),
 and the Paid Collabs suspension on screen, which needs staff credentials this
 machine does not have.
+
+## The shared settings row looped through every open session, and ate the organisation's Supabase quota (2026-10-27)
+
+**Found by Rashid's usage warnings on the Free plan (organisation "WurxMedia", shared by every project in it):** Realtime messages 6.0M of 2M, egress 21.8 GB of 5 GB, log ingestion 12.2 GB of 1 GB. Not Prism (a 16 MB database, about 55,000 requests): this project, `wurxmediahub-dev` (prod is paused), found with `supabase inspect db calls --linked`: 9.9M API requests in 90 days, and the top two statements were ONE row, `wurxbase.app_settings` (id 1): **6.56M reads and 2.68M writes**, at 26 writes and 81 reads a second at the moment of looking (two snapshots 99 seconds apart).
+
+**The loop (`src/vendor/wurxbase/App.jsx`, the settings block):** a fetch put the row's values into React state as NEW arrays; the persist effect for that state (`hired_by_team`, `custom_brands`, `brand_order`) saw a change and upserted the same values; the update was broadcast to every session (the table is in `supabase_realtime`, replica identity FULL, so each message carries the old and the new row); every session fetched (twice, there were two subscriptions to the row) and saved again. Each fetch returned the whole row (egress), each request was logged (log ingestion), each write was a Realtime message, and Realtime's WAL polling of a table written 26 times a second cost about 12 hours of database CPU.
+
+**Two independent layers, both live:**
+1. **Database** (`20261028090000_app_settings_ignore_unchanged_saves.sql`): `suppress_redundant_updates_trigger()` on `wurxbase.app_settings`. A save that changes nothing makes no row version, no WAL and no broadcast. Applied to dev 2026-10-27; the rate fell from 26 writes a second to about 5 a minute within two minutes. To undo: `drop trigger a_ignore_unchanged_saves on wurxbase.app_settings;`. No data was created, changed or removed.
+2. **App** (`src/vendor/wurxbase/settingsSync.js`, used by `App.jsx`): a mirror of what the server last held for each key. A value that came FROM the server (or that it accepted from us) is never written back; a fetched value is applied only if it differs from the last one seen; one realtime subscription instead of two (it also reads the row once whenever it (re)connects); NO 30 second timer at all any more (it re-read the row in every open tab for ever, "in case realtime missed a message"; now the row is read on connect and when a backgrounded tab is looked at again); fetches go through a gate (a burst of events is one more fetch, not a pile). A real edit still saves once. `hideBrand`/`showBrand` still save explicitly (even before the first load, as before) and tell the mirror.
+
+**Proof without a browser** (a browser robot must never be pointed at the WurxBase screens, rule 33 in PARKED.md): `pnpm verify:settings-sync` models the row, three sessions and the database broadcast. The OLD behaviour never settles (5,000 writes in 5,000 steps and still going), the NEW one writes nothing back after loading, a real edit is exactly one write, key order from the database does not matter, an old-format list is converted once, and the database rule alone also ends the loop for the old code.
+
+**How to look for this again:** `supabase inspect db calls --linked` (and `outliers`, `db-stats`) from the project folder, read-only, names the statements that dominate; take two snapshots a minute apart to see a rate. See OPERATIONS.md "Where is the Supabase quota going".
+

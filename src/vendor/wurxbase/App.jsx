@@ -8,6 +8,7 @@ import { fetchBrandContracts } from './brandContract';
 import CreativeAngles from './CreativeAngles';
 import AccessControl from './AccessControl';
 import { can } from './access';
+import { createFetchGate, createSettingsMirror } from './settingsSync';
 
 /* WURX-ADDED · IS THIS ASAD?
    Their gates asked `currentUser?.id !== 'asad' && currentUser?.username !==
@@ -12015,6 +12016,9 @@ export default function App({ tab, onTabChange, embedded = false } = {}) {
   const settingsLoadedRef   = useRef(false);  // prevents saving before load completes
   const settingsSaveTimer   = useRef(null);
   const pendingSettingsPatch = useRef({});
+  // what the server last told us each shared setting is (see settingsSync.js): a value that came FROM it is never written back
+  const settingsMirror        = useRef(createSettingsMirror());
+  const settingsGate          = useRef(null);
 
   // KPIs
   const [kpiCreators, setKpiCreators] = useState(0);
@@ -12405,20 +12409,14 @@ export default function App({ tab, onTabChange, embedded = false } = {}) {
         { event: '*', schema: 'wurxbase', table: 'app_settings', filter: 'id=eq.1' },
         () => { fetchSettings(); }
       )
-      .subscribe();
+      // when the live connection comes up (first time, or after a dropped network) read the row once, so nothing missed while it was
+      // down stays missed: this is what the timer below used to be for
+      .subscribe((status) => { if (status === 'SUBSCRIBED') fetchSettings(); });
     return () => { supabase.removeChannel(ch); };
   }, [currentUser?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ── App settings realtime sync (hidden brands, brand order, etc.) ── */
-  useEffect(() => {
-    const channel = supabase
-      .channel('app_settings_sync')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'wurxbase', table: 'app_settings', filter: 'id=eq.1' },
-        () => fetchSettings()
-      )
-      .subscribe();
-    return () => supabase.removeChannel(channel);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  /* (A second subscription to the same row used to sit here: every settings change fetched twice per session. The one above
+      already listens to every event on the row.) */
 
   /* ── Startup notifications disabled · user reported them as noise on app load.
        Overdue/deadline/due-today info is still visible inside the dashboard views. ── */
@@ -12428,9 +12426,31 @@ export default function App({ tab, onTabChange, embedded = false } = {}) {
   // Immediate save
   function saveSettingNow(patch) {
     if (!settingsLoadedRef.current) return;
+    /*
+     * ONLY WHAT WOULD CHANGE SOMETHING. A value that just came from the server (or that the server already accepted from us)
+     * is not written back: that echo is what looped the whole team's sessions through this row, millions of times
+     * (settingsSync.js has the story). A real edit still differs, so it still saves, once.
+     */
+    const keys = settingsMirror.current.changed(patch);
+    if (!keys.length) return;
+    const body = {};
+    keys.forEach((k) => { body[k] = patch[k]; });
+    supabase.from('app_settings')
+      .upsert({ id: 1, ...body }, { onConflict: 'id' })
+      .then(({ error }) => {
+        if (error) console.error('saveSettingNow failed:', error);
+        else keys.forEach((k) => settingsMirror.current.seen(k, body[k]));
+      });
+  }
+  // An explicit click (hide or show a brand) saves even before the first load finished, as it always did; it still tells the
+  // mirror what the server now holds, so the next fetch is not mistaken for a change.
+  function saveSettingForced(patch, label) {
     supabase.from('app_settings')
       .upsert({ id: 1, ...patch }, { onConflict: 'id' })
-      .then(({ error }) => { if (error) console.error('saveSettingNow failed:', error); });
+      .then(({ error }) => {
+        if (error) console.error(label + ' save failed:', error);
+        else Object.entries(patch).forEach(([k, v]) => settingsMirror.current.seen(k, v));
+      });
   }
   // Debounced save - for rapid changes like drag reorder
   function scheduleSettingsSave(patch) {
@@ -12447,18 +12467,35 @@ export default function App({ tab, onTabChange, embedded = false } = {}) {
      * arrive and set the state.
      */
     if (!settingsLoadedRef.current) return;
+    // nothing to schedule when it is what the server already holds (see saveSettingNow)
+    if (!settingsMirror.current.changed(patch).length) return;
     Object.assign(pendingSettingsPatch.current, patch);
     if (settingsSaveTimer.current) clearTimeout(settingsSaveTimer.current);
     settingsSaveTimer.current = setTimeout(() => {
-      const toPatch = { ...pendingSettingsPatch.current };
+      const wanted = { ...pendingSettingsPatch.current };
       pendingSettingsPatch.current = {};
+      // checked again at the moment of writing: a fetch may have brought the same value in during the 600ms
+      const keys = settingsMirror.current.changed(wanted);
+      if (!keys.length) return;
+      const toPatch = {};
+      keys.forEach((k) => { toPatch[k] = wanted[k]; });
       supabase.from('app_settings')
         .upsert({ id: 1, ...toPatch }, { onConflict: 'id' })
-        .then(({ error }) => { if (error) console.error('scheduleSettingsSave failed:', error); });
+        .then(({ error }) => {
+          if (error) console.error('scheduleSettingsSave failed:', error);
+          else keys.forEach((k) => settingsMirror.current.seen(k, toPatch[k]));
+        });
     }, 600);
   }
 
-  async function fetchSettings() {
+  // Every caller (the first load, the realtime event, the 30 second poll) goes through one gate: at most one fetch at a time, and a burst
+  // of "changed" events is ONE more fetch afterwards, not a pile of them.
+  function fetchSettings() {
+    if (!settingsGate.current) settingsGate.current = createFetchGate(loadSettings);
+    return settingsGate.current();
+  }
+
+  async function loadSettings() {
     const { data, error } = await supabase.from('app_settings').select('*').eq('id', 1).single();
     /*
      * DID THIS ACTUALLY LOAD? The flag below used to be set at the end of this
@@ -12478,12 +12515,20 @@ export default function App({ tab, onTabChange, embedded = false } = {}) {
         { onConflict: 'id' }
       );
       loaded = !seedErr;
+      if (!seedErr) { ['hidden_brands', 'brand_order', 'custom_brands'].forEach((k) => settingsMirror.current.seen(k, [])); }
     }
     if (data) {
-      if (Array.isArray(data.brand_order)  && data.brand_order.length)  { setBrandOrder(data.brand_order);  localStorage.setItem('brandOrder',   JSON.stringify(data.brand_order)); }
-      if (Array.isArray(data.hidden_brands)) { setHiddenBrands(data.hidden_brands); localStorage.setItem('hiddenBrands', JSON.stringify(data.hidden_brands)); }
-      if (Array.isArray(data.custom_brands) && data.custom_brands.length) { setCustomBrands(data.custom_brands); localStorage.setItem('customBrands', JSON.stringify(data.custom_brands)); }
-      if (Array.isArray(data.hired_by_team) && data.hired_by_team.length) {
+      /*
+       * A value is applied only when it DIFFERS from what the server last told us. Setting the same data again as a brand new
+       * array made React run the persist effects below, which wrote it straight back: the echo that looped every session
+       * through this row (see settingsSync.js). Whatever the server says is remembered either way.
+       */
+      const m = settingsMirror.current;
+      const fresh = (key) => { const changed = m.differs(key, data[key]); m.seen(key, data[key]); return changed; };
+      if (fresh('brand_order')   && Array.isArray(data.brand_order)  && data.brand_order.length)  { setBrandOrder(data.brand_order);  localStorage.setItem('brandOrder',   JSON.stringify(data.brand_order)); }
+      if (fresh('hidden_brands') && Array.isArray(data.hidden_brands)) { setHiddenBrands(data.hidden_brands); localStorage.setItem('hiddenBrands', JSON.stringify(data.hidden_brands)); }
+      if (fresh('custom_brands') && Array.isArray(data.custom_brands) && data.custom_brands.length) { setCustomBrands(data.custom_brands); localStorage.setItem('customBrands', JSON.stringify(data.custom_brands)); }
+      if (fresh('hired_by_team') && Array.isArray(data.hired_by_team) && data.hired_by_team.length) {
         const saved = data.hired_by_team;
         if (typeof saved[0] === 'string') {
           setHiredByTeam(saved.map(n => DEFAULT_TEAM.find(d => d.name === n) || { id: n.toLowerCase(), name: n, color: 'var(--wx-text-faint)', bg: '#F3F4F6' }));
@@ -12498,11 +12543,13 @@ export default function App({ tab, onTabChange, embedded = false } = {}) {
 
   useEffect(() => { fetchSettings(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Polling fallback · re-fetch settings every 30s so hidden_brands stays in sync
-  // even if Supabase realtime misses a message (tab was backgrounded, etc.)
+  // NO TIMER. This used to re-fetch every 30 seconds "in case realtime missed a message", in every open tab, for ever. The live
+  // subscription already delivers every change, reads the row again whenever it (re)connects (above), and here the row is read once
+  // more whenever a tab that was in the background is looked at again, which is the one moment a message could really have been missed.
   useEffect(() => {
-    const iv = setInterval(fetchSettings, 30000);
-    return () => clearInterval(iv);
+    const back = () => { if (document.visibilityState === 'visible') fetchSettings(); };
+    document.addEventListener('visibilitychange', back);
+    return () => document.removeEventListener('visibilitychange', back);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist settings - brandOrder debounced (rapid drag changes), rest immediate
@@ -13067,18 +13114,14 @@ export default function App({ tab, onTabChange, embedded = false } = {}) {
     setHiddenBrands(next);
     setAllBrands(prev => prev.filter(b => b !== brand)); // instant visual remove
     if (activeBrand === brand) setActiveBrand('All');
-    supabase.from('app_settings')
-      .upsert({ id: 1, hidden_brands: next }, { onConflict: 'id' })
-      .then(({ error }) => { if (error) console.error('hideBrand save failed:', error); });
+    saveSettingForced({ hidden_brands: next }, 'hideBrand');
     localStorage.setItem('hiddenBrands', JSON.stringify(next));
   }
 
   function showBrand(brand) {
     const next = hiddenBrands.filter(b => b !== brand);
     setHiddenBrands(next);
-    supabase.from('app_settings')
-      .upsert({ id: 1, hidden_brands: next }, { onConflict: 'id' })
-      .then(({ error }) => { if (error) console.error('showBrand save failed:', error); });
+    saveSettingForced({ hidden_brands: next }, 'showBrand');
     localStorage.setItem('hiddenBrands', JSON.stringify(next));
     fetchCreators(); // repopulate allBrands so brand tab reappears
   }

@@ -2236,3 +2236,17 @@ creator flow and refuses there - "start again", never a wrong identity.
 **If Connect breaks for everyone after a deploy**, check `DISPLAY_SCOPES`
 against the TikTok app's own Scopes page. More in our array than on the app and
 TikTok refuses the authorise URL outright.
+
+## Where is the Supabase quota going? (added 2026-10-27)
+
+The Free plan's limits belong to the ORGANISATION, so a warning says nothing about which project caused it. Read-only, from the project's own folder (it is linked):
+
+```bash
+supabase inspect db db-stats --linked     # database size, cache hit rate
+supabase inspect db calls --linked        # the statements called most: one row hammered millions of times shows up first
+supabase inspect db outliers --linked     # the ones that cost the most time
+supabase inspect db table-sizes --linked
+```
+
+Run `calls` twice a minute apart and subtract: that is a rate, and a runaway loop shows as hundreds of calls a minute on one statement. A paused project (prod, today) uses nothing. Realtime messages, egress and log ingestion all scale with how many times a row is written AND how many sessions listen: a table in the `supabase_realtime` publication that is written often is the first suspect. The 2026-10-27 case is in DECISIONS.md ("The shared settings row looped through every open session").
+
