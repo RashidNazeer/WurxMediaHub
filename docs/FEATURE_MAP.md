@@ -19,6 +19,39 @@ truth. This map is the second layer, not the only one.
 
 ---
 
+## Backup data (whole-database backup and restore)
+
+**Files:** `supabase/migrations/20261027120000_backup_data.sql` (schema `backup`,
+tables `public.data_backups` and `public.data_restore_runs`),
+`supabase/functions/backup-data/index.ts`, `src/routes/admin/Backups.tsx`,
+`src/components/admin/backups/*`, `src/lib/admin/useBackups.ts`,
+`src/lib/backup/*` (file format, encryption, download and upload orchestration),
+`scripts/backup-database.mjs`, `scripts/restore-database.mjs`, `scripts/test-backup-*.mjs`.
+Full description and the disaster-recovery steps: `docs/BACKUPS.md`.
+
+**What it reads:** every table in every application schema (`public`, `wurxbase`, and any
+added later; found from the catalogue, not from a list), plus `auth.users` and `auth.identities`.
+**What it writes:** on a restore, all of those (emptied and refilled in one
+transaction); always `audit_log`, `data_backups`, `data_restore_runs`, `backup.chunks`.
+
+**What touches it (so a change elsewhere must be checked against it):**
+
+- **A new table, in any schema,** is backed up automatically. If it has a foreign key INTO an
+  existing table and was created after a backup was taken, restoring that old backup is refused
+  (it would wipe the new table), with a message naming the table.
+- **A new column** is fine: restoring an older backup gives it its default. **A dropped column**
+  is reported as a warning and its old values are not restored.
+- **A trigger that writes** (audit, updated_at, sign-up) is switched off during the restore, so
+  restored rows are exactly as backed up. Triggers on `auth.users` cannot be switched off and run
+  (the profiles the sign-up trigger creates are cleared again before the real rows go in).
+- **`audit_log`'s shape** must keep the columns `backup.audit()` writes
+  (`actor_id, actor_email, actor_role, action, subject_type, subject_id, detail`).
+- **A table that must NOT be backed up or wiped** (scratch, bookkeeping) has to be added to the
+  exclusion list in `backup.introspect()`, and must not hold a foreign key to restored tables.
+- **Roles:** a restore refuses if the acting admin would not be an active `admin` in the backup.
+
+---
+
 ## How much of a job has been filmed (job_progress)
 
 **Files:** `src/lib/work/job-progress.ts`, `src/components/work/JobProgress.tsx`,

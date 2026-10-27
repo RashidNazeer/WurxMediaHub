@@ -208,6 +208,7 @@ const AdminContestSetup = screen(() => import('@/routes/admin/ContestSetup'), 'C
 const AdminContent = screen(() => import('@/routes/admin/Content'), 'AdminContent');
 const AdminActivity = screen(() => import('@/routes/admin/Activity'), 'Activity');
 const AdminClientLinks = screen(() => import('@/routes/admin/ClientLinks'), 'ClientLinks');
+const AdminBackups = screen(() => import('@/routes/admin/Backups'), 'Backups');
 const AdminTikTok = screen(() => import('@/routes/admin/TikTokSettings'), 'TikTokSettings');
 const AdminPaidCollabs = screen(() => import('@/routes/admin/PaidCollabs'), 'PaidCollabs');
 const AdminBrands = screen(() => import('@/routes/admin/Brands'), 'Brands');
@@ -247,6 +248,7 @@ const PREFETCH: Record<string, () => Promise<unknown>> = {
   '/admin': () => import('@/routes/admin/AdminDashboard'),
   '/admin/applications': () => import('@/routes/admin/Applications'),
   '/admin/activity': () => import('@/routes/admin/Activity'),
+  '/admin/backups': () => import('@/routes/admin/Backups'),
   '/admin/tiktok': () => import('@/routes/admin/TikTokSettings'),
   // Deliberately NOT prefetched: it is a very large vendored bundle and nobody
   // who never opens it should download it on a hover.
@@ -636,6 +638,28 @@ export const router = createBrowserRouter([
         HydrateFallback: RouteFallback,
         lazy: lazyRoute(() => import('@/components/layout/ShellLayout'), 'ShellLayout'),
         children: [{ path: '/admin/client-links', element: <AdminClientLinks /> }],
+      },
+    ],
+  },
+
+  {
+    /*
+     * BACKUP DATA, ADMIN ONLY, narrower even than client links.
+     *
+     * A backup holds every account, every password hash and the TikTok
+     * connection details, and a restore can replace the whole database. The
+     * guard only picks the screen: the real boundary is the backup-data Edge
+     * Function, which re-reads the caller's role from the profiles table, asks
+     * for the password again before a download or a restore, and writes the
+     * audit log. Widening this list by mistake would give somebody a screen
+     * whose every button is refused.
+     */
+    Component: () => <RequireAuth allow={['admin']} />,
+    children: [
+      {
+        HydrateFallback: RouteFallback,
+        lazy: lazyRoute(() => import('@/components/layout/ShellLayout'), 'ShellLayout'),
+        children: [{ path: '/admin/backups', element: <AdminBackups /> }],
       },
     ],
   },

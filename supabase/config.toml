@@ -496,3 +496,9 @@ verify_jwt = false
 # platform's JWT gate on would simply refuse every client.
 [functions.collab-share]
 verify_jwt = false
+
+# Backup data. Admin only, and the function re-checks that itself (role admin,
+# read from the profiles table, plus the password again for download and
+# restore). The platform check stays on as a second lock in front of it.
+[functions.backup-data]
+verify_jwt = true

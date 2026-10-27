@@ -421,6 +421,21 @@ dashboard, so prod gets it from the same migration.
 
 SVG is deliberately not allowed: it can carry script.
 
+## 4a. Backups (added 2026-10-27)
+
+Admin screen **Data > Backup data**; the design and the disaster-recovery steps are in
+`docs/BACKUPS.md`. Deploy order on a project: `supabase db push`, then
+`supabase functions deploy backup-data --project-ref <ref>`. It needs `pg_cron` (already used
+by the nightly syncs). Do dev first and rehearse on real data before prod.
+
+Command line: `pnpm backup:database` and `pnpm restore:database` need `DATABASE_URL`, which
+holds the database password: environment only, never a file.
+
+Tests: `pnpm test:backup` (no setup), `pnpm test:backup:live` and `pnpm test:backup:function`
+(need `supabase start`; the function one also `supabase functions serve backup-data`). To sign in
+as an admin on a local stack, enable `[auth.hook.custom_access_token]` in that stack's
+`config.toml` (hosted projects already have the hook).
+
 ## 4b. Edge Functions
 
 ```powershell
