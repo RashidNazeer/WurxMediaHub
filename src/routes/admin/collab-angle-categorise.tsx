@@ -30,6 +30,8 @@ type Progress = {
   skipped: number;
   failed: number;
   needs_review: number;
+  /** Videos failing for a reason that looks like the Gemini model (outage or quota). 0 when an older function omits it. */
+  model_failures: number;
   /** Every video the brand posted this month. 0 when an older function omits it. */
   total_videos: number;
   /** How many of those already sit in an angle. 0 when an older function omits it. */
@@ -66,12 +68,25 @@ const PHASE_WORDS: Record<string, string> = {
  * `functions.invoke` hides the real error body behind `error.context`, which is
  * the raw Response. Same approach as `messageFrom` in `src/lib/tiktok.ts`.
  */
+/** The HTTP status behind a `functions.invoke` error, when there was a response. */
+function statusOf(error: unknown): number | undefined {
+  const status = (error as { context?: Response })?.context?.status;
+  return typeof status === 'number' ? status : undefined;
+}
+
 async function messageFrom(error: unknown, fallback: string): Promise<string> {
   const ctx = (error as { context?: Response })?.context;
+  const status = statusOf(error);
+  let detail = '';
   if (ctx && typeof ctx.json === 'function') {
     try {
       const body = await ctx.clone().json();
       if (body?.error) return String(body.error);
+      /* The gateway and the edge runtime answer in their own shape, with
+         `message` and no `error`: {"code":401,"message":"Invalid JWT"}, or a
+         boot error. Without reading it the screen can only say "refused",
+         which is how one transient 503 became a mystery. */
+      if (typeof body?.message === 'string') detail = body.message;
     } catch {
       /* not JSON: fall through to the translations below */
     }
@@ -90,8 +105,15 @@ async function messageFrom(error: unknown, fallback: string): Promise<string> {
       'the request.';
   }
   if (/non-2xx/i.test(raw)) {
-    return 'The categorising service refused the request. Try again, and if it ' +
-      'keeps happening the server log will say why.';
+    if (status === 401) {
+      return 'Your sign-in was not accepted. Sign out and back in, then try again.';
+    }
+    return `The categorising service returned an error${status ? ` (${status})` : ''}` +
+      `${detail ? `: ${detail}` : ''}. ` +
+      (status !== undefined && status >= 500
+        ? 'This is usually temporary, so try again in a moment. '
+        : 'Try again. ') +
+      'If it keeps happening, the collab-angles function log will say why.';
   }
   return raw;
 }
@@ -104,28 +126,46 @@ async function messageFrom(error: unknown, fallback: string): Promise<string> {
  */
 const CALL_TIMEOUT_MS = 20_000;
 
+/* A 502, 503 or 504 comes from the platform in front of the function, and
+   retrying is safe: collab-angles is idempotent. `angles.progress` only reads,
+   and `angles.start` skips every video that is already filed or queued. One
+   transient 503 once reached the screen as "refused the request" when the very
+   next call would have worked. A 500 is NOT retried: that is the function's own
+   handler failing, and it may already have written part of its work. */
+const TRANSIENT_STATUSES = new Set([502, 503, 504]);
+const RETRY_DELAYS_MS = [1_000, 3_000];
+
 async function callAngles<T>(body: Record<string, unknown>, fallback: string): Promise<T> {
-  const abort = new AbortController();
-  const timer = window.setTimeout(() => abort.abort(), CALL_TIMEOUT_MS);
-  let data: unknown;
-  let error: unknown;
-  try {
-    ({ data, error } = await getSupabase().functions.invoke('collab-angles', {
-      body,
-      signal: abort.signal,
-    }));
-  } catch (e) {
-    throw new Error(
-      abort.signal.aborted
-        ? 'The server did not answer in 20 seconds. Try again in a moment.'
-        : await messageFrom(e, fallback),
-    );
-  } finally {
-    window.clearTimeout(timer);
+  for (let attempt = 0; ; attempt += 1) {
+    const abort = new AbortController();
+    const timer = window.setTimeout(() => abort.abort(), CALL_TIMEOUT_MS);
+    let data: unknown;
+    let error: unknown;
+    try {
+      ({ data, error } = await getSupabase().functions.invoke('collab-angles', {
+        body,
+        signal: abort.signal,
+      }));
+    } catch (e) {
+      throw new Error(
+        abort.signal.aborted
+          ? 'The server did not answer in 20 seconds. Try again in a moment.'
+          : await messageFrom(e, fallback),
+      );
+    } finally {
+      window.clearTimeout(timer);
+    }
+    if (error) {
+      const status = statusOf(error);
+      if (status !== undefined && TRANSIENT_STATUSES.has(status) && attempt < RETRY_DELAYS_MS.length) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+        continue;
+      }
+      throw new Error(await messageFrom(error, fallback));
+    }
+    if ((data as { error?: string } | null)?.error) throw new Error((data as { error: string }).error);
+    return data as T;
   }
-  if (error) throw new Error(await messageFrom(error, fallback));
-  if ((data as { error?: string } | null)?.error) throw new Error((data as { error: string }).error);
-  return data as T;
 }
 
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
@@ -143,6 +183,7 @@ function toProgress(raw: unknown): Progress {
     skipped: num(r.skipped),
     failed: num(r.failed),
     needs_review: num(r.needs_review),
+    model_failures: num(r.model_failures),
     total_videos: num(r.total_videos),
     already_categorised: num(r.already_categorised),
     running_batch: rb
@@ -339,7 +380,21 @@ export function CollabAngleCategorise({ brand, month, canEdit, onFiled }: Props)
       line += `. About ${mins} min left (estimate)`;
     }
   }
-  const shown = error ?? note ?? line;
+  /* THE MODEL BEING DOWN IS NOT A PROBLEM WITH THESE VIDEOS, and without this
+     line the only sign is a number of failed videos with no reason. The audit
+     machine's `module_failed` is nearly always the free Gemini quota (about 500
+     requests a day, resetting daily), but it is also what a broken dependency
+     says, hence "most likely". */
+  const modelNote = progress && progress.model_failures > 0
+    ? `${progress.model_failures} video${progress.model_failures === 1 ? '' : 's'} could not be analysed. ` +
+      'Most likely the Gemini API is not working or its daily quota is used up ' +
+      '(the free key allows about 500 requests a day and resets daily). ' +
+      'They are tried again automatically, with longer waits while it stays down.'
+    : null;
+  const problem = error !== null || (note === null && modelNote !== null);
+  /* The start message ("Already categorising 5 videos") is about what the
+     person just did, so it comes before the standing note about the model. */
+  const shown = error ?? note ?? modelNote ?? line;
 
   return (
     <div className="wx-cat" data-busy={busy ? 'true' : 'false'}>
@@ -390,8 +445,8 @@ export function CollabAngleCategorise({ brand, month, canEdit, onFiled }: Props)
       </div>
       {shown && (
         <p
-          className={'wx-cat-status' + (error ? ' wx-cat-status-err' : '')}
-          role={error ? 'alert' : 'status'}
+          className={'wx-cat-status' + (problem ? ' wx-cat-status-err' : '')}
+          role={problem ? 'alert' : 'status'}
         >
           {shown}
         </p>

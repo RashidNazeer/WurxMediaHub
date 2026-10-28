@@ -45,11 +45,21 @@ import {
   tiktokVideoId,
 } from '../_shared/audit-api.ts';
 import { filePlacements } from '../_shared/angle-store.ts';
+import {
+  chargesAttempt,
+  cooldownLeft,
+  envError,
+  environmentalFailure,
+  MAX_OFFLINE_MS,
+} from '../_shared/angle-backoff.ts';
 
 const STAFF = ['ops', 'admin', 'ads_manager'];
 const BATCH_SIZE = 5;
 const LEASE_MS = 3 * 60_000;
 const MAX_ATTEMPTS = 3;
+/* The audit machine refuses a brief label longer than this with a 422
+   (Backend/app/schemas.py), and a refusal used to repeat every minute. */
+const LABEL_MAX = 80;
 
 const Body = z.object({ budgetMs: z.number().int().min(15_000).max(110_000).optional() });
 
@@ -90,6 +100,56 @@ async function release(db: SupabaseClient, id: string, patch: Record<string, unk
   await db.from('collab_angle_batches').update({ lease_until: null, ...patch }).eq('id', id);
 }
 
+/**
+ * Put videos back in the queue, charging an attempt or not.
+ *
+ * A video that has used `MAX_ATTEMPTS` is `failed` and stays so until somebody
+ * resets it. `charge: false` is for failures that were never the video's fault
+ * (see `_shared/angle-backoff.ts`), so a dead quota cannot spend a queue's
+ * retries.
+ */
+async function requeueVideos(
+  db: SupabaseClient,
+  rows: Array<{ id: string; attempts: number | null; reason?: string }>,
+  reason: string,
+  charge: (id: string) => boolean,
+) {
+  for (const row of rows) {
+    const attempts = Number(row.attempts ?? 0) + (charge(row.id) ? 1 : 0);
+    await db.from('collab_angle_videos').update({
+      status: attempts >= MAX_ATTEMPTS ? 'failed' : 'queued',
+      attempts,
+      batch_id: null,
+      last_error: (row.reason ?? reason).slice(0, 500),
+    }).eq('id', row.id);
+  }
+}
+
+/** The same, for everything still attached to a batch that cannot go on. */
+async function requeueBatch(db: SupabaseClient, batchId: string, reason: string, charge: boolean) {
+  const { data } = await db
+    .from('collab_angle_videos')
+    .select('id, attempts')
+    .eq('batch_id', batchId);
+  await requeueVideos(
+    db,
+    (data ?? []) as Array<{ id: string; attempts: number | null }>,
+    reason,
+    () => charge,
+  );
+}
+
+/** How long a new batch must still wait after environmental failures. */
+async function waitLeft(db: SupabaseClient): Promise<number> {
+  const { data } = await db
+    .from('collab_angle_batches')
+    .select('finished_at, error')
+    .not('finished_at', 'is', null)
+    .order('finished_at', { ascending: false })
+    .limit(10);
+  return cooldownLeft((data ?? []) as Array<{ finished_at: string | null; error: string | null }>);
+}
+
 /** This brand's briefs, in the shape the audit machine wants them. */
 async function briefsFor(db: SupabaseClient, brand: string): Promise<BriefRef[]> {
   const { data } = await db
@@ -113,7 +173,7 @@ async function briefsFor(db: SupabaseClient, brand: string): Promise<BriefRef[]>
       url: b.brief_url,
       /* The machine hands this back as the brief a video followed, and an
          empty label would be useless on the way back. */
-      label: (b.product ?? '').trim() || brand,
+      label: ((b.product ?? '').trim() || brand).slice(0, LABEL_MAX),
       angles: b.angles ?? [],
     }));
 }
@@ -212,9 +272,11 @@ async function fileBatch(db: SupabaseClient, batch: Batch, job: Awaited<ReturnTy
 
   const { data: rows } = await db
     .from('collab_angle_videos')
-    .select('id, video_id, video_url')
+    .select('id, video_id, video_url, attempts')
     .eq('batch_id', batch.id);
-  const mine = (rows ?? []) as Array<{ id: string; video_id: string; video_url: string }>;
+  const mine = (rows ?? []) as Array<
+    { id: string; video_id: string; video_url: string; attempts: number | null }
+  >;
   const byVideoId = new Map(mine.map((r) => [r.video_id, r]));
 
   /* Matched by video id, never by comparing the link text: the machine is
@@ -250,16 +312,72 @@ async function fileBatch(db: SupabaseClient, batch: Batch, job: Awaited<ReturnTy
     already = res.alreadyFiled;
   }
 
+  /* Anything the machine could not place at all. */
+  const placedIds = new Set(toFile.map((t) => t.row.id));
+  const unplacedById = new Map(
+    job.unplaced.map((u) => [tiktokVideoId(u.video ?? ''), u.reason ?? 'not placed']),
+  );
+  const unplaced = mine
+    .filter((row) => !placedIds.has(row.id))
+    .map((row) => ({
+      row,
+      reason: String(
+        unplacedById.get(row.video_id) ?? job.error ?? 'the audit did not return this video',
+      ),
+    }));
+
+  /* WHY A VIDEO CAME BACK WITHOUT AN ANSWER DECIDES WHETHER IT IS CHARGED. When
+     nothing in the batch was confidently placed and every reason is the
+     environment (the Gemini quota, TikTok refusing the machine), the videos did
+     nothing wrong. See `_shared/angle-backoff.ts`.
+
+     The "could not tell" notes are included on purpose. A quota that dies
+     during the vision or judging pass does not always produce `unplaced`
+     videos: the audit machine files them as `needs_review` placements whose
+     note is "no visual evidence" or "the angle judgement returned nothing", and
+     without counting those the batch would look like a success. */
+  const nVideos = mine.length;
+  const environment = environmentalFailure(
+    [...toFile.filter((t) => t.review).map((t) => t.note), ...unplaced.map((u) => u.reason)],
+    { confidentCount: confident.length, nVideos },
+  );
+
   const filedSet = new Set(filed);
   const alreadySet = new Set(already);
+  /* Videos that must go round again: a review placement on its first go, and a
+     placement that filing neither wrote nor recognised (both charged), and
+     review placements that were really the environment (not charged). */
+  const again: Array<{ id: string; attempts: number | null; reason: string }> = [];
+  const free: Array<{ id: string; attempts: number | null; reason: string }> = [];
+  let reviewed = 0;
   for (const t of toFile) {
+    if (t.review) {
+      if (environment) {
+        free.push({ id: t.row.id, attempts: t.row.attempts, reason: t.note ?? 'could not tell' });
+        continue;
+      }
+      /* The machine's own docs say to re-run a "could not tell" once before
+         anybody is asked to look. The evidence is cached, so it is cheap. */
+      if (Number(t.row.attempts ?? 0) < 1) {
+        again.push({
+          id: t.row.id,
+          attempts: t.row.attempts,
+          reason: `needs review, re-running once: ${t.note ?? 'no note'}`,
+        });
+        continue;
+      }
+      reviewed += 1;
+    } else if (!alreadySet.has(t.url) && !filedSet.has(t.url)) {
+      /* Filing wrote nothing for it. Leaving it `queued` with no charge looped
+         for ever, so it is charged like any other failure. */
+      again.push({ id: t.row.id, attempts: t.row.attempts, reason: 'filing did not place this video' });
+      continue;
+    }
     const status = t.review
       ? 'needs_review'
       : alreadySet.has(t.url)
       ? 'skipped'
-      : filedSet.has(t.url)
-      ? 'filed'
-      : 'queued';
+      : 'filed';
     await db.from('collab_angle_videos').update({
       status,
       angle: t.angle,
@@ -268,37 +386,30 @@ async function fileBatch(db: SupabaseClient, batch: Batch, job: Awaited<ReturnTy
       filed_at: status === 'filed' ? new Date().toISOString() : null,
     }).eq('id', t.row.id);
   }
+  /* The first review retry is charged: it is what moves a video on to the
+     "already retried" branch above. An environmental one is not. */
+  await requeueVideos(db, again, '', () => true);
+  await requeueVideos(db, free, '', () => false);
 
-  /* Anything the machine could not place at all. */
-  const placedIds = new Set(toFile.map((t) => t.row.id));
-  const unplacedById = new Map(
-    job.unplaced.map((u) => [tiktokVideoId(u.video ?? ''), u.reason ?? 'not placed']),
-  );
-  for (const row of mine) {
-    if (placedIds.has(row.id)) continue;
-    const reason = unplacedById.get(row.video_id) ?? job.error ?? 'the audit did not return this video';
-    const { data: cur } = await db
-      .from('collab_angle_videos')
-      .select('attempts')
-      .eq('id', row.id)
-      .maybeSingle();
-    const attempts = Number((cur as { attempts?: number } | null)?.attempts ?? 0) + 1;
-    await db.from('collab_angle_videos').update({
-      status: attempts >= MAX_ATTEMPTS ? 'failed' : 'queued',
-      attempts,
-      batch_id: null,
-      last_error: String(reason).slice(0, 500),
-    }).eq('id', row.id);
+  for (const u of unplaced) {
+    await requeueVideos(db, [u.row], u.reason, () => chargesAttempt(u.reason, nVideos));
   }
 
   await db.from('collab_angle_batches').update({
     state: 'done',
     finished_at: new Date().toISOString(),
     lease_until: null,
-    error: job.error,
+    /* The marker is what makes the worker wait before the next batch. */
+    error: environment ? envError(environment) : job.error,
   }).eq('id', batch.id);
 
-  return { filed: filed.length, already: already.length, review: toFile.filter((t) => t.review).length };
+  return {
+    filed: filed.length,
+    already: already.length,
+    review: reviewed,
+    retrying: again.length,
+    environment: environment ?? null,
+  };
 }
 
 Deno.serve(async (req) => {
@@ -354,6 +465,11 @@ Deno.serve(async (req) => {
   let batch = await claimBatch(db);
   let made = false;
   if (!batch) {
+    /* After batches that failed for the environment (the free Gemini quota
+       being spent), wait rather than feed the queue into the same wall. A batch
+       already in flight is never held up by this, only the making of a new one. */
+    const wait = await waitLeft(db);
+    if (wait > 0) return reply({ ok: true, idle: true, cooling_down_s: Math.ceil(wait / 1000) });
     batch = await makeBatch(db);
     made = Boolean(batch);
   }
@@ -400,7 +516,7 @@ Deno.serve(async (req) => {
        here rather than waiting for the next minute keeps it fed, but only
        while there is budget left to do it in. */
     let next: string | null = null;
-    if (Date.now() < deadline - 30_000) {
+    if (Date.now() < deadline - 30_000 && (await waitLeft(db)) === 0) {
       const follow = await makeBatch(db);
       if (follow) {
         try {
@@ -420,17 +536,60 @@ Deno.serve(async (req) => {
     /* The machine being away is not this batch's fault: leave it exactly as
        it was and try again on the next tick. */
     if (err instanceof AuditOffline) {
+      /* Unreachable for a long time is no longer "try again later": it is
+         something a person should see. The batch is closed with the
+         environmental marker (so the worker backs off) and its videos go back
+         uncharged. The age is the batch's own, since nothing else records when
+         it first could not be reached. */
+      const created = await db.from('collab_angle_batches').select('created_at')
+        .eq('id', batch.id).maybeSingle();
+      const age = Date.now() - Date.parse((created.data as { created_at?: string } | null)?.created_at ?? '');
+      if (Number.isFinite(age) && age > MAX_OFFLINE_MS) {
+        const why = `the audit machine has been unreachable for over ${MAX_OFFLINE_MS / 3_600_000} hours: ${err.message}`;
+        await requeueBatch(db, batch.id, why, false);
+        await release(db, batch.id, {
+          state: 'failed',
+          error: envError(why),
+          finished_at: new Date().toISOString(),
+        });
+        return reply({ ok: false, offline: true, gave_up: true, batch: batch.id, detail: why });
+      }
       await release(db, batch.id, { error: err.message });
       return reply({ ok: true, offline: true, batch: batch.id, detail: err.message });
     }
-    const attempts = batch.attempts + 1;
-    const dead = attempts >= MAX_ATTEMPTS || err instanceof AuditRefused;
+
     const message = err instanceof Error ? err.message : String(err);
     console.error('collab-angles-sync failed', batch.id, message);
+
+    if (err instanceof AuditRefused) {
+      /* 429 is the audit queue being full, which is a wait and not a fault. */
+      if (err.status === 429) {
+        await release(db, batch.id, { error: message.slice(0, 500) });
+        return reply({ ok: true, queue_full: true, batch: batch.id, detail: message });
+      }
+      /* 401 and 403 are our key or our permission, the same for every video:
+         wait, and do not blame the videos. Anything else (a 422, say) is about
+         what we sent. It used to put the videos back uncharged and build the
+         same refused batch every minute for ever; now each refusal costs them
+         an attempt, so three of them end it. */
+      const config = err.status === 401 || err.status === 403;
+      await requeueBatch(db, batch.id, message, !config);
+      await release(db, batch.id, {
+        attempts: batch.attempts + 1,
+        state: 'failed',
+        error: config ? envError(message) : message.slice(0, 500),
+        finished_at: new Date().toISOString(),
+      });
+      return reply({ ok: false, batch: batch.id, refused: err.status, error: message }, 200);
+    }
+
+    const attempts = batch.attempts + 1;
+    const dead = attempts >= MAX_ATTEMPTS;
     if (dead) {
-      await db.from('collab_angle_videos')
-        .update({ status: 'queued', batch_id: null })
-        .eq('batch_id', batch.id);
+      /* A batch that has failed three times for our own reasons (no brief, a
+         bad row) is charged to its videos too; before, they went straight back
+         into the queue and the same failure repeated. */
+      await requeueBatch(db, batch.id, message, true);
     }
     await release(db, batch.id, {
       attempts,

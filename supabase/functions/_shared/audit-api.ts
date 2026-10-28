@@ -25,6 +25,8 @@
  * we never saw.
  */
 
+import { describeDetail } from './angle-backoff.ts';
+
 /** Everything the caller needs to reach the backend. */
 export interface AuditCreds {
   url: string;
@@ -117,11 +119,10 @@ async function call(
 
   if (!res.ok) {
     const detail = (body as { detail?: unknown; error?: unknown } | null);
-    const msg = typeof detail?.detail === 'string'
-      ? detail.detail
-      : typeof detail?.error === 'string'
-      ? detail.error
-      : `HTTP ${res.status}`;
+    /* FastAPI sends `detail` as a LIST of {loc, msg} for a 422, so testing for a
+       string alone recorded only "HTTP 422" and hid which field was refused. */
+    const msg = describeDetail(detail?.detail) ??
+      (typeof detail?.error === 'string' ? detail.error : `HTTP ${res.status}`);
     /* 5xx is the backend falling over rather than refusing, so it is worth
        asking again later; 4xx is a decision and will not change. */
     if (res.status >= 500) throw new AuditOffline(`the audit machine errored: ${msg}`);

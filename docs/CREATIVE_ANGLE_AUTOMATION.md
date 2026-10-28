@@ -696,3 +696,101 @@ changed nothing -- which is how the product briefly rendered twice.
 **Proven.** `pnpm build`, `pnpm verify:isolation`, `pnpm verify:angle-products`
 (35 checks) and `pnpm verify:angles-categorise` (53 checks) all pass, and the
 patch script is idempotent at 20 blocks.
+
+### 2026-10-30, the worker stops spending videos on a dead quota
+
+Gemini stays on the free key (about 500 requests a day), so a spent quota is an
+ordinary daily event and not an outage. Before this, the worker charged every
+unplaced video one attempt and started the next batch at once: a dead quota
+moved a whole queue to `failed` in minutes, and each video had been blamed for
+something that was never its fault.
+
+**How a dead quota actually reaches the worker** (read from
+`audit-backend/Backend`, not assumed): as `unplaced` videos whose reason is the
+bare word `module_failed` (the job itself still says `succeeded`), AND as
+`needs_review` *placements* whose note is "no visual evidence" or "the angle
+judgement returned nothing". The second form matters: the worker used to count
+those as placed, so a batch hit by the quota looked like a success.
+
+**What changed** (`collab-angles-sync`, `_shared/audit-api.ts`, and the new
+`_shared/angle-backoff.ts`, which has no imports so it can be tested):
+
+- **Environmental failures are not charged**, in a batch of more than one
+  video. A bad video among good ones is caught anyway: it ends up alone in a
+  later batch, where it IS charged. A lone video is always charged, or a video
+  that fails by itself would sit at the head of the queue for ever and block
+  everything behind it. TikTok download refusals follow the same rule.
+- **A wait before the next batch.** When nothing in a batch was confidently
+  placed and every reason (unplaced reasons and `needs_review` notes alike) is
+  environmental, the batch is marked `ENV:` in its `error`. The worker then
+  waits 5, 10, 20, 40, then 60 minutes between batches for as long as they keep
+  failing that way; any other batch ends the run, so a recovered quota clears
+  it with no reset. No migration: it reads the last ten finished batches. In
+  flight work is never held up. A dead day costs about one probe batch an hour
+  on the audit machine (CPU, almost no quota).
+- **A refused submit no longer loops.** It used to put the videos back uncharged
+  and build the same batch every minute for ever. A 401/403 (our key) now waits
+  like the above; a 429 (their queue is full) is a wait, not a failure; any
+  other refusal charges the videos, so three of them end it. A batch that fails
+  three times for our own reasons (no brief, say) charges them too.
+- **The 422 reason is recorded.** FastAPI's `detail` is a list; it was reduced to
+  "HTTP 422".
+- **Brief labels are cut to 80 characters**, the backend's limit.
+- **`needs_review` is re-run once** before anyone is asked to look, as the
+  backend's docs say, unless the whole batch was environmental (then it is
+  simply tried again later, uncharged). A placement that filing neither wrote
+  nor recognised is charged instead of sitting queued for ever.
+- **Unreachable for over 6 hours** closes the batch with an `ENV:` error and
+  returns its videos uncharged, instead of waiting for ever.
+
+**Known limits, so nobody is surprised:**
+
+- **A brand-level fault now costs a brand its queue.** An unreadable or
+  unshared brief (a 422 naming `briefs.*`) or "no active brief" is the same for
+  every video of that brand. It used to loop for ever and lose nothing; now it
+  charges five videos per batch until every queued video of that brand is
+  `failed`. Treating those as brand-scoped (no charge, no global cooldown)
+  needs a decision about where to record the pause, so it is not done.
+- **A dead quota at brief compile does not fail the job.** With the auto
+  backend the audit machine falls back to its rule engine and flags
+  `BACKEND_DEGRADED`, so a job can run on a degraded brief while Gemini is down.
+  That is the backend's behaviour, not the worker's.
+- **A quota that dies part way through a batch** with some videos already
+  placed leaves the rest uncharged and the next batch tries again at once; the
+  cooldown starts with the first batch where nothing was placed.
+- Nothing on the screen shows a batch's `error`, so an `ENV:` cooldown is visible
+  only in the table. Patch 0002's Gemini note counts a queued video only if its
+  `attempts` is above zero, and uncharged videos have none, so it would read
+  zero during exactly this case; the queued half of its test should key on a
+  model-looking `last_error` alone.
+- Rule 14 (split a failing batch to find the one bad video) is still not built.
+
+**Proven:** `pnpm verify:angles-backoff` (56 checks: every real reason string
+from the audit machine, the lone-video rule, the `needs_review` quota case, and
+a simulated day of dead quota across 167 videos in which at most the one lone
+tail video fails) and `pnpm verify:angles-categorise` (53). **Not proven:** the
+worker on the real Deno runtime against the real database; it was syntax
+checked only.
+
+**Deploy** (the owner; the CLI in this folder may still be linked to the OLD
+project, so relink first and name the project every time):
+
+```
+supabase link --project-ref qinxwfdwvpkzfhcijuqw
+supabase functions deploy collab-angles-sync --project-ref qinxwfdwvpkzfhcijuqw
+```
+
+**Screen patches applied, 2026-10-30** (`audit-backend/patches/0001` and `0002`,
+with three changes made while applying them so they fit the worker above):
+
+- The Gemini note counts a QUEUED video by its `last_error` alone, not by
+  `attempts > 0`, because the worker no longer charges an attempt for a spent
+  quota. As written, the note would have read zero in exactly the case it exists
+  for. Its pattern also knows the audit machine's `needs_review` notes.
+- The note no longer says "retried up to 3 times"; it says they are tried again
+  automatically with longer waits, which is what now happens.
+- The start message ("Already categorising 5 videos") shows ahead of the standing
+  model note instead of being hidden by it.
+
+Needs `supabase functions deploy collab-angles --project-ref qinxwfdwvpkzfhcijuqw`
+for the note to appear; the screen works against the old function (it reads 0).
