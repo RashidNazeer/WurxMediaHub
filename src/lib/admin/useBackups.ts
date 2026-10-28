@@ -108,10 +108,18 @@ export const callBackup: Call = async (body) => {
     }
   }
   if (!message) {
-    message =
-      status === 404 || /not found/i.test(String((error as Error).message))
-        ? 'The backup tools are not set up on this server yet. Ask whoever manages Prism to deploy them.'
-        : 'That did not go through. Try again.';
+    if (!context) {
+      // No answer at all. When the function does not exist on the project, the browser's own
+      // safety check rejects the request before it is sent, so this is what that looks like.
+      message =
+        'Prism could not reach the backup service. If backups have not been set up on this project yet, ' +
+        'the database update and the "backup-data" function still have to be deployed (see docs/BACKUPS.md). ' +
+        'Otherwise check your connection and try again. Nothing was changed.';
+    } else if (status === 404) {
+      message = 'The backup tools are not set up on this server yet. Ask whoever manages Prism to deploy them.';
+    } else {
+      message = 'That did not go through. Nothing was changed. Try again in a moment.';
+    }
   }
   throw new BackupCallError(message, status, busy, needsPassphrase);
 };
