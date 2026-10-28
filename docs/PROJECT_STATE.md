@@ -25,8 +25,9 @@ Prism repo; switched by redeploying its last production build, no code change). 
 
 **Open, in this order:**
 1. The Prism repo is behind the Hub repo (it lacks 398a372 and 1af0014). Push `dev` to the `prism` remote once that remote is configured and Rashid says which branch.
-2. The Audit values (`AUDIT_API_URL` / `AUDIT_API_KEY`, which switch on `collab-angles-cycle`), and the TikTok values only if TikTok returns. **Euka is complete**: the new
-   all-brands key plus Nutra's key cover 13 of 13 stores. `euka-ads-cycle` and `reacher-cycle` are ACTIVE; `tiktok-nightly` and `collab-angles-cycle` are inactive.
+2. The Audit values (`AUDIT_API_URL` / `AUDIT_API_KEY`, which switch on `collab-angles-cycle`). **Euka is complete** (all-brands key plus Nutra's cover 13 of 13 stores) and the **TikTok ads app
+   values are set** (2026-10-28). `euka-ads-cycle`, `reacher-cycle` and `tiktok-nightly` are ACTIVE; only `collab-angles-cycle` is inactive. Rashid is connecting the **bisotime** ads account:
+   he presses Connect another on the live admin TikTok page; the token lands in `tiktok_connections` (plain text, see PARKED 45 for why that matters).
 3. Move the 20 Edge Functions and 92 scripts to the `sb_secret` / `sb_publishable` keys, then disable the legacy keys and revoke the legacy
    signing key (closes the JWT-secret exposure of 2026-10-27).
 4. Several browser suites are stale against the redesigned screens (the apply form is on `/apply`, `/signup` is a different page, the creator

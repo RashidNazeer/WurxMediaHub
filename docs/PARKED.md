@@ -2438,7 +2438,7 @@ I run the checks before you delete the old project?" Do not delete anything. **R
 1. **Two weeks of normal running on CreatorHub** with nothing missing: the cron jobs (`reacher-cycle`, `euka-ads-cycle`) succeeding, the team using the Hub, the Prism site working. Look at
    `cron.job_run_details`, `reacher_sync_runs`, and the Euka function's answer in `net._http_response`.
 2. **The secrets that exist ONLY in the old project.** Supabase never returns a function secret's value, so these are in no file here: **`AUDIT_API_URL` and `AUDIT_API_KEY`**
-   (Rashid did not have them to hand), the seven **`TIKTOK_*`** values (TikTok is not needed for now), and the old project's own Euka main key. Ask whether he now has
+   (Rashid did not have them to hand), the four **`TIKTOK_CREATOR_*`** values (creator sign-in with TikTok; the three ads-app values were saved in `.env.local` and set on 2026-10-28), and the old project's own Euka main key. Ask whether he now has
    the Audit values. If not, THEY ARE LOST FOR GOOD the moment the project is deleted, so say that plainly. A paused project still holds them.
 3. **A second copy of the backups off this laptop.** `D:\Milestone\backups\hub-dev-*` is the only other copy of the data. It holds password hashes and private files: a USB stick, not a shared drive.
 4. **Free paused projects may expire.** My understanding (unverified) is that a free project paused for about 90 days can no longer be restored. Check Supabase's current rule and, if it applies,

@@ -2309,8 +2309,10 @@ remote is not configured on this laptop, so only `origin` was pushed. Do not pus
 so they cannot be copied from one project to another. On CreatorHub: the 4 `*_SYNC_SECRET` values were generated fresh and set in
 BOTH the function secrets and the vault; `REACHER_API_KEY` was copied from `.env.local` (matched by fingerprint). **Euka (2026-10-27):** `EUKA_API_KEY` is set on CreatorHub from a NEW "all brands" key Rashid created. It sees 12 of the 13 stores (everything except
 NUTRAHARMONY STORE, which has its OWN Euka account) and the function reports `eukaAccountsUnavailable: 0`. `euka-ads-cycle` is ACTIVE; its first run
-processed 5 units, 3 ok and 2 failed, both NUTRAHARMONY ("no Euka key we hold owns this store any more"). Nutra's own key was added the same day as `EUKA_API_KEYS` (it is the SAME key the old project had, not rotated, and it is in use); together the two keys cover **all 13** stores. **Not set:** the seven `TIKTOK_*` values (TikTok is not needed for now) and `AUDIT_API_URL` / `AUDIT_API_KEY`. Until those exist
-`tiktok-nightly` and `collab-angles-cycle` are INACTIVE on CreatorHub, or they would fail every few minutes. Vault `*_url`
+processed 5 units, 3 ok and 2 failed, both NUTRAHARMONY ("no Euka key we hold owns this store any more"). Nutra's own key was added the same day as `EUKA_API_KEYS` (it is the SAME key the old project had, not rotated, and it is in use); together the two keys cover **all 13** stores. **TikTok ads app (2026-10-28):** `TIKTOK_APP_ID`, `TIKTOK_APP_SECRET` and `TIKTOK_REDIRECT_URI` (the app's own page, `https://wurxmediahubdev.vercel.app/oauth/tiktok/callback`, which the move did not change)
+are set on CreatorHub; the ID and secret are the SAME values the old project used (matched by fingerprint). Rashid keeps them in the project `.env.local` as `TIKTOK_ADS_APP_ID` / `TIKTOK_ADS_APP_SECRET`.
+`tiktok-nightly` is ACTIVE. **Not set:** the four `TIKTOK_CREATOR_*` values (creator sign-in with TikTok, not needed for now) and `AUDIT_API_URL` / `AUDIT_API_KEY`.
+Until the Audit values exist `collab-angles-cycle` is INACTIVE on CreatorHub, or it would fail every few minutes. Vault `*_url`
 values hold the project address, so they were REWRITTEN to CreatorHub, not copied.
 
 ### Tools and backups (outside the repo on purpose)
