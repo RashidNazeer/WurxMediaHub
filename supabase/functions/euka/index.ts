@@ -187,7 +187,7 @@ async function topVideos(
   return await fetch(`${BASE}/dashboard/top-videos-by-revenue`, {
     method: 'POST',
     headers: { ...auth, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ storeId, brandId, filter: { postedDateRange: { start, end }, limit } }),
+    body: JSON.stringify({ storeId, brandId, filter: { postedDateRange: { startDate: start, endDate: end }, limit } }),
   })
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null);
