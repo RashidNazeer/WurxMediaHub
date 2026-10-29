@@ -52,6 +52,16 @@ console.log('\n2. SAFETY');
 const staffAt = fn.indexOf("!STAFF.includes(String(actor?.role))");
 const queueAt = fn.indexOf("body.action.startsWith('queue.')");
 check('the queue actions sit AFTER the staff check', staffAt > 0 && queueAt > staffAt);
+/* THE BUG OF 2026-10-30: `body.brand.trim()` ran before the queue branch, on a
+   request with no brand, outside the try. The platform answered with a bare 500
+   and the screen said "the service did not answer". Most queue actions carry no
+   brand, so nothing may read one before they are answered. */
+const handler = fn.slice(fn.indexOf('Deno.serve('));
+const firstTrim = handler.indexOf('const brand = body.brand.trim()');
+check('queue actions are answered before anything reads body.brand',
+  handler.indexOf("body.action.startsWith('queue.')") > 0 &&
+    (firstTrim === -1 || handler.indexOf("body.action.startsWith('queue.')") < firstTrim));
+check('body.brand is only read after a check that it exists', /if \(!\('brand' in body\)\)/.test(handler));
 const removable = /const REMOVABLE = \[([^\]]*)\]/.exec(fn)?.[1] ?? '';
 check('removing never touches a video with the audit machine', !removable.includes("'sent'"), removable);
 check('removing never touches filed or skipped history',

@@ -567,18 +567,30 @@ Deno.serve(async (req) => {
       actor_role: actor?.role ?? null,
       action: 'collab_angles.write_denied',
       subject_type: 'brand',
-      detail: { brand: body.brand, month: body.month, wanted: body.action },
+      detail: {
+        brand: 'brand' in body ? body.brand : null,
+        month: 'month' in body ? body.month : null,
+        wanted: body.action,
+      },
     });
     return reply({ error: 'Not allowed' }, 403);
   }
 
-  const brand = body.brand.trim();
-
   try {
+    /* THE QUEUE ACTIONS ARE ANSWERED FIRST, AND INSIDE THE try, because most of
+       them carry no brand at all. This used to come after `body.brand.trim()`,
+       which threw a TypeError on every queue.list and queue.remove OUTSIDE any
+       error handling: the platform then answered with a bare 500 that has no CORS
+       headers, which a browser reports as "the service did not answer". */
     if (body.action.startsWith('queue.')) {
       const res = await queueAction(admin, actor, body);
       return reply(res, (res as { ok?: boolean }).ok === false ? 422 : 200);
     }
+
+    /* From here on the action is angles.start or angles.progress, and both carry
+       a brand and a month. */
+    if (!('brand' in body)) return reply({ error: 'Which brand?' }, 400);
+    const brand = body.brand.trim();
 
     if (body.action === 'angles.progress') {
       return reply({ ok: true, ...(await progressOf(admin, brand, body.month)) });
