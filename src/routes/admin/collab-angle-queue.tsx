@@ -319,7 +319,12 @@ export function CollabAngleQueue({
           : 'Loading…'
       }
       onClose={onClose}
-      busy={busy !== null || startBusy}
+      /* NEVER `busy`. The Modal's `busy` disables the close cross, Escape and the
+         backdrop, which is right for a restore and wrong here: it was passed
+         "a run is in flight", so while any batch was out with the audit server
+         (which is most of the time) the cross did nothing. An edit that is
+         still on its way finishes on the server whether this is open or not,
+         and the result is read on the next look. */
     >
       <div className="mt-5 space-y-4">
         {brand && month ? (

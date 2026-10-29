@@ -97,6 +97,10 @@ for (const s of ['queued', 'sent', 'failed', 'needs_review', 'filed', 'skipped']
 }
 check('there is an "All" chip', /\['all', \.\.\.STATUSES\]/.test(queue));
 check('the dialog is portalled out of the vendored root', /createPortal\(/.test(queue));
+/* The close cross went dead while any batch was running, because the Modal was
+   handed `busy`. It must always be closable. */
+const modalTag = queue.slice(queue.indexOf('<Modal'), queue.indexOf('>', queue.indexOf('onClose={onClose}')));
+check('the dialog can always be closed: the Modal is never given busy', !/\bbusy=/.test(modalTag), modalTag.slice(-160));
 check('the dialog explains a pause and why', /plainReason/.test(queue) && /wait_reason/.test(fn));
 check('no hardcoded hex colour in the screen', !/#[0-9a-fA-F]{3,8}\b/.test(queue));
 check('every type size is a rem', !/text-\[[0-9.]+px\]/.test(queue));
