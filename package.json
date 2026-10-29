@@ -101,6 +101,7 @@
     "verify:followers": "node scripts/check-followers-column.mjs",
     "verify:site": "node scripts/check-public-site.mjs",
     "verify:angles-categorise": "node scripts/check-angles-categorise.mjs",
+    "verify:angles-backoff": "tsx scripts/check-angles-backoff.mjs",
     "verify:angles-live": "node scripts/check-angles-live.mjs",
     "verify:angle-products": "node scripts/check-angle-products.mjs",
     "verify:brand-search": "node scripts/check-brand-search.mjs",
@@ -122,7 +123,13 @@
     "verify:contract-pdf": "node scripts/check-contract-pdf.mjs",
     "verify:brand-visibility": "node scripts/check-brand-visibility.mjs",
     "verify:backdrop-ancestry": "node scripts/check-backdrop-ancestry.mjs",
-    "verify:blur-budget": "node scripts/check-blur-budget.mjs"
+    "verify:blur-budget": "node scripts/check-blur-budget.mjs",
+    "test:backup": "tsx scripts/test-backup-sql.mjs",
+    "test:backup:live": "tsx scripts/test-backup-live.mjs",
+    "test:backup:function": "tsx scripts/test-backup-function.mjs",
+    "backup:database": "tsx scripts/backup-database.mjs",
+    "restore:database": "tsx scripts/restore-database.mjs",
+    "test:backup:chaos": "tsx scripts/test-backup-chaos.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.9",
@@ -146,6 +153,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.12",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query-devtools": "^5.101.4",
     "@types/node": "^24.13.2",
@@ -156,9 +164,11 @@
     "oxlint": "^1.71.0",
     "playwright": "^1.62.0",
     "postcss": "^8.5.26",
+    "postgres": "^3.4.9",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"
   }

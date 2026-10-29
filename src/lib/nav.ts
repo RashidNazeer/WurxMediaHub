@@ -3,6 +3,7 @@ import {
   BarChart3,
   Building2,
   Compass,
+  DatabaseBackup,
   FileBarChart,
   Gift,
   HandCoins,
@@ -81,6 +82,13 @@ export interface NavItem {
    * `collab_share_*` functions re-check the caller's role in the database.
    */
   owners?: boolean;
+  /**
+   * ADMIN ONLY: the role `admin` and nobody else, not even ops. For rows that
+   * lead to something only the owner of the whole system should touch (Backup
+   * data). Hiding the row is not the boundary: the route guard and the
+   * backup-data Edge Function both re-check the role.
+   */
+  adminOnly?: boolean;
 }
 
 export interface NavGroup {
@@ -186,6 +194,15 @@ const ADMIN: NavGroup[] = [
       // Read when something needs explaining, not when something needs
       // deciding, which is why it is here and not with the queues.
       { label: 'Activity', icon: History, to: '/admin/activity' },
+      // Copy the whole database, and put a copy back. Admin only: it holds every
+      // account and can replace everything.
+      {
+        label: 'Backup data',
+        icon: DatabaseBackup,
+        to: '/admin/backups',
+        adminOnly: true,
+        description: 'Copy everything, or put a copy back',
+      },
       { label: 'Uploads', icon: Upload, soon: 'Later' },
     ],
   },
@@ -349,6 +366,14 @@ const STUDIO: NavGroup[] = [
   },
 ];
 
+/** Drop the rows only an admin may see, and any heading left with nothing under it. */
+function withoutAdminOnly(groups: NavGroup[], role: AppRole | undefined): NavGroup[] {
+  if (role === 'admin') return groups;
+  return groups
+    .map((g) => ({ ...g, items: g.items.filter((i) => !i.adminOnly) }))
+    .filter((g) => g.items.length > 0);
+}
+
 export function navForRole(role: AppRole | undefined, collabTabs?: string[]): NavGroup[] {
   /*
    * A MENU ROW MUST NOT LIE ABOUT WHAT IT OPENS.
@@ -362,7 +387,7 @@ export function navForRole(role: AppRole | undefined, collabTabs?: string[]): Na
    * you lacked bounced you to Brands with no explanation. Before the move the
    * row simply was not in the rail, which is the behaviour restored here.
    */
-  if (isStaffRole(role)) return withCollabTabs(ADMIN, role, collabTabs);
+  if (isStaffRole(role)) return withCollabTabs(withoutAdminOnly(ADMIN, role), role, collabTabs);
   /*
    * The read-only roles get the Paid Collabs group and NOTHING ELSE.
    *

@@ -25,6 +25,8 @@
  * we never saw.
  */
 
+import { describeDetail } from './angle-backoff.ts';
+
 /** Everything the caller needs to reach the backend. */
 export interface AuditCreds {
   url: string;
@@ -117,11 +119,10 @@ async function call(
 
   if (!res.ok) {
     const detail = (body as { detail?: unknown; error?: unknown } | null);
-    const msg = typeof detail?.detail === 'string'
-      ? detail.detail
-      : typeof detail?.error === 'string'
-      ? detail.error
-      : `HTTP ${res.status}`;
+    /* FastAPI sends `detail` as a LIST of {loc, msg} for a 422, so testing for a
+       string alone recorded only "HTTP 422" and hid which field was refused. */
+    const msg = describeDetail(detail?.detail) ??
+      (typeof detail?.error === 'string' ? detail.error : `HTTP ${res.status}`);
     /* 5xx is the backend falling over rather than refusing, so it is worth
        asking again later; 4xx is a decision and will not change. */
     if (res.status >= 500) throw new AuditOffline(`the audit machine errored: ${msg}`);
@@ -209,6 +210,8 @@ export interface JobState {
   downloaded: number;
   completed: number;
   elapsedS: number | null;
+  /** The backend's own account of how far it has got; null from an older backend. */
+  progress: Record<string, unknown> | null;
 }
 
 const TERMINAL = new Set(['succeeded', 'partial', 'failed']);
@@ -239,6 +242,7 @@ export async function jobState(creds: AuditCreds, jobId: string): Promise<JobSta
     downloaded: Number(j.downloaded_videos ?? 0),
     completed: Number(j.completed_videos ?? 0),
     elapsedS: typeof j.elapsed_s === 'number' ? j.elapsed_s : null,
+    progress: j.progress && typeof j.progress === 'object' ? j.progress as Record<string, unknown> : null,
   };
 }
 

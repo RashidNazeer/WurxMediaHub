@@ -22,6 +22,16 @@ import { getSupabase } from '@/lib/supabase';
  * half its videos still reaches a full ring instead of hanging at 50.
  */
 
+type LiveBatch = {
+  step: number;
+  steps: number;
+  label: string;
+  videos_judged: number;
+  videos_total: number;
+  /** Seconds the audit machine had been silent when the worker last asked. */
+  quiet_s: number | null;
+};
+
 type Progress = {
   total: number;
   queued: number;
@@ -30,11 +40,23 @@ type Progress = {
   skipped: number;
   failed: number;
   needs_review: number;
+  /** Videos failing for a reason that looks like the Gemini model (outage or quota). 0 when an older function omits it. */
+  model_failures: number;
   /** Every video the brand posted this month. 0 when an older function omits it. */
   total_videos: number;
   /** How many of those already sit in an angle. 0 when an older function omits it. */
   already_categorised: number;
-  running_batch: { state: string; last_phase: string | null; n_videos: number } | null;
+  running_batch: {
+    state: string;
+    last_phase: string | null;
+    n_videos: number;
+    /** What the audit machine says it is doing. Null from an older function or backend. */
+    live: LiveBatch | null;
+    batch_no: number;
+    batches: number;
+    /** Seconds since the worker last heard from the audit machine. */
+    heard_s: number | null;
+  } | null;
   eta_seconds: number | null;
 };
 
@@ -66,12 +88,25 @@ const PHASE_WORDS: Record<string, string> = {
  * `functions.invoke` hides the real error body behind `error.context`, which is
  * the raw Response. Same approach as `messageFrom` in `src/lib/tiktok.ts`.
  */
+/** The HTTP status behind a `functions.invoke` error, when there was a response. */
+function statusOf(error: unknown): number | undefined {
+  const status = (error as { context?: Response })?.context?.status;
+  return typeof status === 'number' ? status : undefined;
+}
+
 async function messageFrom(error: unknown, fallback: string): Promise<string> {
   const ctx = (error as { context?: Response })?.context;
+  const status = statusOf(error);
+  let detail = '';
   if (ctx && typeof ctx.json === 'function') {
     try {
       const body = await ctx.clone().json();
       if (body?.error) return String(body.error);
+      /* The gateway and the edge runtime answer in their own shape, with
+         `message` and no `error`: {"code":401,"message":"Invalid JWT"}, or a
+         boot error. Without reading it the screen can only say "refused",
+         which is how one transient 503 became a mystery. */
+      if (typeof body?.message === 'string') detail = body.message;
     } catch {
       /* not JSON: fall through to the translations below */
     }
@@ -90,8 +125,15 @@ async function messageFrom(error: unknown, fallback: string): Promise<string> {
       'the request.';
   }
   if (/non-2xx/i.test(raw)) {
-    return 'The categorising service refused the request. Try again, and if it ' +
-      'keeps happening the server log will say why.';
+    if (status === 401) {
+      return 'Your sign-in was not accepted. Sign out and back in, then try again.';
+    }
+    return `The categorising service returned an error${status ? ` (${status})` : ''}` +
+      `${detail ? `: ${detail}` : ''}. ` +
+      (status !== undefined && status >= 500
+        ? 'This is usually temporary, so try again in a moment. '
+        : 'Try again. ') +
+      'If it keeps happening, the collab-angles function log will say why.';
   }
   return raw;
 }
@@ -104,28 +146,46 @@ async function messageFrom(error: unknown, fallback: string): Promise<string> {
  */
 const CALL_TIMEOUT_MS = 20_000;
 
+/* A 502, 503 or 504 comes from the platform in front of the function, and
+   retrying is safe: collab-angles is idempotent. `angles.progress` only reads,
+   and `angles.start` skips every video that is already filed or queued. One
+   transient 503 once reached the screen as "refused the request" when the very
+   next call would have worked. A 500 is NOT retried: that is the function's own
+   handler failing, and it may already have written part of its work. */
+const TRANSIENT_STATUSES = new Set([502, 503, 504]);
+const RETRY_DELAYS_MS = [1_000, 3_000];
+
 async function callAngles<T>(body: Record<string, unknown>, fallback: string): Promise<T> {
-  const abort = new AbortController();
-  const timer = window.setTimeout(() => abort.abort(), CALL_TIMEOUT_MS);
-  let data: unknown;
-  let error: unknown;
-  try {
-    ({ data, error } = await getSupabase().functions.invoke('collab-angles', {
-      body,
-      signal: abort.signal,
-    }));
-  } catch (e) {
-    throw new Error(
-      abort.signal.aborted
-        ? 'The server did not answer in 20 seconds. Try again in a moment.'
-        : await messageFrom(e, fallback),
-    );
-  } finally {
-    window.clearTimeout(timer);
+  for (let attempt = 0; ; attempt += 1) {
+    const abort = new AbortController();
+    const timer = window.setTimeout(() => abort.abort(), CALL_TIMEOUT_MS);
+    let data: unknown;
+    let error: unknown;
+    try {
+      ({ data, error } = await getSupabase().functions.invoke('collab-angles', {
+        body,
+        signal: abort.signal,
+      }));
+    } catch (e) {
+      throw new Error(
+        abort.signal.aborted
+          ? 'The server did not answer in 20 seconds. Try again in a moment.'
+          : await messageFrom(e, fallback),
+      );
+    } finally {
+      window.clearTimeout(timer);
+    }
+    if (error) {
+      const status = statusOf(error);
+      if (status !== undefined && TRANSIENT_STATUSES.has(status) && attempt < RETRY_DELAYS_MS.length) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+        continue;
+      }
+      throw new Error(await messageFrom(error, fallback));
+    }
+    if ((data as { error?: string } | null)?.error) throw new Error((data as { error: string }).error);
+    return data as T;
   }
-  if (error) throw new Error(await messageFrom(error, fallback));
-  if ((data as { error?: string } | null)?.error) throw new Error((data as { error: string }).error);
-  return data as T;
 }
 
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
@@ -133,7 +193,9 @@ const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v)
 /** Narrow the function's reply to what the button needs, tolerating gaps. */
 function toProgress(raw: unknown): Progress {
   const r = (raw ?? {}) as Record<string, unknown>;
-  const rb = r.running_batch as { state?: unknown; last_phase?: unknown; n_videos?: unknown } | null | undefined;
+  const rb = r.running_batch as Record<string, unknown> | null | undefined;
+  const lv = rb?.progress as Record<string, unknown> | null | undefined;
+  const polled = typeof rb?.polled_at === 'string' ? Date.parse(rb.polled_at) : NaN;
   const eta = r.eta_seconds;
   return {
     total: num(r.total),
@@ -143,6 +205,7 @@ function toProgress(raw: unknown): Progress {
     skipped: num(r.skipped),
     failed: num(r.failed),
     needs_review: num(r.needs_review),
+    model_failures: num(r.model_failures),
     total_videos: num(r.total_videos),
     already_categorised: num(r.already_categorised),
     running_batch: rb
@@ -150,6 +213,19 @@ function toProgress(raw: unknown): Progress {
           state: String(rb.state ?? ''),
           last_phase: typeof rb.last_phase === 'string' ? rb.last_phase : null,
           n_videos: num(rb.n_videos),
+          live: lv && typeof lv === 'object' && num(lv.steps) > 0
+            ? {
+                step: num(lv.step),
+                steps: num(lv.steps),
+                label: typeof lv.label === 'string' ? lv.label : '',
+                videos_judged: num(lv.videos_judged),
+                videos_total: num(lv.videos_total),
+                quiet_s: typeof lv.seconds_since_activity === 'number' ? lv.seconds_since_activity : null,
+              }
+            : null,
+          batch_no: num(rb.batch_no),
+          batches: num(rb.batches),
+          heard_s: Number.isFinite(polled) ? Math.max(0, (Date.now() - polled) / 1000) : null,
         }
       : null,
     eta_seconds: typeof eta === 'number' && Number.isFinite(eta) && eta > 0 ? eta : null,
@@ -202,6 +278,14 @@ function startNote(res: StartResult | null | undefined, brand: string, month: st
 
 const doneOf = (p: Progress) => p.filed + p.skipped + p.failed + p.needs_review;
 const activeOf = (p: Progress | null) => !!p && p.queued + p.sent > 0;
+/* Work that is happening now: a batch out with the audit service, or videos
+   sent to it. Videos that are merely queued are NOT this. After an error the
+   worker leaves them queued to retry later, sometimes for an hour, and treating
+   them as running kept the button disabled for as long as the service stayed
+   down, so nobody could press it again. Pressing it while they wait is safe:
+   the Edge Function reports them as already queued instead of adding them again. */
+const runningOf = (p: Progress | null) =>
+  !!p && (p.sent > 0 || ['submitting', 'running', 'filing'].includes(p.running_batch?.state ?? ''));
 
 type Props = {
   brand: string;
@@ -283,6 +367,7 @@ export function CollabAngleCategorise({ brand, month, canEdit, onFiled }: Props)
   }, [ready, look]);
 
   const active = activeOf(progress);
+  const running = runningOf(progress);
 
   useEffect(() => {
     if (!ready || !active) return;
@@ -295,7 +380,7 @@ export function CollabAngleCategorise({ brand, month, canEdit, onFiled }: Props)
   }, [ready, active, look]);
 
   const start = async () => {
-    if (starting || active) return;
+    if (starting || running) return;
     setStarting(true);
     setError(null);
     setNote(null);
@@ -317,7 +402,7 @@ export function CollabAngleCategorise({ brand, month, canEdit, onFiled }: Props)
 
   if (!brand || !month || !canEdit) return null;
 
-  const busy = starting || active;
+  const busy = starting || running;
   const total = progress?.total ?? 0;
   const done = progress ? doneOf(progress) : 0;
   const pct = total > 0 ? Math.min(100, Math.max(0, (done / total) * 100)) : 0;
@@ -339,7 +424,51 @@ export function CollabAngleCategorise({ brand, month, canEdit, onFiled }: Props)
       line += `. About ${mins} min left (estimate)`;
     }
   }
-  const shown = error ?? note ?? line;
+  /* THE MODEL BEING DOWN IS NOT A PROBLEM WITH THESE VIDEOS, and without this
+     line the only sign is a number of failed videos with no reason. The audit
+     machine's `module_failed` is nearly always the free Gemini quota (about 500
+     requests a day, resetting daily), but it is also what a broken dependency
+     says, hence "most likely". */
+  const modelNote = progress && progress.model_failures > 0
+    ? `${progress.model_failures} video${progress.model_failures === 1 ? '' : 's'} could not be analysed. ` +
+      'Most likely the Gemini API is not working or its daily quota is used up ' +
+      '(the free key allows about 500 requests a day and resets daily). ' +
+      'They are tried again automatically, with longer waits while it stays down.'
+    : null;
+  /* WHAT THE AUDIT MACHINE IS DOING RIGHT NOW. A video takes minutes, and a
+     bare "0 of 39 done" for the first half hour looks the same as a hung job.
+     So say which batch, which step and, while judging, how many of this batch's
+     videos are finished, and how long since the machine last moved on. */
+  let live = '';
+  const rbatch = progress?.running_batch;
+  if (running && rbatch) {
+    const lv = rbatch.live;
+    const where = rbatch.batches > 1 ? `Batch ${rbatch.batch_no} of ${rbatch.batches}: ` : '';
+    if (lv) {
+      live = `${where}step ${lv.step} of ${lv.steps}, ${lv.label.toLowerCase()}`;
+      if (lv.step === lv.steps && lv.videos_total > 0) {
+        live += ` (${lv.videos_judged} of ${lv.videos_total} videos judged)`;
+      } else if (lv.videos_total > 0) {
+        live += ` (${lv.videos_total} videos in this batch)`;
+      }
+      /* Silence as the machine reported it, plus the time since we last asked. */
+      const quiet = (lv.quiet_s ?? 0) + (rbatch.heard_s ?? 0);
+      if (quiet >= 600) {
+        live += `. No activity for ${Math.round(quiet / 60)} minutes. If this does not change, tell an admin`;
+      } else if (quiet >= 90) {
+        live += `. Last activity ${Math.round(quiet / 60)} min ago, still working on this step`;
+      } else {
+        live += '. Working';
+      }
+    } else {
+      const ph = rbatch.last_phase ? PHASE_WORDS[rbatch.last_phase] : undefined;
+      live = `${where}${rbatch.n_videos} videos with the audit service${ph ? `: ${ph.toLowerCase()}` : ''}`;
+    }
+  }
+  const problem = error !== null || (note === null && modelNote !== null);
+  /* The start message ("Already categorising 5 videos") is about what the
+     person just did, so it comes before the standing note about the model. */
+  const shown = error ?? note ?? modelNote ?? line;
 
   return (
     <div className="wx-cat" data-busy={busy ? 'true' : 'false'}>
@@ -388,10 +517,15 @@ export function CollabAngleCategorise({ brand, month, canEdit, onFiled }: Props)
           </svg>
         )}
       </div>
+      {live && !error && (
+        <p className="wx-cat-status" role="status" data-live="true">
+          {live}
+        </p>
+      )}
       {shown && (
         <p
-          className={'wx-cat-status' + (error ? ' wx-cat-status-err' : '')}
-          role={error ? 'alert' : 'status'}
+          className={'wx-cat-status' + (problem ? ' wx-cat-status-err' : '')}
+          role={problem ? 'alert' : 'status'}
         >
           {shown}
         </p>

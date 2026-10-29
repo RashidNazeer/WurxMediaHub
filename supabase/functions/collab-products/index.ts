@@ -217,7 +217,11 @@ async function handle(req: Request): Promise<Response> {
               headers: { ...auth, 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 brandId,
-                postedDateRange: { start: iso(from), end: iso(to) },
+                /* `startDate`/`endDate`, as Euka's spec (api.euka.ai/openapi.json)
+                   declares them. This sent `start`/`end`, which Euka now refuses
+                   with a 400 for EVERY brand — "EUKA will not return a catalogue
+                   (error 400)" — so onboarding never got a dropdown. */
+                postedDateRange: { startDate: iso(from), endDate: iso(to) },
                 /* 100 IS THEIR CEILING, and 200 is a 400 rather than a
                    truncated page — the same trap as Reacher's page_size. */
                 pageSize: 100,
@@ -301,6 +305,14 @@ async function handle(req: Request): Promise<Response> {
              * worth trying again later.
              */
             const theirFault = r.status >= 500;
+            /* Their reason, in the function log: a bare "400" is how the wrong
+               date keys went unexplained. Never sent to the browser. */
+            console.error(
+              'euka products refused',
+              store.name,
+              r.status,
+              (await r.text().catch(() => '')).slice(0, 300),
+            );
             return json({
               source: 'euka',
               store: store.name,

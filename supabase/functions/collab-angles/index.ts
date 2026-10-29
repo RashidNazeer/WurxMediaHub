@@ -160,32 +160,81 @@ async function monthOf(db: SupabaseClient, brand: string, month: string) {
   return { videos, noDate, filed };
 }
 
+/* What the audit machine writes into `last_error` when the hosted model
+   (Gemini) is the problem. `module_failed` is its word for a model call that
+   did not complete, which on the free key is nearly always the 500 requests a
+   day quota. It is also what every video said when the audit machine's own
+   dependencies were broken, so the screen only says "most likely". */
+const MODEL_TROUBLE =
+  /module_failed|resource[_ ]exhausted|quota|gemini|model call|rate[ -]?limit|no visual evidence|angle judgement returned nothing|not judged against every brief/i;
+/* Only RECENT failures count, so a month that failed weeks ago for reasons
+   since fixed does not keep blaming the model. */
+const MODEL_TROUBLE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+type VideoRow = {
+  status: string;
+  attempts: number | null;
+  last_error: string | null;
+  updated_at: string | null;
+};
+
+/** The counts the screen draws, and how many videos are failing because of the model. */
+function countProgress(rows: VideoRow[], now = Date.now()) {
+  const counts = { queued: 0, sent: 0, filed: 0, skipped: 0, failed: 0, needs_review: 0 };
+  let modelFailures = 0;
+  for (const r of rows) {
+    if (r.status in counts) counts[r.status as keyof typeof counts] += 1;
+    /* Failed, or queued again after a failure: either way the model is not
+       currently doing its job for this video. A queued video is judged by its
+       `last_error` alone and NOT by `attempts`: the worker does not charge an
+       attempt for a failure that is the environment's (a spent quota), so a
+       video held back by the quota has attempts of zero. */
+    const failing = r.status === 'failed' || r.status === 'queued';
+    if (
+      failing && r.last_error && MODEL_TROUBLE.test(r.last_error) &&
+      now - Date.parse(r.updated_at ?? '') <= MODEL_TROUBLE_WINDOW_MS
+    ) modelFailures += 1;
+  }
+  return { counts, modelFailures };
+}
+
 async function progressOf(db: SupabaseClient, brand: string, month: string) {
   const { videos, filed } = await monthOf(db, brand, month);
 
   const { data, error } = await db
     .from('collab_angle_videos')
-    .select('status')
+    .select('status, attempts, last_error, updated_at')
     .eq('brand', brand)
     .eq('month', month);
   if (error) throw new Error(error.message);
 
-  const counts = { queued: 0, sent: 0, filed: 0, skipped: 0, failed: 0, needs_review: 0 };
-  for (const r of (data ?? []) as Array<{ status: string }>) {
-    if (r.status in counts) counts[r.status as keyof typeof counts] += 1;
-  }
+  const { counts, modelFailures } = countProgress((data ?? []) as VideoRow[]);
   const total = (data ?? []).length;
   const left = counts.queued + counts.sent;
 
   const { data: batch } = await db
     .from('collab_angle_batches')
-    .select('state, last_phase, n_videos, provider_job, error')
+    .select('id, state, last_phase, n_videos, provider_job, error, last_polled_at')
     .eq('brand', brand)
     .eq('month', month)
     .in('state', ['submitting', 'running', 'filing'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  /* The audit machine's own progress for the running batch. Read apart from
+     the query above so that a missing column (migration 20261029120000 not yet
+     applied) costs the detail and nothing else. */
+  let batchProgress: unknown = null;
+  const batchId = (batch as { id?: string } | null)?.id;
+  if (batchId) {
+    const { data: pr } = await db.from('collab_angle_batches')
+      .select('last_progress').eq('id', batchId).maybeSingle();
+    batchProgress = (pr as { last_progress?: unknown } | null)?.last_progress ?? null;
+  }
+  /* Which batch this is out of how many, from the queue itself. */
+  const batchesTotal = Math.max(1, Math.ceil(total / 5));
+  const batchesDone = Math.min(batchesTotal, Math.floor((counts.filed + counts.skipped + counts.failed + counts.needs_review) / 5));
 
   /* A rough number, and the UI says so. Five and a half minutes a video is
      what a first run measured; a video the machine has seen before is far
@@ -195,11 +244,18 @@ async function progressOf(db: SupabaseClient, brand: string, month: string) {
   return {
     total,
     ...counts,
+    /* How many videos are failing for a reason that looks like the Gemini model
+       (an outage or the daily quota). Additive: an older screen ignores it. */
+    model_failures: modelFailures,
     running_batch: batch
       ? {
         state: (batch as { state: string }).state,
         last_phase: (batch as { last_phase: string | null }).last_phase,
         n_videos: (batch as { n_videos: number }).n_videos,
+        progress: batchProgress,
+        polled_at: (batch as { last_polled_at: string | null }).last_polled_at,
+        batch_no: batchesDone + 1,
+        batches: batchesTotal,
       }
       : null,
     /* About the brand month as a whole, not the queue: `total` above is what the
