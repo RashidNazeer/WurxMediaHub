@@ -10,7 +10,7 @@ import type { DeliverableLike } from '@/components/creator/ContestEntryDialog';
  */
 
 /** Under this, the countdown ring switches to the warning token. §8.1. */
-export const URGENT_MS = 48 * 3_600_000;
+const URGENT_MS = 48 * 3_600_000;
 
 /**
  * WHICH ROWS A CARD IS ALLOWED TO QUOTE.
@@ -107,7 +107,7 @@ export function countdownOf(contest: CreatorContest, now: number): Countdown {
   return { leftMs, share, centre: String(d), sub: d === 1 ? 'day left' : 'days left', urgent };
 }
 
-export interface Filmed {
+interface Filmed {
   /** Approved videos. A real count, so a real 0 is a 0. */
   done: number;
   /**

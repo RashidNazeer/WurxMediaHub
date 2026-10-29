@@ -291,7 +291,7 @@ export function WavesField({ intensity = 'full' }: { intensity?: 'full' | 'subtl
   const hostRef = useRef<HTMLDivElement | null>(null);
 
   /* Read inside the effect, so changing `intensity` never tears down the GL
-     context. Same pattern as `GlassFold.tsx`. */
+     context. */
   const intensityRef = useRef(intensity);
   intensityRef.current = intensity;
 
@@ -535,8 +535,7 @@ export function WavesField({ intensity = 'full' }: { intensity?: 'full' | 'subtl
      * Taking the position from the wrapper would therefore hand it the height
      * of the whole scrolling document on those two pages — a canvas several
      * thousand pixels tall, scrolling with the content. Fixed here, it is the
-     * viewport on all five, and the background does not scroll. Same reason
-     * `GlassFold.tsx` does it this way.
+     * viewport on all five, and the background does not scroll.
      *
      * `data-wx-waves` is a hook for `scripts/`, not for CSS.
      *

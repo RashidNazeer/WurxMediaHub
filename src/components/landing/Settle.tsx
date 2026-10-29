@@ -160,7 +160,7 @@ export function SettleWords({ text, className }: { text: string; className?: str
    BLOCKS THAT GAIN DEPTH ONCE
    ============================================================================ */
 
-export interface SettleOptions {
+interface SettleOptions {
   /** Rem the block starts below its resting place. */
   rise?: number;
   /** Degrees it starts tipped back about its top edge, settling to 0. */

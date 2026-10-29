@@ -14,12 +14,3 @@ const SHIPPED: Record<string, string> = {
 export function brandLogo(slug: string | null | undefined, url: string | null | undefined) {
   return url || (slug ? (SHIPPED[slug] ?? null) : null);
 }
-
-/**
- * Logos supplied as a finished 4:5 card picture, with the mark in the middle.
- * The card shows these as they are and keeps its dark fade below the mark.
- */
-const POSTER = new Set(['aurelia', 'dr-tobias']);
-
-export const isPosterLogo = (slug: string | null | undefined, url: string | null | undefined) =>
-  !url && Boolean(slug && POSTER.has(slug));

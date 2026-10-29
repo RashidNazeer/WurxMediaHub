@@ -14,7 +14,7 @@ import type { BrandThemeConfig } from '@/lib/brand-theme';
  * it opens.
  */
 
-export type BrandSavePayload = {
+type BrandSavePayload = {
   action: 'brand.save';
   brandId?: string | null;
   name: string;
@@ -25,7 +25,7 @@ export type BrandSavePayload = {
   isActive: boolean;
 };
 
-export type OfferSavePayload = {
+type OfferSavePayload = {
   action: 'offer.save';
   offerId?: string | null;
   brandId: string;
@@ -54,13 +54,13 @@ export type OfferSavePayload = {
   audience: string;
 };
 
-export type OfferDeletePayload = { action: 'offer.delete'; offerId: string };
+type OfferDeletePayload = { action: 'offer.delete'; offerId: string };
 
 /**
  * The brand's story. Its own action, so the About form cannot touch the name,
  * the store id or the budget by sending a stale copy of them back.
  */
-export type BrandAboutPayload = {
+type BrandAboutPayload = {
   action: 'brand.about';
   brandId: string;
   logoUrl: string | null;
@@ -83,7 +83,7 @@ export type BrandAboutPayload = {
   founderNote: string | null;
 };
 
-export type BriefSavePayload = {
+type BriefSavePayload = {
   action: 'brief.save';
   briefId?: string | null;
   brandId: string;
@@ -95,9 +95,9 @@ export type BriefSavePayload = {
   isActive: boolean;
 };
 
-export type BriefDeletePayload = { action: 'brief.delete'; briefId: string };
+type BriefDeletePayload = { action: 'brief.delete'; briefId: string };
 
-export type ProductSavePayload = {
+type ProductSavePayload = {
   action: 'product.save';
   productId?: string | null;
   brandId: string;
@@ -112,9 +112,9 @@ export type ProductSavePayload = {
   isActive: boolean;
 };
 
-export type ProductDeletePayload = { action: 'product.delete'; productId: string };
+type ProductDeletePayload = { action: 'product.delete'; productId: string };
 
-export type ManagePayload =
+type ManagePayload =
   | BrandSavePayload
   | BrandAboutPayload
   | OfferSavePayload
@@ -124,7 +124,7 @@ export type ManagePayload =
   | BriefSavePayload
   | BriefDeletePayload;
 
-export interface ManageResult {
+interface ManageResult {
   row: Brand | Offer | BrandProduct | BrandBrief;
   /** Pasted lines that matched no creator. Empty on everything but offers. */
   unmatched: string[];

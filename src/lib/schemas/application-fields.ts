@@ -40,7 +40,7 @@ export type WorkedWithWurx = (typeof WORKED_WITH_WURX)[number]['value'];
  * `password-rules.ts` is the one that owns it and it is Zod-free, so importing
  * it costs this module nothing.
  */
-export { PASSWORD_MAX, PASSWORD_MIN } from './password-rules';
+export { PASSWORD_MIN } from './password-rules';
 
 /** Raw form state. Empty strings are the "nothing picked yet" case. */
 export interface ApplicationInput {

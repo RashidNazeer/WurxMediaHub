@@ -54,7 +54,7 @@ type OKLCH = { l: number; c: number; h: number };
 
 const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
 
-export function hexToRgb(hex: string): RGB | null {
+function hexToRgb(hex: string): RGB | null {
   const s = hex.trim().replace(/^#/, '');
   const full = s.length === 3 ? s.replace(/./g, (c) => c + c) : s;
   if (!/^[0-9a-fA-F]{6}$/.test(full)) return null;
@@ -70,7 +70,7 @@ const toHex2 = (n: number) =>
     .toString(16)
     .padStart(2, '0');
 
-export const rgbToHex = ({ r, g, b }: RGB) => `#${toHex2(r)}${toHex2(g)}${toHex2(b)}`;
+const rgbToHex = ({ r, g, b }: RGB) => `#${toHex2(r)}${toHex2(g)}${toHex2(b)}`;
 
 /* sRGB transfer function, both directions. */
 const toLinear = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
@@ -330,7 +330,7 @@ export const AREA_META: Record<
 /** The hero gradient's angle when nobody has chosen one. */
 export const DEFAULT_ANGLE = 115;
 
-export type Mode = 'light' | 'dark';
+type Mode = 'light' | 'dark';
 
 /**
  * The brightness and saturation an area can support, per mode.
@@ -350,9 +350,9 @@ export type Mode = 'light' | 'dark';
  *   hero vibrates against text whatever its contrast ratio says. That is a
  *   comfort limit rather than a WCAG one, and no ratio would have caught it.
  */
-export type Band = { lo: number; hi: number; cMax: number };
+type Band = { lo: number; hi: number; cMax: number };
 
-export function bandFor(area: BrandAreaKey, mode: Mode, tone: BrandTone): Band {
+function bandFor(area: BrandAreaKey, mode: Mode, tone: BrandTone): Band {
   if (area === 'page') {
     return mode === 'light'
       ? { lo: 0.95, hi: 0.995, cMax: 0.04 }
@@ -410,7 +410,7 @@ const clampTo = (n: number, lo: number, hi: number) => (n < lo ? lo : n > hi ? h
  * outside the band, and then only as far as its edge. An admin who picks a
  * colour that was already in range gets their own hex back unchanged.
  */
-export function fitStop(
+function fitStop(
   hex: string,
   area: BrandAreaKey,
   mode: Mode,
@@ -595,7 +595,7 @@ export type BrandPalette = {
   accentInk: string;
 };
 
-export type BrandTheme = { light: BrandPalette; dark: BrandPalette };
+type BrandTheme = { light: BrandPalette; dark: BrandPalette };
 
 /** The PRISM accent violet, used when a brand has chosen no colour of its own. */
 export const DEFAULT_BRAND_COLOR = '#6A2FE0';

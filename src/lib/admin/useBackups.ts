@@ -66,14 +66,14 @@ export interface RestoreRun {
   error: string | null;
 }
 
-export interface BackupList {
+interface BackupList {
   backups: BackupRow[];
   restores: RestoreRun[];
   stored_bytes: number;
 }
 
 /** A refusal from the function, carrying its words and the flags the screen reacts to. */
-export class BackupCallError extends Error {
+class BackupCallError extends Error {
   readonly status: number;
   readonly busy: boolean;
   readonly needsPassphrase: boolean;
@@ -124,7 +124,7 @@ export const callBackup: Call = async (body) => {
   throw new BackupCallError(message, status, busy, needsPassphrase);
 };
 
-export const BACKUPS_KEY = ['admin', 'backups'] as const;
+const BACKUPS_KEY = ['admin', 'backups'] as const;
 
 /**
  * The backups and restore runs. Polls quickly while something is running, and

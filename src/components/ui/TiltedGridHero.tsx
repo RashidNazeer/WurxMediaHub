@@ -177,7 +177,7 @@ function measure(
   return { columns, sweep, unit: round(unit), limit: round(Math.min(sweep, limit)), bend };
 }
 
-export type TiltedGridImage = {
+type TiltedGridImage = {
   src: string;
   /** The brand's name. Published once as text; the band itself is decorative. */
   alt: string;
@@ -190,7 +190,7 @@ export type TiltedGridImage = {
   h?: number;
 };
 
-export type TiltedGridHeroProps = {
+type TiltedGridHeroProps = {
   /**
    * Marks run along the row in order. A tile takes its next mark each time
    * it wraps off-screen, so the whole list plays through however few tiles
@@ -788,5 +788,3 @@ function Mark({
     />
   );
 }
-
-export default TiltedGridHero;

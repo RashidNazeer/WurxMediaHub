@@ -147,7 +147,7 @@ const BRAND_COLUMNS_INNER =
 const OFFER_COLUMNS =
   'id, brand_id, badge_title, title, description, video_count, reward_amount, currency, status, needs_application, kind, created_at, updated_at';
 
-export const PRODUCT_COLUMNS =
+const PRODUCT_COLUMNS =
   'id, brand_id, name, external_product_id, image_url, price, currency, commission_rate, badge_title, is_active, created_at, updated_at';
 
 type BrandRow = Omit<Brand, keyof Commercials> & {
@@ -317,12 +317,6 @@ export interface BrandOfferFilters {
   search: string;
   page: number;
 }
-
-export const DEFAULT_BRAND_OFFER_FILTERS: BrandOfferFilters = {
-  status: 'all',
-  search: '',
-  page: 1,
-};
 
 /**
  * Every offer in one brand's hub, kept live, and PAGED IN THE DATABASE.

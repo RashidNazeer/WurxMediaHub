@@ -135,7 +135,7 @@ function readWhole(raw: string): number | null {
  * so this component states exactly what it needs, and so a row arriving from
  * anywhere with these five facts renders identically.
  */
-export interface DeliverableRow {
+interface DeliverableRow {
   id: string;
   type: DeliverableType;
   title: string;

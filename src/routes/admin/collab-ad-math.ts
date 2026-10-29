@@ -16,7 +16,7 @@ export type AdFigures = {
   mixedCurrency: boolean;
 };
 
-export type AdTotals = {
+type AdTotals = {
   cost: number;
   revenue: number;
   orders: number;

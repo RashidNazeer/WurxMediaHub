@@ -2,7 +2,6 @@
 import { ChevronDown } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 import { cn } from '@/lib/utils';
-import { useQueryClient } from '@tanstack/react-query';
 import { ContestDashboard } from '@/components/creator/ContestDashboard';
 import { LockedUntilApproved } from '@/components/creator/LockedUntilApproved';
 import { ContestEntryDialog } from '@/components/creator/ContestEntryDialog';
@@ -22,13 +21,10 @@ import { ViewSwitch } from '@/components/creator/earn/ViewSwitch';
 import { useNow } from '@/components/creator/earn/use-now';
 import { useContestWin } from '@/components/creator/earn/useContestWin';
 import { DataError, EmptyState } from '@/components/ui/DataState';
-import { useAuth } from '@/lib/auth/auth-context';
-import { useProfile } from '@/lib/auth/useProfile';
 import {
   doorOf,
   entryStateOf,
   isLiveForThem,
-  useCreatorContests,
   type CreatorContest,
 } from '@/lib/creator/useCreatorContests';
 
@@ -109,66 +105,11 @@ import {
  * — so the two routes, the two nav labels and the two screens stay as they are.
  */
 
-/**
- * `hubBrandId` renders this same screen inside a Brand Hub, showing only that
- * brand's contests.
- *
- * It is WHERE THE SCREEN IS, and it is now the only brand narrowing there is:
- * the creator's own brand dropdown is deleted, so there is no longer a second,
- * conflicting answer to "which brand am I looking at" on a page that is a
- * brand.
- *
- * NEITHER PLACE DRAWS A TITLE. The section name lives on the nav item and is
- * drawn by the top bar, so it costs no vertical space here; inside a hub the
- * rail names the section instead.
- */
 /** Contests beyond which a search box earns its place. */
 const SEARCH_AFTER = 8;
 
-export function Contests({ hubBrandId }: { hubBrandId?: string } = {}) {
-  const { claims } = useAuth();
-  const { data: profile } = useProfile();
-  const role = profile?.role ?? claims?.role;
-  const approved = role === 'creator' || role === 'ops' || role === 'admin';
-
-  /*
-   * ENTERING IS NARROWER THAN READING, and the screen has to say so rather than
-   * find out. `is_approved_creator()` admits ops and admin so staff can BROWSE
-   * a contest, while `apply_for_contest` asserts `creator` exactly (rule E6).
-   * Without this a staff member reading their own product gets a primary Enter
-   * button whose only possible outcome is a refusal.
-   */
-  const isCreator = role === 'creator';
-
-  /*
-   * Her claimed and confirmed figures ride along with her entries, in the same
-   * query, because they are the same question: what is true about my own
-   * entries right now. So a tile that has an entry to draw always has the
-   * figures to draw on it, and there is no third loading state on this screen.
-   */
-  const { contests, isLoading, isError } = useCreatorContests(hubBrandId);
-  const queryClient = useQueryClient();
-  /* The hook hands back no refetch, so retry invalidates the two reads it is built from. */
-  const retry = () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['creator', 'contests'] }),
-      queryClient.invalidateQueries({ queryKey: ['creator', 'contest-entries'] }),
-    ]);
-
-  return (
-    <ContestsView
-      approved={approved}
-      isCreator={isCreator}
-      contests={contests}
-      isLoading={isLoading}
-      isError={isError}
-      retry={retry}
-    />
-  );
-}
-
 /**
- * THE SCREEN ITSELF, with its data handed in. `Contests` fetches; this draws.
+ * THE SCREEN ITSELF, with its data handed in by the caller (the Brand Hub and the merged Earn page).
  * Split so `/dev/contests` can render the REAL layout against fixtures, which
  * is the only way anybody without a login can look at it.
  */

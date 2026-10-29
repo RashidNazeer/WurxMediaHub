@@ -34,7 +34,7 @@ export type ClientLink = {
   is_live: boolean;
 };
 
-export type NewClientLink = {
+type NewClientLink = {
   label: string;
   brands: string[];
   months: string[];
@@ -118,7 +118,7 @@ export function useCreateClientLink() {
   });
 }
 
-export type LinkOpen = { viewed_at: string; visitor: string | null; user_agent: string | null };
+type LinkOpen = { viewed_at: string; visitor: string | null; user_agent: string | null };
 
 /** When a link was opened, newest first. Never an address: only a salted hash. */
 export function useClientLinkOpens(id: string | null) {

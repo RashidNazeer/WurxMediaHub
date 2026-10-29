@@ -15,10 +15,10 @@ import type { PictureData } from './lines';
  *   - a picture bigger than PICTURE_MAX_BYTES is skipped on its own.
  */
 
-export const PICTURE_BUDGET_BYTES = 120 * 1024 * 1024;
-export const PICTURE_MAX_BYTES = 10 * 1024 * 1024;
+const PICTURE_BUDGET_BYTES = 120 * 1024 * 1024;
+const PICTURE_MAX_BYTES = 10 * 1024 * 1024;
 /** Per picture. A slow one is skipped and counted, never waited on forever. */
-export const PICTURE_TIMEOUT_MS = 20_000;
+const PICTURE_TIMEOUT_MS = 20_000;
 
 /** One picture the server knows about, with a short-lived link to read it. */
 export interface PictureRef {
@@ -29,7 +29,7 @@ export interface PictureRef {
   url: string;
 }
 
-export interface PackedPictures {
+interface PackedPictures {
   items: PictureData[];
   skipped: number;
   bytes: number;

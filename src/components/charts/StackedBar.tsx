@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import { exactMoney } from './chart-kit';
 
-export interface StackPart {
+interface StackPart {
   label: string;
   value: number;
   token: string;

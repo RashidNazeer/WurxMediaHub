@@ -610,5 +610,3 @@ export function CollabAngleQueue({
     document.body,
   );
 }
-
-export default CollabAngleQueue;

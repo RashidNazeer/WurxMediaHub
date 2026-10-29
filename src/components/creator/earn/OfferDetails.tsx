@@ -50,7 +50,7 @@ import { useCreatorBrandBriefs } from './useOfferBrief';
  */
 
 /** The least an offer has to be for this panel to describe it. */
-export interface OfferDetailsOffer {
+interface OfferDetailsOffer {
   id: string;
   /** Needed to reach the brand's briefs and products. Optional: see `brandId`. */
   brand_id?: string;
@@ -64,7 +64,7 @@ export interface OfferDetailsOffer {
 }
 
 /** The frozen half of the deal, when a creator is already on it. */
-export interface OfferDetailsAgreed {
+interface OfferDetailsAgreed {
   committed_amount: string | number | null;
   committed_video_count: number | null;
   currency: string;

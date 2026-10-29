@@ -34,14 +34,14 @@ export const UI_SCALES = [
   { value: 'large', label: 'Large', px: 16.5 },
 ] as const;
 
-export type UiScale = (typeof UI_SCALES)[number]['value'];
+type UiScale = (typeof UI_SCALES)[number]['value'];
 
 /**
  * 15px, against the browser's 16px. Everything is about 6% smaller than it was
  * on 2026-08-15, which is the "a little smaller" he asked for rather than a
  * change somebody has to squint at to notice.
  */
-export const DEFAULT_UI_SCALE: UiScale = 'default';
+const DEFAULT_UI_SCALE: UiScale = 'default';
 
 const KEY = 'wurxmediahub-ui-scale';
 
@@ -75,7 +75,7 @@ export function clearUiScale() {
  */
 const listeners = new Set<(s: UiScale) => void>();
 
-export function setUiScale(scale: UiScale) {
+function setUiScale(scale: UiScale) {
   window.localStorage.setItem(KEY, scale);
   applyUiScale(scale);
   listeners.forEach((fn) => fn(scale));

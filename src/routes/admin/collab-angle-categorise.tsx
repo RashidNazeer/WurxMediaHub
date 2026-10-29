@@ -460,5 +460,3 @@ export function CollabAngleCategorise({ brand, month, canEdit, onFiled }: Props)
     </div>
   );
 }
-
-export default CollabAngleCategorise;

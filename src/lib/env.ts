@@ -27,7 +27,7 @@
  * the same failure.
  */
 
-export interface Env {
+interface Env {
   VITE_SUPABASE_URL: string;
   /**
    * The `sb_publishable_...` key, not the legacy `eyJ...` anon JWT. Both work

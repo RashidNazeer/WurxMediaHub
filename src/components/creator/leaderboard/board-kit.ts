@@ -20,13 +20,13 @@ export const RANGES: { key: RangeKey; label: string }[] = [
   { key: 'all', label: 'All time' },
 ];
 
-export interface BoardWindow {
+interface BoardWindow {
   from: string;
   to: string;
 }
 
 /** Older than any figure this product holds, so "all time" means all of it. */
-export const ALL_TIME_FROM = '2000-01-01';
+const ALL_TIME_FROM = '2000-01-01';
 
 /**
  * A chip to two dates, in UTC. Calendar weeks (Monday first) and calendar
@@ -41,7 +41,7 @@ export function rangeWindow(key: RangeKey): BoardWindow {
 }
 
 /** RPC numerics arrive as numbers or strings; a missing one stays missing. */
-export function num(v: unknown): number | null {
+function num(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;

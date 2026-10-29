@@ -84,7 +84,7 @@ export interface CreatorNotification {
 }
 
 /** How many items the panel will ever show. Newest first, the rest dropped. */
-export const NOTIFICATION_CAP = 20;
+const NOTIFICATION_CAP = 20;
 
 /** How far back each underlying read looks. */
 const FEED_CAP = 25;
@@ -426,7 +426,7 @@ function fromAwards(rows: AwardRow[]): CreatorNotification[] {
 
 /* --------------------------------------------------------------- public -- */
 
-export interface CreatorNotifications {
+interface CreatorNotifications {
   items: CreatorNotification[];
   unreadCount: number;
   /** Everything currently in the list becomes read, on this device only. */

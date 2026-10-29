@@ -63,7 +63,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 
 /* ------------------------------------------------------------------ shapes -- */
 
-export type ContestEntryStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
+type ContestEntryStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
 
 /**
  * What a deliverable asks for. Mirrors the database enum
@@ -74,7 +74,7 @@ export type ContestDeliverableType = 'gmv' | 'video_count';
 /** Where one claimed set of figures has got to. Only staff can move it. */
 export type ContestProgressStatus = 'pending' | 'confirmed' | 'rejected';
 
-export interface CreatorContestBrand {
+interface CreatorContestBrand {
   id: string;
   name: string;
   slug: string;
@@ -104,7 +104,7 @@ export interface CreatorContestDeliverable {
   sortOrder: number;
 }
 
-export interface CreatorContestProduct {
+interface CreatorContestProduct {
   contestId: string;
   productId: string;
   productName: string;
@@ -201,7 +201,7 @@ export interface CreatorConfirmedTotals {
 }
 
 /** One row of `contest_entry_progress`, which is keyed to exactly one entry. */
-export interface CreatorEntryProgress {
+interface CreatorEntryProgress {
   entryId: string;
   contestId: string;
   /** Frozen at approval. Null means an open ended entry, so draw no bar. */
@@ -280,7 +280,7 @@ export interface CreatorContest {
  * did. Without it a receipt written six weeks later would quote whatever their
  * total is now, which is not what anybody was paid on.
  */
-export interface CreatorContestAward {
+interface CreatorContestAward {
   id: string;
   entryId: string;
   contestId: string;
@@ -316,7 +316,7 @@ export function doorOf(c: CreatorContest, now = Date.now()): ContestDoor {
 }
 
 /** Where THEY stand, which is a different question from the one above. */
-export type ContestEntryState = 'in' | 'waiting' | 'declined' | 'withdrawn' | 'none';
+type ContestEntryState = 'in' | 'waiting' | 'declined' | 'withdrawn' | 'none';
 
 export function entryStateOf(c: CreatorContest): ContestEntryState {
   const s = c.entry?.status;
@@ -325,21 +325,6 @@ export function entryStateOf(c: CreatorContest): ContestEntryState {
   if (s === 'rejected') return 'declined';
   if (s === 'withdrawn') return 'withdrawn';
   return 'none';
-}
-
-/**
- * Whether tapping Enter would do anything.
- *
- * A courtesy, not a boundary. `apply_for_contest` re-checks every one of these
- * under a row lock, plus the exclusion the browser is never told about, because
- * a creator holding an id can post straight at the Edge Function.
- */
-export function canEnter(c: CreatorContest, now = Date.now()): boolean {
-  const state = entryStateOf(c);
-  return (
-    doorOf(c, now) === 'open' &&
-    (state === 'none' || state === 'declined' || state === 'withdrawn')
-  );
 }
 
 /** Live work outranks a shut door: they are in it, so it is still theirs. */
@@ -404,7 +389,7 @@ interface ProductRow {
   product_name: string;
 }
 
-export interface CreatorContestCatalogue {
+interface CreatorContestCatalogue {
   contests: ContestRow[];
   deliverables: DeliverableRow[];
   products: ProductRow[];
@@ -436,7 +421,7 @@ export interface CreatorContestCatalogue {
  * entry against another brand's contest simply finds no parent row here and
  * falls away on its own.
  */
-export function useCreatorContestCatalogue(brandId?: string) {
+function useCreatorContestCatalogue(brandId?: string) {
   const queryClient = useQueryClient();
 
   const query = useQuery({
@@ -584,7 +569,7 @@ interface AwardRow {
   paid_at: string | null;
 }
 
-export interface MyContestEntries {
+interface MyContestEntries {
   entries: EntryRow[];
   terms: TermRow[];
   progress: ProgressRow[];
@@ -618,7 +603,7 @@ export interface MyContestEntries {
  * learns on the next refetch. Six reads, one round trip, because they are all
  * the same question: what is true about my own entries right now.
  */
-export function useMyContestEntries() {
+function useMyContestEntries() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -821,7 +806,7 @@ export function newVideosNeeded(
 }
 
 /** The claim sitting with the team, if there is one. At most one, by index. */
-export function pendingClaimOf(updates: CreatorProgressUpdate[]): CreatorProgressUpdate | null {
+function pendingClaimOf(updates: CreatorProgressUpdate[]): CreatorProgressUpdate | null {
   return updates.find((u) => u.status === 'pending') ?? null;
 }
 
@@ -1064,7 +1049,7 @@ export function useCreatorContests(brandId?: string) {
  * the next is 4th, because inventing an order between two people who are level
  * is both untrue and a fact about somebody else.
  */
-export interface MyContestStanding {
+interface MyContestStanding {
   /** How many people are in it. No hint of who. */
   entrants: number;
   /** The caller's own confirmed figures, the same ones the totals view carries. */
@@ -1116,16 +1101,16 @@ export function useMyContestStanding(contestId: string | null | undefined) {
 
 /* --------------------------------------------------------------- writing -- */
 
-export type EnterContestPayload = {
+type EnterContestPayload = {
   action: 'contest.enter';
   contestId: string;
   note: string | null;
 };
 
-export type WithdrawEntryPayload = { action: 'contest.withdraw'; entryId: string };
+type WithdrawEntryPayload = { action: 'contest.withdraw'; entryId: string };
 
 /** NULL clears it. Changing a target and dropping one are the same act. */
-export type SetTargetPayload = {
+type SetTargetPayload = {
   action: 'contest.target';
   entryId: string;
   target: number | null;
@@ -1135,7 +1120,7 @@ export type SetTargetPayload = {
  * ONE NEW VIDEO, filed with an update. Exactly the new ones, never the ones
  * already declared: 5 to 6 sends one of these, not six.
  */
-export type ContestProgressVideo = {
+type ContestProgressVideo = {
   videoUrl: string;
   adCode: string;
   adAuthorized?: boolean;
@@ -1166,7 +1151,7 @@ export type ContestProgressVideo = {
  *
  * IT LANDS AS A CLAIM. Nothing here is money until staff confirm it.
  */
-export type SubmitProgressPayload = {
+type SubmitProgressPayload = {
   action: 'progress.submit';
   entryId: string;
   gmv: number;

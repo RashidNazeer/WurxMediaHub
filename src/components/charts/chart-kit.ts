@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from 'react';
  *
  * NO CHART LIBRARY, and that is a deliberate departure from the build prompt,
  * which said to install Recharts if nothing was installed. Nothing is — but
- * this repo already hand-rolls its charts (`PerformanceChart.tsx`,
- * `VelocityChart.tsx`) and the note in the first of them gives the reason this
+ * this repo already hand-rolled its charts (the since-deleted
+ * `PerformanceChart.tsx` and `VelocityChart.tsx`) and the note in the first of them gave the reason this
  * work inherits: "the stack is locked, a dependency for two charts is a poor
  * trade, and this way the marks obey the same --wx-* tokens as everything else
  * and follow the text-size setting."
@@ -50,7 +50,7 @@ export interface ChartPoint {
 export const NOT_REPORTED = 'Not reported';
 
 /** The box a chart draws into, measured rather than assumed. */
-export interface ChartBox {
+interface ChartBox {
   /** Content width in CSS pixels. */
   w: number;
   /** Content height in CSS pixels. */
@@ -134,7 +134,7 @@ export function compact(n: number): string {
  * paid in rupiah is never shown dollars. An unknown code is printed as the code
  * itself rather than guessed at.
  */
-export function currencyPrefix(currency: string | null): string {
+function currencyPrefix(currency: string | null): string {
   const code = (currency || 'USD').toUpperCase();
   const known: Record<string, string> = {
     USD: '$',

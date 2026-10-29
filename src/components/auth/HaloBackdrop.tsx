@@ -12,11 +12,8 @@
  * changing the ground is one edit instead of five. None of those files
  * changed to make this swap.
  *
- * `GlassFold.tsx` and the WebGL fragment shader in it are left in the tree,
- * unreferenced. That shader is Rashid's own, pasted verbatim, and if the
- * aurora turns out not to be what he wants it is one import away from coming
- * back. The tokens it read (`--wx-field-body`, `--wx-field-edge`) are still
- * declared for the same reason.
+ * The old `GlassFold.tsx` component and its WebGL fragment shader have been
+ * deleted; they remain in git history if the aurora is ever replaced again.
  *
  * `intensity` carries straight through: `subtle` behind a signed-in screen,
  * where there is real work on top of the ground, and `full` on the public

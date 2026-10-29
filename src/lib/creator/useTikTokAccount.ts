@@ -17,7 +17,7 @@ import { useAuth } from '@/lib/auth/auth-context';
  * leak even if a policy elsewhere is written wrongly.
  */
 
-export interface TikTokAccount {
+interface TikTokAccount {
   creator_id: string;
   open_id: string;
   display_name: string | null;

@@ -36,7 +36,7 @@ import type { ChartPoint } from '@/components/charts';
  * never changes, so a row fetched once is correct forever.
  */
 
-export interface VideoDay {
+interface VideoDay {
   stat_date: string;
   cost: number;
   gross_revenue: number;
@@ -81,7 +81,7 @@ const label = (iso: string) =>
  *
  * The axis runs from the first reported day to the last, never wider: an empty
  * stretch before the video existed reads as "you earned nothing" rather than
- * "there was nothing yet", which is the same mistake `rangeToDates` avoids.
+ * "there was nothing yet", which is the same mistake the old all-time range helper avoided.
  */
 export function toSeries(days: VideoDay[]): {
   gmv: ChartPoint[];

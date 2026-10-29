@@ -342,7 +342,7 @@ function PageSkeleton({ bare = false }: { bare?: boolean }) {
  * must not carry a `backdrop-filter`. `data-brand-world` is what
  * `scripts/shots-hub.mjs` finds the page by.
  */
-export function AccentScope({
+function AccentScope({
   brand,
   children,
 }: {

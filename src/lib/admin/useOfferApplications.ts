@@ -118,7 +118,7 @@ function flattenBudget(row: QueueRowRaw): OfferQueueRow {
  * literally. `or=(...)` is especially easy to break, so anything that is not a
  * plain search character is dropped before it can get near one.
  */
-export const sanitiseOfferSearch = (raw: string) =>
+const sanitiseOfferSearch = (raw: string) =>
   raw
     .trim()
     .replace(/^@+/, '')
@@ -178,7 +178,7 @@ export function useOfferApplications(filters: OfferQueueFilters) {
   });
 }
 
-export type OfferApplicationCounts = Record<OfferApplicationStatus, number>;
+type OfferApplicationCounts = Record<OfferApplicationStatus, number>;
 
 /**
  * Counts for the tabs and the dashboard.

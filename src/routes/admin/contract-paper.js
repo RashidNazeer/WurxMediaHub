@@ -148,11 +148,6 @@ function tracked(d, text, x, y, space) {
   }
   return cx - x - space;
 }
-function trackedWidth(d, text, space) {
-  let w = 0;
-  for (const ch of String(text)) w += d.getTextWidth(ch) + space;
-  return w - space;
-}
 
 /**
  * THE CHROME, STAMPED ON EVERY PAGE.
@@ -267,7 +262,7 @@ function footer(d, page, total) {
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    THE DOCUMENT
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-export function drawContract(fields, sections) {
+function drawContract(fields, sections) {
   const d = new jsPDF({ unit: 'pt', format: 'letter' });
   let y = 0;
 

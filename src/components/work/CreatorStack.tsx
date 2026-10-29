@@ -1,7 +1,7 @@
 import { CreatorFace } from '@/components/work/CreatorFace';
 import { cn } from '@/lib/utils';
 
-export interface StackedCreator {
+interface StackedCreator {
   id: string;
   name: string | null;
   handle: string | null;

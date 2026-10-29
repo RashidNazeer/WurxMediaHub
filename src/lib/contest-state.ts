@@ -22,7 +22,7 @@
 export type ContestLifecycle = 'open' | 'off' | 'closed' | 'settled' | 'cancelled';
 
 /** The four facts that decide it. Both `Contest` and `CreatorContest` carry them. */
-export interface ContestLifecycleFacts {
+interface ContestLifecycleFacts {
   status: 'active' | 'inactive';
   expiresAt: string;
   settledAt: string | null;

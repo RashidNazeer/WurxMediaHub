@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { TIERS } from '@/lib/auth/auth-context';
 
 /** Matches the cap the Edge Function enforces, so the browser fails first. */
-export const MAX_BATCH = 100;
+const MAX_BATCH = 100;
 
 /**
  * The reviewer's decision, validated in the browser.

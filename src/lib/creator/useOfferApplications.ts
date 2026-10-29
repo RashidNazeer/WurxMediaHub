@@ -103,13 +103,13 @@ export function useMyOfferApplications(brandId: string | undefined) {
   return query;
 }
 
-export type ApplyPayload = {
+type ApplyPayload = {
   action: 'application.create';
   offerId: string;
   note: string | null;
 };
 
-export type WithdrawPayload = { action: 'application.withdraw'; applicationId: string };
+type WithdrawPayload = { action: 'application.withdraw'; applicationId: string };
 
 /**
  * Asking for an offer, and changing your mind.

@@ -31,7 +31,7 @@ import physiciansChoice from '@/assets/brands/physicians-choice.png';
 import pureDailyCare from '@/assets/brands/puredailycare.png';
 import vitauthority from '@/assets/brands/vitauthority.png';
 
-export interface BrandLogo {
+interface BrandLogo {
   name: string;
   logo: string;
   /** Rendered height in px. Square marks need less than wide wordmarks. */

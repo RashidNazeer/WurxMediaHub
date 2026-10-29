@@ -11,7 +11,7 @@ import { useProfile, type Profile } from '@/lib/auth/useProfile';
  *   'approved'     the moment they are let in
  *   null           nothing owed, show the normal screen
  */
-export type OnboardingMoment = 'welcome' | 'approved' | null;
+type OnboardingMoment = 'welcome' | 'approved' | null;
 
 /**
  * Decide it from the profile row, never from local state.
@@ -21,7 +21,7 @@ export type OnboardingMoment = 'welcome' | 'approved' | null;
  * congratulations, not a "welcome, you have applied" card that is already out
  * of date. So approval wins, and dismissing it settles the welcome too.
  */
-export function momentFor(profile: Profile | undefined): OnboardingMoment {
+function momentFor(profile: Profile | undefined): OnboardingMoment {
   if (!profile) return null;
   if (profile.role === 'creator' && !profile.approval_celebrated_at) return 'approved';
   if (!profile.welcomed_at) return 'welcome';

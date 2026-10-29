@@ -15,11 +15,11 @@ import { getSupabase } from '@/lib/supabase';
  * immediately instead of after the upload fails.
  */
 
-export const BUCKET = 'brand-assets';
+const BUCKET = 'brand-assets';
 
 /** SVG is absent on purpose: it can carry script, and a logo does not need it. */
 export const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
-export const MAX_BYTES = 2 * 1024 * 1024;
+const MAX_BYTES = 2 * 1024 * 1024;
 
 const EXTENSION: Record<string, string> = {
   'image/png': 'png',
@@ -28,7 +28,7 @@ const EXTENSION: Record<string, string> = {
 };
 
 /** Null when the file is fine, otherwise something a person can act on. */
-export function checkImage(file: File): string | null {
+function checkImage(file: File): string | null {
   if (!(ACCEPTED_TYPES as readonly string[]).includes(file.type)) {
     return 'Use a PNG, JPG or WebP image';
   }

@@ -24,7 +24,7 @@ import { getSupabase } from '@/lib/supabase';
  * by brand, so opening three offers from one brand is still one request.
  */
 
-export interface CreatorBrandBrief {
+interface CreatorBrandBrief {
   id: string;
   title: string;
   what_to_make: string | null;

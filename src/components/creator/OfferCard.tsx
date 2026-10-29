@@ -59,7 +59,7 @@ import { needsFilming, progressSentence, type JobProgress } from '@/lib/work/job
  */
 
 /** The least an offer has to be for this card to draw it. */
-export interface OfferCardOffer {
+interface OfferCardOffer {
   id: string;
   /**
    * The brand, for the detail panel's brief and product reads.

@@ -45,7 +45,7 @@
  * the surprising choice.
  */
 
-export type PeriodRange = { from: string; to: string } | null;
+type PeriodRange = { from: string; to: string } | null;
 
 type VideoRow = { date?: string | null } & Record<string, unknown>;
 type CreatorLike = { video_codes?: unknown } & Record<string, unknown>;

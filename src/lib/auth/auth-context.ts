@@ -77,7 +77,7 @@ export type CreatorTier = (typeof TIERS)[number];
  * A token is signed but it is still client-side data, and it can be up to an
  * hour stale. Permission is enforced by row level security in the database.
  */
-export interface AuthClaims {
+interface AuthClaims {
   role: AppRole;
   tier: CreatorTier | null;
   active: boolean;
@@ -114,7 +114,7 @@ export interface IdentitySwap {
   toEmail: string | null;
 }
 
-export interface AuthContextValue {
+interface AuthContextValue {
   status: AuthStatus;
   session: Session | null;
   user: User | null;

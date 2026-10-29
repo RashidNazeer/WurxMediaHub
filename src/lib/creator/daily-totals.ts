@@ -12,7 +12,7 @@ import type { DailyPerformance } from '@/lib/creator/usePerformance';
 
 const DAY_MS = 86_400_000;
 
-export const spanDays = (r: DateRange) =>
+const spanDays = (r: DateRange) =>
   Math.round((Date.parse(`${r.to}T00:00:00Z`) - Date.parse(`${r.from}T00:00:00Z`)) / DAY_MS) +
   1;
 
@@ -27,24 +27,6 @@ export const spanDays = (r: DateRange) =>
 export function previousWindow(r: DateRange): DateRange {
   const n = spanDays(r);
   return { from: addDays(r.from, -n), to: addDays(r.from, -1) };
-}
-
-export type Delta = { kind: 'pct'; pct: number } | { kind: 'new' } | null;
-
-/**
- * A change, or the honest absence of one.
- *
- * Previous zero and current positive is "new", never an infinite percentage.
- * Both zero says nothing at all: "0% vs last month" on a figure that has never
- * moved is a sentence with no information in it. Compared at cent precision, so
- * float dust in a sum cannot turn nothing into "+0.00001%".
- */
-export function deltaOf(cur: number | null, prev: number | null): Delta {
-  if (cur === null || prev === null) return null;
-  const c = Math.round(cur * 100) / 100;
-  const p = Math.round(prev * 100) / 100;
-  if (p === 0) return c === 0 ? null : { kind: 'new' };
-  return { kind: 'pct', pct: ((c - p) / p) * 100 };
 }
 
 export function sumDaily(rows: DailyPerformance[]) {

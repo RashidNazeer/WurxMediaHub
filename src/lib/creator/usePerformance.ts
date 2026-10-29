@@ -19,7 +19,6 @@ import { getSupabase } from '@/lib/supabase';
  */
 
 const DAY = 24 * 60 * 60 * 1000;
-const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 export type PerformanceWindow = {
   earliest: string | null;
@@ -41,7 +40,7 @@ export type PerformanceWindow = {
  * two tabs together is the one sum this data cannot support, and no screen
  * does it.
  */
-export type VideoSource = 'offer' | 'contest' | 'both';
+type VideoSource = 'offer' | 'contest' | 'both';
 
 export type VideoPerformance = {
   item_id: string;
@@ -201,99 +200,9 @@ export function useDailyPerformance(
   });
 }
 
-/* ------------------------------------------------------------ date ranges -- */
-
-export type RangeKey = 'all' | '7' | '30' | 'month';
-
-export const RANGES: { key: RangeKey; label: string }[] = [
-  { key: 'all', label: 'All time' },
-  { key: '7', label: '7 days' },
-  { key: '30', label: '30 days' },
-  { key: 'month', label: 'By month' },
-];
-
-/* ----------------------------------------------------------------- months -- */
-
-/**
- * Walking month by month, which is how somebody actually asks "what did I make
- * in July".
- *
- * A month is `YYYY-MM`. Stepping is done on the STRING rather than by adding 30
- * days to a Date, because month lengths differ and "a month ago" from the 31st
- * is a question with no good answer.
- */
-export const monthKey = (d: Date) =>
-  `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-
-export function shiftMonth(key: string, by: number): string {
-  const [y, m] = key.split('-').map(Number);
-  const d = new Date(Date.UTC(y!, m! - 1 + by, 1));
-  return monthKey(d);
-}
-
-export function monthLabel(key: string): string {
-  const [y, m] = key.split('-').map(Number);
-  return new Date(Date.UTC(y!, m! - 1, 1)).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}
-
-/** First and last day of a month, clamped to the creator's own window. */
-export function monthToDates(
-  key: string,
-  window: PerformanceWindow | undefined
-): { from: string; to: string } {
-  const [y, m] = key.split('-').map(Number);
-  const first = `${key}-01`;
-  const lastDay = new Date(Date.UTC(y!, m!, 0)).getUTCDate();
-  const last = `${key}-${String(lastDay).padStart(2, '0')}`;
-
-  const yesterday = iso(new Date(Date.now() - DAY));
-  return {
-    from: window?.earliest && window.earliest > first ? window.earliest : first,
-    // Never past yesterday: today is still being counted and we do not store it.
-    to: last > yesterday ? yesterday : last,
-  };
-}
-
-
-/**
- * Turn a range choice into two dates.
- *
- * ALL TIME IS THE DEFAULT, and that is Rashid's rule with a reason: a video
- * that ran last month would show a flat zero under month-to-date, and a
- * creator seeing zero against work they know sold is the fastest way to lose
- * their trust in every other number on the screen.
- *
- * THE FLOOR IS THE DAY THEIR FIRST VIDEO EXISTED. Never earlier: an empty
- * stretch before the video was even posted reads as "you earned nothing"
- * rather than "there was nothing yet".
- *
- * THE CEILING IS YESTERDAY, because today is still accruing and we do not
- * store it. Showing a half-written day next to complete ones would make the
- * last bar of every chart look like a collapse.
- */
-export function rangeToDates(
-  key: RangeKey,
-  window: PerformanceWindow | undefined
-): { from: string | null; to: string | null } {
-  if (!window?.earliest) return { from: null, to: null };
-
-  const yesterday = iso(new Date(Date.now() - DAY));
-  const to = window.latest && window.latest < yesterday ? window.latest : yesterday;
-
-  if (key === 'all') return { from: window.earliest, to };
-
-  const back = Number(key);
-  const start = iso(new Date(new Date(`${to}T00:00:00Z`).getTime() - (back - 1) * DAY));
-  return { from: start < window.earliest ? window.earliest : start, to };
-}
-
 /* ------------------------------------------------------- which brand paid -- */
 
-export type BrandPerformance = {
+type BrandPerformance = {
   brand_id: string | null;
   brand_name: string | null;
   gmv: number;

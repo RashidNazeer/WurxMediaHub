@@ -88,15 +88,12 @@ export function timeLeft(iso: string, now: number = Date.now()): string {
   return `${Math.ceil(hours / 24)} days left`;
 }
 
-/** True once the deadline has passed. The one definition, used everywhere. */
-export const hasClosed = (iso: string, now: number = Date.now()) => Date.parse(iso) <= now;
-
 /* -------------------------------------------------------------------------- */
 /* Wall clock arithmetic, the other direction                                  */
 /* -------------------------------------------------------------------------- */
 
 /** The five numbers an admin actually typed, read back out of an instant. */
-export interface WallClock {
+interface WallClock {
   year: number;
   month: number;
   day: number;
@@ -112,7 +109,7 @@ export interface WallClock {
  * `hour % 24`, which maps 24 back to 0 WITHOUT moving the day with it, so a
  * deadline at midnight silently landed twenty four hours early.
  */
-export function wallClockInZone(instantMs: number, timeZone: string): WallClock {
+function wallClockInZone(instantMs: number, timeZone: string): WallClock {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,
     hourCycle: 'h23',
@@ -162,7 +159,7 @@ function offsetAt(instantMs: number, timeZone: string): number {
   return d.getTime() - instantMs;
 }
 
-export type InstantResult =
+type InstantResult =
   | { ok: true; iso: string }
   | { ok: false; message: string };
 

@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils';
 
 export type DeliverableType = 'gmv' | 'video_count';
 
-export interface DeliverableProgressProps {
+interface DeliverableProgressProps {
   type: DeliverableType;
   /** What the admin set. Read only, always, everywhere. */
   target: number;

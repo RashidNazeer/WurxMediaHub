@@ -8,7 +8,7 @@ export type ResolvedTheme = 'light' | 'dark';
 
 export const THEME_STORAGE_KEY = 'wurxmediahub-theme';
 
-export interface ThemeContextValue {
+interface ThemeContextValue {
   mode: ThemeMode;
   resolved: ResolvedTheme;
   setMode: (mode: ThemeMode) => void;

@@ -30,14 +30,6 @@ export interface QueueFilters {
   page: number;
 }
 
-export const DEFAULT_FILTERS: QueueFilters = {
-  status: 'pending',
-  workedWithWurx: false,
-  search: '',
-  sort: 'newest',
-  page: 1,
-};
-
 export interface QueueRow {
   id: string;
   tiktok_handle: string;
@@ -62,7 +54,7 @@ export interface QueueRow {
  * literally. Handles are alphanumerics, dots and underscores, so anything else
  * is dropped before it can become part of the query.
  */
-export const sanitiseSearch = (raw: string) =>
+const sanitiseSearch = (raw: string) =>
   raw
     .trim()
     .replace(/^@+/, '')
@@ -103,7 +95,7 @@ export function useApplications(filters: QueueFilters) {
   });
 }
 
-export interface ApplicationCounts extends Record<ApplicationStatus, number> {
+interface ApplicationCounts extends Record<ApplicationStatus, number> {
   /** Pending AND previously worked with Wurx, the fast-track pile. */
   pendingKnown: number;
 }

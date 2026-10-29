@@ -56,7 +56,7 @@ export const TIER_LABEL: Record<CreatorTier, string> = {
  *    else these numbers are not comparable. `tierTarget` returns null there
  *    rather than comparing two different currencies.
  */
-export const TIER_GMV_THRESHOLD: Record<CreatorTier, number> = {
+const TIER_GMV_THRESHOLD: Record<CreatorTier, number> = {
   creator: 0,
   rising: 1_000,
   pro: 10_000,
@@ -66,7 +66,7 @@ export const TIER_GMV_THRESHOLD: Record<CreatorTier, number> = {
 const ORDER: CreatorTier[] = ['creator', 'rising', 'pro', 'elite'];
 
 /** The tier above this one, or null at the top. */
-export function nextTier(tier: CreatorTier): CreatorTier | null {
+function nextTier(tier: CreatorTier): CreatorTier | null {
   const i = ORDER.indexOf(tier);
   return i >= 0 && i < ORDER.length - 1 ? (ORDER[i + 1] ?? null) : null;
 }

@@ -51,7 +51,7 @@ const DIRECTORY_COLUMNS =
   'application_id, tiktok_handle, application_status, niche, reviewed_at';
 
 /** Same guard the other queues use: a comma or a bracket changes the filter. */
-export const sanitiseCreatorSearch = (raw: string) =>
+const sanitiseCreatorSearch = (raw: string) =>
   raw
     .trim()
     .replace(/^@+/, '')
@@ -288,7 +288,7 @@ export function useCreatorJobs(creatorId: string | undefined) {
   });
 }
 
-export interface CreatorHistoryRow {
+interface CreatorHistoryRow {
   id: number;
   action: string;
   subject_type: string;

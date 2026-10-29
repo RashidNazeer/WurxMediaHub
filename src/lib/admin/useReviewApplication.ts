@@ -4,7 +4,7 @@ import type { AppRole, CreatorTier } from '@/lib/auth/auth-context';
 import type { ApplicationStatus } from '@/lib/auth/useApplication';
 import { reviewSchema, type ReviewInput } from '@/lib/schemas/review';
 
-export interface ReviewResult {
+interface ReviewResult {
   application_id: string;
   user_id: string;
   status: ApplicationStatus;
@@ -13,7 +13,7 @@ export interface ReviewResult {
   reviewed_at: string;
 }
 
-export interface ReviewOutcome {
+interface ReviewOutcome {
   /** How many actually went through. */
   reviewed: number;
   /** Per application, so a partial batch can be explained rather than hidden. */

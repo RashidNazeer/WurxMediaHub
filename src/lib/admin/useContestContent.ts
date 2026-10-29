@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { getSupabase } from '@/lib/supabase';
 import type { ContentStatus } from '@/lib/content';
 
-export interface ContestVideoRow {
+interface ContestVideoRow {
   id: string;
   entryId: string;
   creatorId: string;
@@ -26,7 +26,7 @@ export interface ContestVideoRow {
   currency: string;
 }
 
-export interface ContestVideoPage {
+interface ContestVideoPage {
   rows: ContestVideoRow[];
   total: number;
 }

@@ -28,7 +28,7 @@ export function iso(d: Date): string {
 }
 
 /** `YYYY-MM` in UTC. */
-export function ym(d: Date): string {
+function ym(d: Date): string {
   return iso(d).slice(0, 7);
 }
 
@@ -44,7 +44,7 @@ export function firstOfMonth(key: string): string {
 }
 
 /** Last day of a `YYYY-MM`, found by stepping back from the next first. */
-export function lastOfMonth(key: string): string {
+function lastOfMonth(key: string): string {
   const [y, m] = key.split('-').map(Number);
   return iso(new Date(Date.UTC(y as number, m as number, 1) - DAY));
 }
@@ -83,14 +83,14 @@ export function dayLabel(date: string): string {
  * creator whose last video stopped earning in August cannot select into an empty
  * September and read it as the product losing their money.
  */
-export function ceilingOf(w: PerformanceWindow | undefined): string {
+function ceilingOf(w: PerformanceWindow | undefined): string {
   const yesterday = iso(new Date(Date.now() - DAY));
   if (!w?.latest) return yesterday;
   return w.latest < yesterday ? w.latest : yesterday;
 }
 
 /** The earliest day worth offering: their first video. */
-export function floorOf(w: PerformanceWindow | undefined): string | null {
+function floorOf(w: PerformanceWindow | undefined): string | null {
   return w?.earliest ?? null;
 }
 

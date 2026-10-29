@@ -109,7 +109,7 @@ export function Reveal({
    SCROLL DEPTH
    ============================================================================ */
 
-export interface ScrollDepthOptions {
+interface ScrollDepthOptions {
   /** Pixels the block starts below its resting place. */
   rise?: number;
   /** Degrees it starts tipped back about its top edge (rotateX), settling to 0. */
@@ -261,61 +261,6 @@ export function ParallaxLayer({
 /** Splits text into words, each keeping its trailing space so wrapping is unchanged. */
 function wordsOf(text: string) {
   return text.split(' ').filter(Boolean);
-}
-
-function ScrollWord({
-  progress,
-  index,
-  count,
-  children,
-}: {
-  progress: MotionValue<number>;
-  index: number;
-  count: number;
-  children: ReactNode;
-}) {
-  /* Each word owns a slice of the progress, overlapping its neighbours, so the
-     line assembles left to right under the thumb. */
-  const start = (index / count) * 0.5;
-  const end = start + 0.5;
-  const opacity = useTransform(progress, [start, start + 0.3], [0, 1]);
-  const transform = useTransform(progress, (p) => {
-    const t = 1 - Math.min(Math.max((p - start) / (end - start), 0), 1);
-    if (t === 0) return 'none';
-    /* Sub-pixel while the word is travelling; it drops to `none` the moment it
-       lands, so nothing is read off a fractional offset. See `ScrollDepth`. */
-    return `translateY(${(34 * t).toFixed(2)}px) rotate(${((index % 2 ? 4 : -4) * t).toFixed(2)}deg)`;
-  });
-  return (
-    <m.span className="inline-block" style={{ transform, opacity }}>
-      {children}
-    </m.span>
-  );
-}
-
-/**
- * A heading whose words arrive one after another as it scrolls into view, each
- * rising and straightening on its own offset. Scroll-linked, so scrolling back
- * un-says it. Plain text under `prefers-reduced-motion`.
- */
-export function ScrollWords({ text, className }: { text: string; className?: string }) {
-  const quiet = useReducedMotion();
-  const ref = useRef<HTMLSpanElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ['start 0.98', 'start 0.62'] });
-  if (quiet) return <span className={className}>{text}</span>;
-  const words = wordsOf(text);
-  return (
-    <span ref={ref} className={className}>
-      {words.map((w, i) => (
-        <span key={`${w}-${i}`}>
-          <ScrollWord progress={scrollYProgress} index={i} count={words.length}>
-            {w}
-          </ScrollWord>
-          {i < words.length - 1 ? ' ' : null}
-        </span>
-      ))}
-    </span>
-  );
 }
 
 /**

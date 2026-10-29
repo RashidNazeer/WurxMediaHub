@@ -15,7 +15,7 @@ export interface LeaderboardRow {
   total_creators: number;
 }
 
-export interface MyStanding {
+interface MyStanding {
   rank: number;
   gmv: number;
   spend: number;

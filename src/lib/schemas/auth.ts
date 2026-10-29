@@ -12,8 +12,6 @@ import { PASSWORD_MAX, PASSWORD_MIN, isObviousPassword } from './password-rules'
  * one changes, change the other, or people will pass the form and be rejected
  * by the server, which is a maddening bug to report.
  */
-export { PASSWORD_MAX, PASSWORD_MIN } from './password-rules';
-
 const password = z
   .string()
   .min(PASSWORD_MIN, `Use at least ${PASSWORD_MIN} characters`)
@@ -36,22 +34,6 @@ export const signInSchema = z.object({
   password: z.string().min(1, 'Enter your password'),
 });
 
-export const signUpSchema = z
-  .object({
-    displayName: z
-      .string()
-      .trim()
-      .min(2, 'Tell us what to call you')
-      .max(60, 'Keep it under 60 characters'),
-    email,
-    password,
-    confirmPassword: z.string(),
-  })
-  .refine((d) => d.password === d.confirmPassword, {
-    message: 'Both passwords need to match',
-    path: ['confirmPassword'],
-  });
-
 export const forgotPasswordSchema = z.object({ email });
 
 export const resetPasswordSchema = z
@@ -65,7 +47,6 @@ export const resetPasswordSchema = z
   });
 
 export type SignInInput = z.infer<typeof signInSchema>;
-export type SignUpInput = z.infer<typeof signUpSchema>;
 
 /** One message per bad field, in the shape the forms expect. */
 export function collectErrors<T extends Record<string, unknown>>(

@@ -195,7 +195,7 @@ export function CreatorHomeView({
           />
 
           {/* ORDERS, NOT VIEWS: views need a live TikTok call and Home may
-              not make one. See FOURTH_METRIC in useHomeData. */}
+              not make one. See "THE FOURTH METRIC IS ORDERS" in useHomeData. */}
           <MetricTile
             index={1}
             title="Orders"

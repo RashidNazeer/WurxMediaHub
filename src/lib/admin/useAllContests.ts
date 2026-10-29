@@ -270,7 +270,7 @@ export function useAllContests(filters: AllContestsFilters) {
   });
 }
 
-export interface AllContestsCounts {
+interface AllContestsCounts {
   all: number;
   on: number;
   off: number;

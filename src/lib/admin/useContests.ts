@@ -90,10 +90,10 @@ export type ContestStatus = 'active' | 'inactive';
  * `useManageContest`, which already imports `ContestStatus` from this file and
  * would make the two a cycle.
  */
-export type ContestDeliverableType = 'gmv' | 'video_count';
+type ContestDeliverableType = 'gmv' | 'video_count';
 
 /** The commercial half. Staff only, and its own table for exactly that reason. */
-export interface ContestCommercials {
+interface ContestCommercials {
   totalBudget: number | null;
   internalNote: string | null;
 }
@@ -106,7 +106,7 @@ export interface ContestCommercials {
  * there is no "not priced yet" case left to draw and no null to mistake for a
  * zero. A reward of zero is a genuine unpaid deliverable and reads as one.
  */
-export interface ContestDeliverable {
+interface ContestDeliverable {
   id: string;
   contestId: string;
   type: ContestDeliverableType;
@@ -231,7 +231,7 @@ const flatten = (r: ContestRow): Contest => ({
  * to `ContestStateChip`, which both sides draw, and a second exported map of
  * the same five phrases is how two screens end up disagreeing about one of them.
  */
-export type ContestState = ContestLifecycle;
+type ContestState = ContestLifecycle;
 
 export function stateOf(c: Contest, now = Date.now()): ContestState {
   return contestLifecycleOf(c, now);

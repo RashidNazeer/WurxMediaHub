@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth/auth-context';
 import { STAGE_META, type OfferApplicationStatus, type OfferStage } from '@/lib/offer-stages';
@@ -263,9 +263,4 @@ export function summarise(rows: MyWorkRow[]): WorkSummary {
     money,
     byStage,
   };
-}
-
-/** The summary, memoised, straight from the rows. */
-export function useWorkSummary(rows: MyWorkRow[] | undefined): WorkSummary {
-  return useMemo(() => summarise(rows ?? []), [rows]);
 }

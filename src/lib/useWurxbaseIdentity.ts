@@ -46,7 +46,7 @@ const supabaseClient = () => import('@/lib/supabase').then((m) => m.getSupabase(
  * often as people join.
  */
 
-export interface WurxbaseIdentity {
+interface WurxbaseIdentity {
   /** Their role, from their own row where we could find it. */
   role: WurxBaseRole;
   /** Their personal overrides, or `{}`. */

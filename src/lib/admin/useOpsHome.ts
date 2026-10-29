@@ -16,7 +16,7 @@ import { STAGE_META, type OfferStage } from '@/lib/offer-stages';
  * through "all clear" on the way to the truth.
  */
 
-export interface Inbox {
+interface Inbox {
   /** Waiting on US. */
   applications: number;
   requests: number;
@@ -58,7 +58,7 @@ export function useInbox() {
   });
 }
 
-export interface WithCreators {
+interface WithCreators {
   /** Approved jobs sitting at each of these stages. */
   filming: number;
   sampleOut: number;
@@ -156,7 +156,7 @@ export function useOpsMoney() {
   });
 }
 
-export interface AtRisk {
+interface AtRisk {
   /** Brands past 80% of their allocation, worst first. */
   brands: { id: string; name: string; percent: number }[];
   /** Live offers with nobody on them and nobody waiting. */

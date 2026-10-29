@@ -21,7 +21,7 @@ import { joinChannel } from '@/lib/realtime';
 import { useAuth } from '@/lib/auth/auth-context';
 
 /** One row of the view, exactly as it comes back. */
-export interface JobProgressRow {
+interface JobProgressRow {
   application_id: string;
   creator_id: string;
   brand_id: string;
@@ -45,7 +45,7 @@ export interface JobProgress extends JobProgressRow {
   fraction: number | null;
 }
 
-export const JOB_PROGRESS_COLUMNS =
+const JOB_PROGRESS_COLUMNS =
   'application_id, creator_id, brand_id, offer_id, required, approved, waiting, ' +
   'needs_another_take, posted';
 

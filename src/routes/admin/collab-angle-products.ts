@@ -27,14 +27,14 @@
  */
 
 /** What `videoFig` returns, as much of it as the grouping needs. */
-export interface AngleFig {
+interface AngleFig {
   v: { product?: string | null; creator?: string | null } | null;
   views: number;
   gmv: number;
   ad: number;
 }
 
-export interface AngleVideo {
+interface AngleVideo {
   url: string;
   f: AngleFig;
 }
@@ -51,7 +51,7 @@ export interface ProductHead {
 }
 
 /** A video row, or a product band that introduces the rows under it. */
-export interface AngleRow {
+interface AngleRow {
   url: string;
   f: AngleFig | null;
   wxHead?: ProductHead;

@@ -27,12 +27,12 @@ import type { ContestStatus } from '@/lib/admin/useContests';
  * `public.contest_deliverable_type`, which starts at two values and grows one
  * `alter type ... add value` at a time.
  */
-export type ContestDeliverableType = 'gmv' | 'video_count';
+type ContestDeliverableType = 'gmv' | 'video_count';
 
 /** Staff confirm or refuse a claim. `pending` is the only thing a creator writes. */
-export type ContestProgressStatus = 'pending' | 'confirmed' | 'rejected';
+type ContestProgressStatus = 'pending' | 'confirmed' | 'rejected';
 
-export type ContestSavePayload = {
+type ContestSavePayload = {
   action: 'contest.save';
   contestId?: string | null;
   brandId: string;
@@ -61,7 +61,7 @@ export type ContestSavePayload = {
 };
 
 /** Staff only, and its own action so the setup form cannot reach it by accident. */
-export type ContestCommercialsPayload = {
+type ContestCommercialsPayload = {
   action: 'contest.commercials';
   contestId: string;
   totalBudget: number | null;
@@ -69,16 +69,16 @@ export type ContestCommercialsPayload = {
 };
 
 /** Closes the door, never the work. Everybody already in carries on and is paid. */
-export type ContestStatusPayload = {
+type ContestStatusPayload = {
   action: 'contest.status';
   contestId: string;
   status: ContestStatus;
 };
 
-export type ContestDeletePayload = { action: 'contest.delete'; contestId: string };
+type ContestDeletePayload = { action: 'contest.delete'; contestId: string };
 
 /** The fire alarm. Affects every entrant, and the screen has to say so. */
-export type ContestCancelPayload = {
+type ContestCancelPayload = {
   action: 'contest.cancel';
   contestId: string;
   /** MESSAGE, not reason: the entrants read this. See decision D14. */
@@ -99,7 +99,7 @@ export type ContestCancelPayload = {
  * pays 120, and one creator earns both on the way past. There is no uniqueness
  * on (contest, type) in the database and adding one here would delete tiering.
  */
-export type DeliverableSavePayload = {
+type DeliverableSavePayload = {
   action: 'deliverable.save';
   deliverableId?: string | null;
   contestId: string;
@@ -120,7 +120,7 @@ export type DeliverableSavePayload = {
 };
 
 /** Retire, never delete. A row somebody holds terms against is part of a promise. */
-export type DeliverableRetirePayload = {
+type DeliverableRetirePayload = {
   action: 'deliverable.retire';
   deliverableId: string;
 };
@@ -146,7 +146,7 @@ export type DeliverableRetirePayload = {
  * `manage-content`, so confirming a count of six is not a decision about six
  * videos.
  */
-export type ProgressReviewPayload = {
+type ProgressReviewPayload = {
   action: 'progress.review';
   updateId: string;
   status: Exclude<ContestProgressStatus, 'pending'>;
@@ -167,7 +167,7 @@ export type ProgressReviewPayload = {
  * and sending one back withdraws it again unless it has already been paid. The
  * result carries both figures so the screen can say which happened.
  */
-export type ContestContentReviewPayload = {
+type ContestContentReviewPayload = {
   action: 'content.review';
   contentId: string;
   status: 'approved' | 'needs_another_take';
@@ -195,7 +195,7 @@ export type ContestContentReviewResult = {
  * away and barring them are two decisions: a refusal leaves them free to apply
  * again, and `block` also writes an exclusion scoped to this one contest.
  */
-export type EntryReviewPayload = {
+type EntryReviewPayload = {
   action: 'entry.review';
   entryId: string;
   decision: 'approved' | 'rejected';
@@ -206,14 +206,14 @@ export type EntryReviewPayload = {
   blockReason: string | null;
 };
 
-export type ProductsSetPayload = {
+type ProductsSetPayload = {
   action: 'products.set';
   contestId: string;
   productIds: string[];
 };
 
 /** Scoped to ONE contest. Never a brand, never an account. See decision D5. */
-export type ExclusionSavePayload = {
+type ExclusionSavePayload = {
   action: 'exclusion.save';
   contestId: string;
   handle: string | null;
@@ -223,7 +223,7 @@ export type ExclusionSavePayload = {
   reason: string | null;
 };
 
-export type ExclusionRemovePayload = {
+type ExclusionRemovePayload = {
   action: 'exclusion.remove';
   exclusionId: string;
 };
@@ -241,7 +241,7 @@ export type ExclusionRemovePayload = {
  * thing that can owe somebody money. It returns what is still unpaid rather
  * than refusing on it, so the screen warns before the click.
  */
-export type ContestSettlePayload = {
+type ContestSettlePayload = {
   action: 'contest.settle';
   contestId: string;
   /** MESSAGE, not reason: every entrant reads this on their own timeline. */
@@ -261,7 +261,7 @@ export type ContestSettlePayload = {
  *
  * THERE IS NO WAY BACK. Nothing unpays a reward, so the screen confirms first.
  */
-export type AwardPayPayload = {
+type AwardPayPayload = {
   action: 'award.pay';
   awardIds: string[];
   /** THE CREATOR READS THIS, on every reward in the list. */
@@ -269,7 +269,7 @@ export type AwardPayPayload = {
   allowSuspended: boolean;
 };
 
-export type ManageContestPayload =
+type ManageContestPayload =
   | ContestSavePayload
   | ContestCommercialsPayload
   | ContestStatusPayload

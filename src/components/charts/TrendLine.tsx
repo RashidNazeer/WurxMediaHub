@@ -28,7 +28,7 @@ import { ChartTip } from './ChartTip';
  * repo's own code and the charting rules disagree.
  *
  * The build prompt (§5.1c) asks for "ad spend drawn as faint bars behind it on
- * a second scale". `PerformanceChart.tsx` in this repo argues the opposite, in
+ * a second scale". the since-deleted `PerformanceChart.tsx` argued the opposite, in
  * its own words: *"A second y-axis would let any two lines be drawn to cross
  * wherever the scaling happened to put them, which is the single most
  * misleading thing a chart can do."* The general rule agrees with the code.

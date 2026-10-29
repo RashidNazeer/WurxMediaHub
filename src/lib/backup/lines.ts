@@ -37,7 +37,7 @@ export interface PictureData {
   bytes: Uint8Array;
 }
 
-export function chunkToLine(c: Chunk): string {
+function chunkToLine(c: Chunk): string {
   if (c.kind !== 'rows') return c.payload;
   return JSON.stringify({ k: 'rows', t: c.table_id, n: c.n, h: c.hash }) + '\t' + c.payload;
 }
@@ -55,7 +55,7 @@ async function pictureLine(p: PictureData): Promise<string> {
 }
 
 /** The footer, updated to vouch for the pictures that were packed in. */
-export function endWithPictures(
+function endWithPictures(
   endPayload: string,
   pictures: { count: number; bytes: number; skipped: number },
 ): string {
@@ -66,7 +66,7 @@ export function endWithPictures(
   return JSON.stringify(end);
 }
 
-export interface FileBuild {
+interface FileBuild {
   /** Everything from the database, in order: head, rows..., end. */
   chunks: AsyncIterable<Chunk> | Iterable<Chunk>;
   pictures?: { items: PictureData[]; skipped: number } | null;
@@ -91,13 +91,6 @@ export async function writeLines(build: FileBuild): Promise<void> {
       await build.write(chunkToLine(c));
     }
   }
-}
-
-export interface FileSummary {
-  chunks: number;
-  rows: number;
-  pictures: number;
-  pictureBytes: number;
 }
 
 /**
@@ -156,21 +149,4 @@ export async function* picturesFromFile(
     }
     yield { picture: { bucket: meta.bucket, path: meta.path, type: meta.type, bytes } };
   }
-}
-
-/** A quick scan of a file for the screen: how many pieces, rows and pictures it holds. */
-export async function summariseFile(opened: OpenedBackup): Promise<FileSummary> {
-  const s: FileSummary = { chunks: 0, rows: 0, pictures: 0, pictureBytes: 0 };
-  for await (const line of opened.lines()) {
-    if (line.startsWith('{"k":"file"')) {
-      s.pictures++;
-      const tab = line.indexOf('\t');
-      s.pictureBytes += Number((JSON.parse(line.slice(0, tab)) as { size?: number }).size ?? 0);
-    } else if (line.startsWith('{"k":"rows"')) {
-      s.chunks++;
-      const tab = line.indexOf('\t');
-      s.rows += Number((JSON.parse(line.slice(0, tab)) as { n?: number }).n ?? 0);
-    }
-  }
-  return s;
 }

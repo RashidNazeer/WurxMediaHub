@@ -10,7 +10,7 @@ import { z } from 'zod';
  */
 
 /** Money arrives from an <input> as a string. Empty means "not set". */
-export const optionalMoney = z
+const optionalMoney = z
   .string()
   .trim()
   .transform((v) => (v === '' ? null : v))
@@ -23,7 +23,7 @@ export const optionalMoney = z
   .transform((v) => (v === null ? null : Number(v)));
 
 /** Whole number, or null when the box is left empty. */
-export const optionalCount = z
+const optionalCount = z
   .string()
   .trim()
   .transform((v) => (v === '' ? null : v))
@@ -49,7 +49,6 @@ export const brandSchema = z.object({
 });
 
 export type BrandInput = z.input<typeof brandSchema>;
-export type BrandParsed = z.output<typeof brandSchema>;
 
 /**
  * The one place that decides whether an offer needs applying for.
@@ -139,7 +138,6 @@ export const offerSchema = z
   });
 
 export type OfferInput = z.input<typeof offerSchema>;
-export type OfferParsed = z.output<typeof offerSchema>;
 
 /* ------------------------------------------------------- the brand's look -- */
 
@@ -187,7 +185,7 @@ const plainArea = (max: number) => z.object({ stops: stopsField(max) }).strict()
  * Rashid, 2026-08-25, asking for it: *"some brands have multo color themes so
  * our app should be designed accoridnlgy"*.
  */
-export const brandThemeSchema = z
+const brandThemeSchema = z
   .object({
     v: z.literal(1),
     hero: heroArea.optional(),

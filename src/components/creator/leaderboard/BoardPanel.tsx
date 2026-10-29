@@ -26,7 +26,7 @@ import { RANGES, faceMoney, tipMoney, type BoardItem, type RangeKey } from './bo
  * and the preview route supplies fixtures.
  */
 
-export interface BoardPanelProps {
+interface BoardPanelProps {
   state: 'loading' | 'error' | 'ready';
   /** Exactly three rows (rank order) when the podium is shown, else empty. */
   podium: LeaderboardRow[];

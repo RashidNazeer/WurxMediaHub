@@ -219,7 +219,7 @@ const ROSTER_COLUMNS =
  * PostgREST puts filter values straight into the query string, where a comma or
  * a bracket changes what the filter MEANS. Same guard the offer queue uses.
  */
-export const sanitiseRosterSearch = (raw: string) =>
+const sanitiseRosterSearch = (raw: string) =>
   raw
     .trim()
     .replace(/^@+/, '')

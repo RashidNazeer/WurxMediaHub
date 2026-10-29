@@ -19,17 +19,10 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 export type PeriodKey = '7' | '30' | '90' | 'custom';
 
-export const PERIODS: { key: PeriodKey; label: string }[] = [
-  { key: '7', label: '7D' },
-  { key: '30', label: '30D' },
-  { key: '90', label: '90D' },
-  { key: 'custom', label: 'Custom' },
-];
-
 /**
  * 30 DAYS IS THE DEFAULT, and that is a change worth naming.
  *
- * `rangeToDates` in `usePerformance.ts` defaults to ALL TIME, with a good
+ * The old range helper in `usePerformance.ts` (since removed) defaulted to ALL TIME, with a good
  * reason recorded: "a video that ran last month would show a flat zero under
  * month-to-date, and a creator seeing zero against work they know sold is the
  * fastest way to lose their trust in every other number on the screen."
@@ -41,7 +34,7 @@ export const PERIODS: { key: PeriodKey; label: string }[] = [
  * period is empty and all-time is not, they say so and link to it. The fix for
  * "zero is frightening" is an explanation, not a wider default.
  */
-export const DEFAULT_PERIOD: PeriodKey = '30';
+const DEFAULT_PERIOD: PeriodKey = '30';
 
 export interface CreatorPeriod {
   key: PeriodKey;

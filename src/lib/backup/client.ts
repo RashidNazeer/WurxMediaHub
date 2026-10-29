@@ -57,7 +57,7 @@ async function repeatable(call: Call, body: Record<string, unknown>): Promise<Re
 
 // ------------------------------------------------------------------ download --
 
-export interface DownloadOptions {
+interface DownloadOptions {
   backupId: string;
   /** The admin's password, checked again by the server. */
   password: string;
@@ -70,7 +70,7 @@ export interface DownloadOptions {
   fetcher?: (url: string, signal: AbortSignal) => Promise<Response>;
 }
 
-export interface DownloadResult {
+interface DownloadResult {
   bytes: Uint8Array;
   filename: string;
   pictures: { count: number; skipped: number };
@@ -173,7 +173,7 @@ export async function uploadBackupFile(
 
 // ------------------------------------------------------------------ pictures --
 
-export type PutSigned = (bucket: string, path: string, token: string, bytes: Uint8Array, type: string) => Promise<boolean>;
+type PutSigned = (bucket: string, path: string, token: string, bytes: Uint8Array, type: string) => Promise<boolean>;
 
 export interface PicturesRestored {
   restored: number;

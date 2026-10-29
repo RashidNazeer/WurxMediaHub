@@ -45,7 +45,7 @@ export const OFFER_STAGES = [
 
 export type OfferStage = (typeof OFFER_STAGES)[number];
 
-export interface StageMeta {
+interface StageMeta {
   label: string;
   /** What it means, in the creator's terms. */
   creatorHint: string;
@@ -122,10 +122,6 @@ export const STAGE_META: Record<OfferStage, StageMeta> = {
 
 /** Zero-based position in the pipeline, for trackers and progress bars. */
 export const stageIndex = (stage: OfferStage): number => OFFER_STAGES.indexOf(stage);
-
-/** How far along, 0 to 1. `paid` is the end, so it is a full bar. */
-export const stageProgress = (stage: OfferStage): number =>
-  stageIndex(stage) / (OFFER_STAGES.length - 1);
 
 /**
  * Tailwind text colour for a stage's money bucket, so anything printed NEXT to

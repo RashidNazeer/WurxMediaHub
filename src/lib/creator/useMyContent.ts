@@ -60,7 +60,7 @@ export function useMyContent() {
   return query;
 }
 
-export type ContentPayload =
+type ContentPayload =
   | {
       action: 'content.create';
       applicationId: string;

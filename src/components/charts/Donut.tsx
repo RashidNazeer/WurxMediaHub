@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import { compactMoney, exactMoney, useChartBox } from './chart-kit';
 
-export interface Slice {
+interface Slice {
   /** The brand, usually. */
   label: string;
   value: number;

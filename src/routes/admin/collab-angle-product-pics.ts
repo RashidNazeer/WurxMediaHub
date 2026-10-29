@@ -24,7 +24,7 @@ import { useEffect, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 
 /** Lowercased product name -> image URL. */
-export type ProductPics = Map<string, string>;
+type ProductPics = Map<string, string>;
 
 const CACHE = new Map<string, Promise<ProductPics>>();
 
@@ -43,7 +43,7 @@ async function fetchPics(brand: string): Promise<ProductPics> {
   return map;
 }
 
-export function productPics(brand: string): Promise<ProductPics> {
+function productPics(brand: string): Promise<ProductPics> {
   const key = String(brand || '').trim();
   if (!key) return Promise.resolve(new Map());
   if (!CACHE.has(key)) {

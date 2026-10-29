@@ -42,7 +42,6 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
  * orders are the same transaction counted three ways, so the four tiles
  * describe one story rather than three.
  */
-export const FOURTH_METRIC = 'orders' as const;
 
 /**
  * COMMISSION IS NOT MEASURED ANYWHERE, so Home must not pretend otherwise.
@@ -61,7 +60,7 @@ export const FOURTH_METRIC = 'orders' as const;
  */
 export const COMMISSION_IS_MEASURED = false;
 
-export interface HomeTotals {
+interface HomeTotals {
   gmv: number;
   spend: number;
   orders: number;

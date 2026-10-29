@@ -107,7 +107,7 @@ export function isObviousPassword(password: string): boolean {
   return false;
 }
 
-export type Requirement = {
+type Requirement = {
   id: 'length' | 'pattern' | 'match';
   /** Written as the thing that must be true, so the ticked state reads right. */
   label: string;

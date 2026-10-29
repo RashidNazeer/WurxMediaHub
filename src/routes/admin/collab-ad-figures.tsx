@@ -55,12 +55,11 @@ export {
   money,
   roiText,
 } from './collab-ad-math';
-export type { AdFigures, AdTotals } from './collab-ad-math';
 
 import type { AdFigures } from './collab-ad-math';
 
 /** The spark code Euka holds for one video. */
-export type SparkCode = { code: string; expired: boolean };
+type SparkCode = { code: string; expired: boolean };
 
 type Ctx = {
   /** Register video ids to fetch. Safe to call during render. */
@@ -114,7 +113,7 @@ type Ctx = {
  * machine east of Greenwich that lands the boundary on the wrong day — which
  * for this data means a day's money filed under the wrong month.
  */
-export function monthBounds(monthKey: string): { from: string | null; to: string | null } {
+function monthBounds(monthKey: string): { from: string | null; to: string | null } {
   const m = /^(\d{4})-(\d{2})$/.exec(monthKey ?? '');
   if (!m) return { from: null, to: null };
   const year = Number(m[1]);
@@ -148,7 +147,7 @@ export function monthBounds(monthKey: string): { from: string | null; to: string
  * to whole months otherwise. So a range here is honoured exactly when the data
  * behind it can honour it, and is never silently widened.
  */
-export function periodBounds(periodKey: string): { from: string | null; to: string | null } {
+function periodBounds(periodKey: string): { from: string | null; to: string | null } {
   const key = (periodKey ?? '').trim();
   const range = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/.exec(key);
   if (range) {
@@ -160,11 +159,6 @@ export function periodBounds(periodKey: string): { from: string | null; to: stri
     return from <= to ? { from, to } : { from: to, to: from };
   }
   return monthBounds(key);
-}
-
-/** True when the period is an explicit day range rather than a whole month. */
-export function isRangePeriod(periodKey: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}\.\.\d{4}-\d{2}-\d{2}$/.test((periodKey ?? '').trim());
 }
 
 const AdFiguresContext = createContext<Ctx | null>(null);

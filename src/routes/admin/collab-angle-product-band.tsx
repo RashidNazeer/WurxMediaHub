@@ -12,7 +12,7 @@ import { useState } from 'react';
 import type { ProductHead } from './collab-angle-products';
 import { wxCompact } from './collab-angle-products';
 
-export interface ProductHeadProps {
+interface ProductHeadProps {
   head: ProductHead;
   shut: boolean;
   onToggle: () => void;
