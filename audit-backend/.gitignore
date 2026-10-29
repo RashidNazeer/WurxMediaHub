@@ -1,0 +1,7 @@
+﻿__pycache__/
+*.pyc
+
+
+# Local-only operations notes: server address, Oracle IDs, staged copies of scripts.
+# Not secrets, but account-specific; keep out of any repo that gets published.
+ops-local/

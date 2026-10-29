@@ -1,0 +1,124 @@
+diff --git a/supabase/functions/collab-angles/index.ts b/supabase/functions/collab-angles/index.ts
+index 45f0932..9e8eafb 100644
+--- a/supabase/functions/collab-angles/index.ts
++++ b/supabase/functions/collab-angles/index.ts
+@@ -160,20 +160,51 @@ async function monthOf(db: SupabaseClient, brand: string, month: string) {
+   return { videos, noDate, filed };
+ }
+ 
++/* What the audit machine writes into `last_error` when the hosted model
++   (Gemini) is the problem. `module_failed` is its word for a model call that
++   did not complete, which on the free key is nearly always the 500 requests a
++   day quota. It is also what every video said when the audit machine's own
++   dependencies were broken, so the screen only says "most likely". */
++const MODEL_TROUBLE = /module_failed|resource[_ ]exhausted|quota|gemini|model call|rate[ -]?limit/i;
++/* Only RECENT failures count, so a month that failed weeks ago for reasons
++   since fixed does not keep blaming the model. */
++const MODEL_TROUBLE_WINDOW_MS = 24 * 60 * 60 * 1000;
++
++type VideoRow = {
++  status: string;
++  attempts: number | null;
++  last_error: string | null;
++  updated_at: string | null;
++};
++
++/** The counts the screen draws, and how many videos are failing because of the model. */
++function countProgress(rows: VideoRow[], now = Date.now()) {
++  const counts = { queued: 0, sent: 0, filed: 0, skipped: 0, failed: 0, needs_review: 0 };
++  let modelFailures = 0;
++  for (const r of rows) {
++    if (r.status in counts) counts[r.status as keyof typeof counts] += 1;
++    /* Failed, or queued again after a failure: either way the model is not
++       currently doing its job for this video. */
++    const failing = r.status === 'failed' || (r.status === 'queued' && (r.attempts ?? 0) > 0);
++    if (
++      failing && r.last_error && MODEL_TROUBLE.test(r.last_error) &&
++      now - Date.parse(r.updated_at ?? '') <= MODEL_TROUBLE_WINDOW_MS
++    ) modelFailures += 1;
++  }
++  return { counts, modelFailures };
++}
++
+ async function progressOf(db: SupabaseClient, brand: string, month: string) {
+   const { videos, filed } = await monthOf(db, brand, month);
+ 
+   const { data, error } = await db
+     .from('collab_angle_videos')
+-    .select('status')
++    .select('status, attempts, last_error, updated_at')
+     .eq('brand', brand)
+     .eq('month', month);
+   if (error) throw new Error(error.message);
+ 
+-  const counts = { queued: 0, sent: 0, filed: 0, skipped: 0, failed: 0, needs_review: 0 };
+-  for (const r of (data ?? []) as Array<{ status: string }>) {
+-    if (r.status in counts) counts[r.status as keyof typeof counts] += 1;
+-  }
++  const { counts, modelFailures } = countProgress((data ?? []) as VideoRow[]);
+   const total = (data ?? []).length;
+   const left = counts.queued + counts.sent;
+ 
+@@ -195,6 +226,9 @@ async function progressOf(db: SupabaseClient, brand: string, month: string) {
+   return {
+     total,
+     ...counts,
++    /* How many videos are failing for a reason that looks like the Gemini model
++       (an outage or the daily quota). Additive: an older screen ignores it. */
++    model_failures: modelFailures,
+     running_batch: batch
+       ? {
+         state: (batch as { state: string }).state,
+diff --git a/src/routes/admin/collab-angle-categorise.tsx b/src/routes/admin/collab-angle-categorise.tsx
+index de8642d..2f665c6 100644
+--- a/src/routes/admin/collab-angle-categorise.tsx
++++ b/src/routes/admin/collab-angle-categorise.tsx
+@@ -30,6 +30,8 @@ type Progress = {
+   skipped: number;
+   failed: number;
+   needs_review: number;
++  /** Videos failing for a reason that looks like the Gemini model (outage or quota). 0 when an older function omits it. */
++  model_failures: number;
+   /** Every video the brand posted this month. 0 when an older function omits it. */
+   total_videos: number;
+   /** How many of those already sit in an angle. 0 when an older function omits it. */
+@@ -181,6 +183,7 @@ function toProgress(raw: unknown): Progress {
+     skipped: num(r.skipped),
+     failed: num(r.failed),
+     needs_review: num(r.needs_review),
++    model_failures: num(r.model_failures),
+     total_videos: num(r.total_videos),
+     already_categorised: num(r.already_categorised),
+     running_batch: rb
+@@ -377,7 +380,19 @@ export function CollabAngleCategorise({ brand, month, canEdit, onFiled }: Props)
+       line += `. About ${mins} min left (estimate)`;
+     }
+   }
+-  const shown = error ?? note ?? line;
++  /* THE MODEL BEING DOWN IS NOT A PROBLEM WITH THESE VIDEOS, and without this
++     line the only sign is a number of failed videos with no reason. The audit
++     machine's `module_failed` is nearly always the free Gemini quota (about 500
++     requests a day, resetting daily), but it is also what a broken dependency
++     says, hence "most likely". */
++  const modelNote = progress && progress.model_failures > 0
++    ? `${progress.model_failures} video${progress.model_failures === 1 ? '' : 's'} could not be analysed. ` +
++      'Most likely the Gemini API is not working or its daily quota is used up ' +
++      '(the free key allows about 500 requests a day and resets daily). ' +
++      'They are retried up to 3 times, then stay failed until an admin resets them.'
++    : null;
++  const problem = error !== null || modelNote !== null;
++  const shown = error ?? modelNote ?? note ?? line;
+ 
+   return (
+     <div className="wx-cat" data-busy={busy ? 'true' : 'false'}>
+@@ -428,8 +443,8 @@ export function CollabAngleCategorise({ brand, month, canEdit, onFiled }: Props)
+       </div>
+       {shown && (
+         <p
+-          className={'wx-cat-status' + (error ? ' wx-cat-status-err' : '')}
+-          role={error ? 'alert' : 'status'}
++          className={'wx-cat-status' + (problem ? ' wx-cat-status-err' : '')}
++          role={problem ? 'alert' : 'status'}
+         >
+           {shown}
+         </p>

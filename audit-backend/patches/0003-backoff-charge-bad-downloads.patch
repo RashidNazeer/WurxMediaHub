@@ -1,0 +1,225 @@
+diff --git a/supabase/functions/_shared/angle-backoff.ts b/supabase/functions/_shared/angle-backoff.ts
+index 279544d..2cbe22c 100644
+--- a/supabase/functions/_shared/angle-backoff.ts
++++ b/supabase/functions/_shared/angle-backoff.ts
+@@ -17,19 +17,18 @@
+  *
+  * THE RULE, in two parts:
+  *
+- *   1. In a batch of MORE THAN ONE video, a failure whose reason is the
+- *      environment is not charged to the video. A bad video among good ones is
+- *      still caught: it ends up alone in a later batch, where it IS charged. A
+- *      lone video that fails with a model reason must be able to run out of
+- *      attempts, or it sits at the head of the queue and blocks everything
+- *      behind it for ever.
++ *   1. In a batch of MORE THAN ONE video, a MODEL failure is not charged to
++ *      the video, and a download failure is charged only when the evidence says
++ *      it is the video's own (see `chargesAttempt`). A lone video that fails
++ *      must be able to run out of attempts, or it sits at the head of the queue
++ *      and blocks everything behind it for ever.
+  *   2. A batch where NOTHING was confidently placed and every reason is
+  *      environmental is marked with `ENV:` in its `error`. The worker then
+  *      waits before making another batch, longer each time it happens in a
+  *      row, and a batch that works clears it.
+  *
+  * THE STRINGS BELOW ARE THE AUDIT MACHINE'S OWN, read from its source
+- * (audit-backend/Backend, 2026-10-30), not guessed:
++ * (audit-backend/Backend, 2026-10-29), not guessed:
+  *   - `module_failed`: app/services/pipeline.py sets it when a model call
+  *     failed, and `angle_groups` reports it as the bare reason
+  *     (`r.get('error') or r.get('status')`) in `unplaced`. The job still
+@@ -80,9 +79,46 @@ export function isEnvironmental(reason: string | null | undefined, nVideos: numb
+   return nVideos > 1 && causeOf(reason) !== 'video';
+ }
+ 
+-/** Whether an unplaced video should be charged an attempt. */
+-export function chargesAttempt(reason: string | null | undefined, nVideos: number): boolean {
+-  return !isEnvironmental(reason, nVideos);
++/**
++ * How many environmental batches in a row, all failing to download, before the
++ * videos in the latest one are charged after all. See `chargesAttempt`.
++ */
++export const SOURCE_CHARGE_AFTER = 3;
++
++/**
++ * Whether an unplaced video should be charged an attempt.
++ *
++ * `confidentCount` is how many videos in the batch got a real answer, and
++ * `envRun` how many environmental batches in a row this one makes (0 when it is
++ * not one). Both default to 0, which is the old behaviour.
++ *
++ * A model failure in a batch of more than one is never charged: the free quota
++ * can die part way through a batch, so a good video fails alongside a bad one.
++ *
++ * A DOWNLOAD failure is different, because "could not download this link" is
++ * what a blocked server and a DELETED or PRIVATE video both say. Never charging
++ * it left two bad videos unable to run out of attempts: they always shared a
++ * batch, so they were never charged, never failed, and were probed once an hour
++ * for ever (simulated: a queue of 172 with 7 bad videos left 29 stuck, 22 of
++ * them good videos starved behind the cooldown). So it IS charged when
++ *   - other videos in the batch DID download, which shows the server is fine
++ *     and this link is the problem; or
++ *   - the whole-batch failure has repeated SOURCE_CHARGE_AFTER times running,
++ *     which is as long as a real block is worth protecting the queue from, and
++ *     is how bad videos at the TAIL of a queue, with no good ones left to
++ *     compare against, finally run out.
++ */
++export function chargesAttempt(
++  reason: string | null | undefined,
++  nVideos: number,
++  confidentCount = 0,
++  envRun = 0,
++): boolean {
++  if (nVideos <= 1) return true;
++  const cause = causeOf(reason);
++  if (cause === 'video') return true;
++  if (cause === 'source') return confidentCount > 0 || envRun >= SOURCE_CHARGE_AFTER;
++  return false;
+ }
+ 
+ /**
+diff --git a/supabase/functions/collab-angles-sync/index.ts b/supabase/functions/collab-angles-sync/index.ts
+index 594f035..786e38a 100644
+--- a/supabase/functions/collab-angles-sync/index.ts
++++ b/supabase/functions/collab-angles-sync/index.ts
+@@ -50,6 +50,7 @@ import {
+   cooldownLeft,
+   envError,
+   environmentalFailure,
++  isEnvError,
+   MAX_OFFLINE_MS,
+ } from '../_shared/angle-backoff.ts';
+ 
+@@ -150,6 +151,22 @@ async function waitLeft(db: SupabaseClient): Promise<number> {
+   return cooldownLeft((data ?? []) as Array<{ finished_at: string | null; error: string | null }>);
+ }
+ 
++/** How many environmental batches the most recently finished ones begin with. */
++async function envRunBefore(db: SupabaseClient): Promise<number> {
++  const { data } = await db
++    .from('collab_angle_batches')
++    .select('finished_at, error')
++    .not('finished_at', 'is', null)
++    .order('finished_at', { ascending: false })
++    .limit(10);
++  let run = 0;
++  for (const b of (data ?? []) as Array<{ error: string | null }>) {
++    if (!isEnvError(b.error)) break;
++    run += 1;
++  }
++  return run;
++}
++
+ /** This brand's briefs, in the shape the audit machine wants them. */
+ async function briefsFor(db: SupabaseClient, brand: string): Promise<BriefRef[]> {
+   const { data } = await db
+@@ -342,6 +359,10 @@ async function fileBatch(db: SupabaseClient, batch: Batch, job: Awaited<ReturnTy
+     { confidentCount: confident.length, nVideos },
+   );
+ 
++  /* How many environmental batches in a row this one makes, so a download
++     failure that keeps happening can finally be charged (see `chargesAttempt`). */
++  const envRun = environment ? (await envRunBefore(db)) + 1 : 0;
++
+   const filedSet = new Set(filed);
+   const alreadySet = new Set(already);
+   /* Videos that must go round again: a review placement on its first go, and a
+@@ -392,7 +413,7 @@ async function fileBatch(db: SupabaseClient, batch: Batch, job: Awaited<ReturnTy
+   await requeueVideos(db, free, '', () => false);
+ 
+   for (const u of unplaced) {
+-    await requeueVideos(db, [u.row], u.reason, () => chargesAttempt(u.reason, nVideos));
++    await requeueVideos(db, [u.row], u.reason, () => chargesAttempt(u.reason, nVideos, confident.length, envRun));
+   }
+ 
+   await db.from('collab_angle_batches').update({
+diff --git a/scripts/check-angles-backoff.mjs b/scripts/check-angles-backoff.mjs
+index 2f9ad57..0fc62e2 100644
+--- a/scripts/check-angles-backoff.mjs
++++ b/scripts/check-angles-backoff.mjs
+@@ -17,6 +17,7 @@ import { join } from 'node:path';
+ import {
+   BASE_COOLDOWN_MS,
+   MAX_COOLDOWN_MS,
++  SOURCE_CHARGE_AFTER,
+   causeOf,
+   chargesAttempt,
+   cooldownLeft,
+@@ -70,6 +71,17 @@ check('five downloads refused together: NOT charged',
+   !chargesAttempt('could not download this link', 5));
+ check('a video-specific reason is charged in a batch of five',
+   chargesAttempt('video is 0 seconds long', 5));
++const DL = 'could not download this link';
++check('a download failure IS charged when others in the batch downloaded fine',
++  chargesAttempt(DL, 5, 3, 0));
++check('...but a model failure is not, even then (the quota can die part way through)',
++  !chargesAttempt('module_failed', 5, 3, 0));
++check('a whole-batch download failure is not charged the first two times',
++  !chargesAttempt(DL, 5, 0, 1) && !chargesAttempt(DL, 5, 0, 2));
++check('...but is once it has repeated SOURCE_CHARGE_AFTER times running',
++  chargesAttempt(DL, 5, 0, SOURCE_CHARGE_AFTER));
++check('a model failure is never charged by repetition, so a dead quota cannot burn a queue',
++  !chargesAttempt('module_failed', 5, 0, 50));
+ 
+ console.log('\n3. WHEN THE WHOLE BATCH IS ENVIRONMENTAL');
+ const none = { confidentCount: 0, nVideos: 5 };
+@@ -159,7 +171,9 @@ const api = read('supabase/functions/_shared/audit-api.ts');
+ check('the worker imports the backoff rules', /from '\.\.\/_shared\/angle-backoff\.ts'/.test(worker));
+ check('a new batch waits out the cooldown (tick start and follow-up)',
+   (worker.match(/await waitLeft\(db\)/g) ?? []).length === 2);
+-check('unplaced videos are charged through chargesAttempt', /chargesAttempt\(u\.reason, nVideos\)/.test(worker));
++check('unplaced videos are charged through chargesAttempt, with the batch evidence',
++  /chargesAttempt\(u\.reason, nVideos, confident\.length, envRun\)/.test(worker));
++check('the run of environmental batches is read before it is charged', /envRunBefore\(db\)/.test(worker));
+ check('needs_review notes feed the environment test',
+   /toFile\.filter\(\(t\) => t\.review\)\.map\(\(t\) => t\.note\)/.test(worker));
+ check('an environmental needs_review is not charged', /requeueVideos\(db, free, '', \(\) => false\)/.test(worker));
+@@ -177,6 +191,48 @@ check('the worker writes only statuses the table allows',
+   [...worker.matchAll(/status: [^'\n]*'([a-z_]+)'/g)].every((m) =>
+     ['queued', 'sent', 'filed', 'skipped', 'failed', 'needs_review'].includes(m[1])));
+ 
++console.log('\n8. A QUEUE WITH BAD VIDEOS STILL FINISHES (simulated, the worker\'s own rules)');
++{
++  /* Deleted or private TikToks all say "could not download this link", which is
++     also what a blocked server says. The first version never charged that in a
++     batch of two or more, so two bad videos could never run out of attempts: a
++     queue of 172 with seven left 29 stuck, 22 of them good videos starved. This
++     runs the real rules over the same queue and demands that every one ends. */
++  const N = 172;
++  const BATCH = 5;
++  for (const [label, bad] of [
++    ['two bad videos', new Set([40, 120])],
++    ['seven bad videos spread through the queue', new Set([3, 30, 55, 70, 101, 133, 160])],
++    ['seven bad videos at the head', new Set([0, 1, 2, 3, 4, 5, 6])],
++  ]) {
++    const vids = Array.from({ length: N }, (_, i) => ({ bad: bad.has(i), attempts: 0, status: 'queued' }));
++    const finished = [];
++    let t = 0;
++    for (let guard = 0; guard < 5000 && t < 7 * 24 * 60 * MIN; guard += 1) {
++      const wait = cooldownLeft(finished, t);
++      if (wait > 0) { t += wait; continue; }
++      const batch = vids.filter((v) => v.status === 'queued').slice(0, BATCH);
++      if (!batch.length) break;
++      const good = batch.filter((v) => !v.bad);
++      const reasons = batch.filter((v) => v.bad).map(() => DL);
++      const env = environmentalFailure(reasons, { confidentCount: good.length, nVideos: batch.length });
++      let run = env ? 1 : 0;
++      if (env) for (const b of finished) { if (isEnvError(b.error)) run += 1; else break; }
++      for (const v of good) v.status = 'filed';
++      for (const v of batch.filter((x) => x.bad)) {
++        if (chargesAttempt(DL, batch.length, good.length, run)) v.attempts += 1;
++        v.status = v.attempts >= 3 ? 'failed' : 'queued';
++      }
++      t += 15 * MIN;
++      finished.unshift({ finished_at: new Date(t).toISOString(), error: env ? envError(env) : null });
++    }
++    const count = (s) => vids.filter((v) => v.status === s).length;
++    check(`${label}: nothing is left stuck`, count('queued') === 0, `stuck=${count('queued')}`);
++    check(`${label}: every good video is filed`, count('filed') === N - bad.size, `filed=${count('filed')}`);
++    check(`${label}: every bad video ends up failed, not looping`, count('failed') === bad.size, `failed=${count('failed')}`);
++  }
++}
++
+ console.log(`\n${pass} passed, ${fails.length} failed`);
+ if (fails.length) {
+   console.log(fails.map((f) => `  - ${f}`).join('\n'));
