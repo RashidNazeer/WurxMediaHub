@@ -507,6 +507,13 @@ Deno.serve(async (req) => {
         last_phase: job.phase,
         last_polled_at: new Date().toISOString(),
       });
+      /* Best effort and separate: if the column is not there yet (migration
+         20261029120000), this fails alone and the poll above is unaffected. */
+      if (job.progress) {
+        await db.from('collab_angle_batches')
+          .update({ last_progress: job.progress }).eq('id', batch.id)
+          .then(() => {}, () => {});
+      }
       return reply({ ok: true, batch: batch.id, phase: job.phase, status: job.status });
     }
 

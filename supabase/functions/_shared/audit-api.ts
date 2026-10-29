@@ -210,6 +210,8 @@ export interface JobState {
   downloaded: number;
   completed: number;
   elapsedS: number | null;
+  /** The backend's own account of how far it has got; null from an older backend. */
+  progress: Record<string, unknown> | null;
 }
 
 const TERMINAL = new Set(['succeeded', 'partial', 'failed']);
@@ -240,6 +242,7 @@ export async function jobState(creds: AuditCreds, jobId: string): Promise<JobSta
     downloaded: Number(j.downloaded_videos ?? 0),
     completed: Number(j.completed_videos ?? 0),
     elapsedS: typeof j.elapsed_s === 'number' ? j.elapsed_s : null,
+    progress: j.progress && typeof j.progress === 'object' ? j.progress as Record<string, unknown> : null,
   };
 }
 

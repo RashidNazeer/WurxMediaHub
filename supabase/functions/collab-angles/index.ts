@@ -214,13 +214,27 @@ async function progressOf(db: SupabaseClient, brand: string, month: string) {
 
   const { data: batch } = await db
     .from('collab_angle_batches')
-    .select('state, last_phase, n_videos, provider_job, error')
+    .select('id, state, last_phase, n_videos, provider_job, error, last_polled_at')
     .eq('brand', brand)
     .eq('month', month)
     .in('state', ['submitting', 'running', 'filing'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  /* The audit machine's own progress for the running batch. Read apart from
+     the query above so that a missing column (migration 20261029120000 not yet
+     applied) costs the detail and nothing else. */
+  let batchProgress: unknown = null;
+  const batchId = (batch as { id?: string } | null)?.id;
+  if (batchId) {
+    const { data: pr } = await db.from('collab_angle_batches')
+      .select('last_progress').eq('id', batchId).maybeSingle();
+    batchProgress = (pr as { last_progress?: unknown } | null)?.last_progress ?? null;
+  }
+  /* Which batch this is out of how many, from the queue itself. */
+  const batchesTotal = Math.max(1, Math.ceil(total / 5));
+  const batchesDone = Math.min(batchesTotal, Math.floor((counts.filed + counts.skipped + counts.failed + counts.needs_review) / 5));
 
   /* A rough number, and the UI says so. Five and a half minutes a video is
      what a first run measured; a video the machine has seen before is far
@@ -238,6 +252,10 @@ async function progressOf(db: SupabaseClient, brand: string, month: string) {
         state: (batch as { state: string }).state,
         last_phase: (batch as { last_phase: string | null }).last_phase,
         n_videos: (batch as { n_videos: number }).n_videos,
+        progress: batchProgress,
+        polled_at: (batch as { last_polled_at: string | null }).last_polled_at,
+        batch_no: batchesDone + 1,
+        batches: batchesTotal,
       }
       : null,
     /* About the brand month as a whole, not the queue: `total` above is what the
