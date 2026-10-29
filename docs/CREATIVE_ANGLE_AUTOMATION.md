@@ -835,3 +835,34 @@ the removable list or an action name is broken), `pnpm build`, the function's
 exact selects run against CreatorHub. **Not proven:** the dialog in a browser and
 the edits against a real staff session. Nobody on this machine has a staff
 login, so the first real use is the first real test.
+
+### 2026-10-30, the worker is tested against a Gemini outage and recovery
+
+`pnpm verify:angles-worker` runs the REAL `collab-angles-sync` handler in Node
+with only its edges replaced: an in-memory database (`scripts/lib/mock-supabase.mjs`),
+a fake audit backend that can be switched between healthy, Gemini down,
+recovering, offline and 503, and a controllable clock so a day of cron ticks
+(once a minute, as scheduled) runs in a moment. 29 checks:
+
+- Gemini down: videos return to the queue uncharged, the batch is marked `ENV:`,
+  and the worker waits (5, 10, 20, 40, then an hour) instead of sending more.
+- Twelve hours of that: about one probe batch an hour at the end, every video
+  still queued, none charged, none failed.
+- Quota back: it notices within the hour with nobody pressing anything, files all
+  of the videos, clears the wait, and does not keep waiting.
+- Dying part way through a batch, and Gemini "answering" but unable to see the
+  videos (the `needs_review` form): kept and not charged, then filed on recovery.
+- A video that fails alone still runs out of attempts, so it cannot block the queue.
+- Audit machine unreachable, or answering 503 "GEMINI_API_KEY not set": the batch
+  is held, nothing is charged, and it finishes when the service is back.
+
+Run against the worker as it was before these fixes (4ab6d9c), 16 of the 29
+fail: the five videos were charged an attempt at once, the next batch went out
+immediately, and `needs_review` videos were parked. It passes only the offline
+and 503 cases, which were already correct.
+
+**What it does not prove:** that the live audit machine produces exactly these
+reason strings (they were read from its source), or the real Deno runtime. The
+live batch history on CreatorHub shows the same `ENV:` pattern happening for
+real, including the "no visual evidence" form that is the Gemini vision pass
+failing, followed by a recovery.

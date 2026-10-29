@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "paths": {
+      "npm:@supabase/supabase-js@2.110.9": ["./mock-supabase.mjs"],
+      "npm:zod@4.4.3": ["../../node_modules/zod"]
+    }
+  }
+}
