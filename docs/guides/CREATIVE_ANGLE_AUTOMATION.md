@@ -916,9 +916,16 @@ duplicate product in any case, update in place, another brand's brief untouchabl
 private/HTML/403/404/empty documents refused with nothing saved, Google unreachable,
 aliases, a creator refused, the audit log; and both copies of the parser over one table
 of inputs. Removing the duplicate-product guard makes eight of them fail.
-**Not proven:** the form in a browser, and the check against Google's real answers (the
-function asks Google's export endpoint; the stand-in reproduces the documented
-behaviours, not a live capture).
+**Found by testing against real Google, and fixed:** the first version asked Google's
+export endpoint without following redirects, and a genuinely public document answers
+with a redirect to Google's content server, so it could never be confirmed (it saved,
+saying "not checked"). The function now follows redirects and judges where they end:
+plain text means readable, Google's sign-in page means not shared. Verified live on
+CreatorHub: a real public document comes back confirmed, and a made-up document id is
+refused with "Google could not find that document" and nothing saved.
+**Not proven:** the form in a browser, and the real answer for a PRIVATE document (no
+private document was to hand; that path is proven only against the stand-in, which
+ends at the sign-in page as Google documents it).
 
 **Not built:** removing or switching off a brief. The table keeps a replaced brief with
 `is_active = false`; there is no button for it yet.

@@ -84,7 +84,13 @@ globalThis.fetch = async (url) => {
   if (!String(url).startsWith('https://docs.google.com/document/d/')) throw new Error(`unexpected fetch ${url}`);
   switch (googleMode) {
     case 'public': return new Response(LONG_TEXT, { status: 200, headers: { 'content-type': 'text/plain; charset=utf-8' } });
-    case 'private': return new Response(null, { status: 302, headers: { location: 'https://accounts.google.com/ServiceLogin?continue=x' } });
+    /* A private document: fetch follows Google's redirect and ENDS at the sign-in
+       page, which is HTML. A response's url cannot be set by the constructor. */
+    case 'private': {
+      const res = new Response('<html>Sign in</html>', { status: 200, headers: { 'content-type': 'text/html' } });
+      Object.defineProperty(res, 'url', { value: 'https://accounts.google.com/ServiceLogin?continue=x' });
+      return res;
+    }
     case 'html': return new Response('<html>Sign in</html>', { status: 200, headers: { 'content-type': 'text/html' } });
     case 'forbidden': return new Response('no', { status: 403 });
     case 'notfound': return new Response('no', { status: 404 });

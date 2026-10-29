@@ -594,27 +594,29 @@ type Reach = { ok: true; verified: boolean } | { ok: false; error: string };
  * Can the audit backend read this document? It fetches Google's plain-text
  * export without signing in, so ask for exactly that.
  *
- * A private document does not answer 403: Google redirects to its sign-in page,
- * or serves that page as HTML with a 200. Both are "not shared". Anything this
- * cannot tell (Google slow, an odd status, no network) is NOT a refusal: the
- * link is saved and the answer says it could not be checked, because blocking
- * somebody over our own failure to ask would be worse than the risk.
+ * REDIRECTS ARE FOLLOWED, and where they end is the answer. A PUBLIC document's
+ * export redirects to Google's content server and ends in plain text (found by
+ * testing against a real document: the first version refused to follow and so
+ * could never confirm anything). A PRIVATE one redirects to Google's sign-in
+ * page, which is HTML at accounts.google.com. Both are read from the final
+ * response, not from the first.
+ *
+ * Anything this cannot tell (Google slow, an odd status, no network) is NOT a
+ * refusal: the link is saved and the answer says it could not be checked,
+ * because blocking somebody over our own failure to ask would be worse than the
+ * risk.
  */
 async function checkShared(docId: string, tab: string | null): Promise<Reach> {
   let res: Response;
   try {
-    res = await fetch(briefExportUrl(docId, tab), {
-      redirect: 'manual',
-      signal: AbortSignal.timeout(10_000),
-    });
+    res = await fetch(briefExportUrl(docId, tab), { signal: AbortSignal.timeout(10_000) });
   } catch {
     return { ok: true, verified: false };
   }
-  if (res.status >= 300 && res.status < 400) {
+  /* Where it ended up: Google's sign-in page means nobody is allowed in. */
+  if (/accounts\.google\.com|ServiceLogin/i.test(res.url)) {
     await res.body?.cancel();
-    return /accounts\.google\.com|ServiceLogin/i.test(res.headers.get('location') ?? '')
-      ? { ok: false, error: NOT_SHARED }
-      : { ok: true, verified: false };
+    return { ok: false, error: NOT_SHARED };
   }
   if (res.status === 401 || res.status === 403) {
     await res.body?.cancel();
