@@ -873,3 +873,52 @@ reason strings (they were read from its source), or the real Deno runtime. The
 live batch history on CreatorHub shows the same `ENV:` pattern happening for
 real, including the "no visual evidence" form that is the Gemini vision pass
 failing, followed by a recovery.
+
+### 2026-10-30, a brand's creative briefs can be added and changed from the screen
+
+Umar: a brand with no creative brief saved (Mineral Ice) must let the user paste the
+brief's link when they press Categorise; a brand can have one or more briefs; and a
+saved brief can be updated.
+
+Until now the only way to register a brief was a migration, so a brand without one
+answered "has no content brief on file" and stopped. The Categorise dialog now has a
+**Creative brief** section for the brand on screen:
+
+- **No brief yet:** a notice, the add form already open, and the Categorise button
+  disabled until a brief exists.
+- **One or more briefs:** each is listed (product name, a short link that opens the
+  document, how many concepts have been read, when it was updated) with **Edit link**,
+  and **Add another brief** for a second product.
+- A brand's briefs are told apart by **product name** (the table allows one active
+  brief per brand and product, and the name is what the audit backend reports back),
+  so the second brief must name its product and the form says why.
+
+**How it works.** Two actions on `collab-angles` (`brief.list`, `brief.save`), behind the
+same staff check, audited as `collab_angles.brief_save`. No migration: the table already
+had the columns and the constraints.
+- The link must be a Google Doc (`src/lib/brief-url.ts` in the browser and
+  `supabase/functions/_shared/brief-url.ts` on the server, kept in step by a test). The
+  tab (`?tab=t.xxxx`) is kept and everything else dropped, so a document always becomes
+  the same stored link. Drive links, published-to-the-web links and non-Google links are
+  refused with a sentence saying what to do.
+- Before saving, the function asks Google for the plain-text export, the way the audit
+  backend will. A private document comes back as a sign-in page: that is refused, as are
+  a missing or an empty document. If Google cannot be asked at all the brief is saved
+  and the screen says it was not checked, because blocking someone over our own failure
+  to ask is worse than the risk.
+- **Changing a link clears the brief's saved concepts** so the backend reads the new
+  document on the next run. Videos already filed under the old concepts stay where
+  they are.
+
+**Proven:** `pnpm verify:angles-briefs` (68 checks) runs the real handler against an
+in-memory database and a stand-in for Google: first brief, second brief, refused
+duplicate product in any case, update in place, another brand's brief untouchable,
+private/HTML/403/404/empty documents refused with nothing saved, Google unreachable,
+aliases, a creator refused, the audit log; and both copies of the parser over one table
+of inputs. Removing the duplicate-product guard makes eight of them fail.
+**Not proven:** the form in a browser, and the check against Google's real answers (the
+function asks Google's export endpoint; the stand-in reproduces the documented
+behaviours, not a live capture).
+
+**Not built:** removing or switching off a brief. The table keeps a replaced brief with
+`is_active = false`; there is no button for it yet.

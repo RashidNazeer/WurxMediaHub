@@ -23,7 +23,15 @@
  *   queue.retry        put failed or flagged videos back, with fresh attempts
  *   queue.retry_group  the same for a whole brand and month
  *   queue.prioritise   make a brand's month the next one the worker picks up
- * None of them takes a video URL: they name rows by id, brand and month, so the
+ * AND THE BRIEFS (brief.*), because a brand with no creative brief cannot be
+ * categorised and a brief sometimes has to change:
+ *   brief.list         the active briefs a brand has
+ *   brief.save         add a brief (one brand can have several, one per product)
+ *                      or, with an id, change the link of an existing one
+ * A link must be a Google Docs link shared as "anyone with the link can view",
+ * which is asked of Google before it is stored: a private document comes back as
+ * a sign-in page and would otherwise fail a batch twenty minutes in.
+ * None of the queue actions takes a video URL: they name rows by id, brand and month, so the
  * audit machine can still only ever be given links this function derived. A
  * video that is `sent` is at the audit machine right now and is never removed.
  *
@@ -43,6 +51,7 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 import { tiktokVideoId } from '../_shared/audit-api.ts';
 import { filedVideoIds } from '../_shared/angle-store.ts';
 import { cooldownLeft, isEnvError, ENV_MARK } from '../_shared/angle-backoff.ts';
+import { briefExportUrl, parseBriefUrl } from '../_shared/brief-url.ts';
 
 const STAFF = ['ops', 'admin', 'ads_manager'];
 const MONTH = /^\d{4}-\d{2}$/;
@@ -82,10 +91,25 @@ const Body = z.discriminatedUnion('action', [
     brand: z.string().trim().min(1).max(120),
     month: z.string().regex(MONTH, 'month must be YYYY-MM'),
   }),
+  z.object({
+    action: z.literal('brief.list'),
+    brand: z.string().trim().min(1).max(120),
+  }),
+  z.object({
+    action: z.literal('brief.save'),
+    brand: z.string().trim().min(1).max(120),
+    brief_url: z.string().trim().min(1).max(600),
+    /* The product this brief is for. Empty for a brand with one brief. */
+    product: z.string().trim().max(80).optional(),
+    /* Present when changing a brief that exists; absent when adding one. */
+    id: z.uuid().optional(),
+  }),
 ]);
 
 /** A brief row, as the queue needs it. */
 interface Brief {
+  id?: string;
+  updated_at?: string;
   brand: string;
   aliases: string[] | null;
   product: string;
@@ -325,13 +349,19 @@ const LIST_LIMIT = 1000;
    long run of filed videos can never push waiting ones off the end of the list. */
 const DONE_LIMIT = 400;
 
-async function audit(db: SupabaseClient, actor: Actor, action: string, detail: Record<string, unknown>) {
+async function audit(
+  db: SupabaseClient,
+  actor: Actor,
+  action: string,
+  detail: Record<string, unknown>,
+  subject = 'collab_angle_queue',
+) {
   await db.from('audit_log').insert({
     actor_id: actor.id,
     actor_email: actor.email,
     actor_role: actor.role,
     action,
-    subject_type: 'collab_angle_queue',
+    subject_type: subject,
     detail,
   });
 }
@@ -523,6 +553,168 @@ async function queueAction(db: SupabaseClient, actor: Actor, body: z.infer<typeo
   }
 }
 
+/* ── the creative briefs ──────────────────────────────────────────────────── */
+
+const BRIEF_COLUMNS = 'id, brand, aliases, product, brief_url, angles, position, updated_at';
+/* The table's own CHECK: position between 0 and 20. */
+const MAX_BRIEF_POSITION = 20;
+const NOT_SHARED =
+  'Google will not show that document to people who are not signed in. Open it, choose Share, ' +
+  'and set General access to "Anyone with the link" as Viewer. Then try again.';
+
+type BriefBody = Extract<z.infer<typeof Body>, { action: 'brief.list' | 'brief.save' }>;
+
+function briefShape(b: Brief) {
+  return {
+    id: b.id ?? null,
+    product: b.product ?? '',
+    brief_url: b.brief_url,
+    /* How many concepts the backend has read from it. 0 means it will read the
+       document on the next run, which is what a changed link wants. */
+    angle_count: (b.angles ?? []).length,
+    position: b.position,
+    updated_at: b.updated_at ?? null,
+  };
+}
+
+/** The active briefs this brand has, under any of its spellings. */
+async function activeBriefs(db: SupabaseClient, brand: string): Promise<Brief[]> {
+  const { data, error } = await db
+    .from('collab_brand_briefs')
+    .select(BRIEF_COLUMNS)
+    .eq('is_active', true)
+    .order('position', { ascending: true });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Brief[]).filter((b) => briefMatches(b, brand));
+}
+
+type Reach = { ok: true; verified: boolean } | { ok: false; error: string };
+
+/**
+ * Can the audit backend read this document? It fetches Google's plain-text
+ * export without signing in, so ask for exactly that.
+ *
+ * A private document does not answer 403: Google redirects to its sign-in page,
+ * or serves that page as HTML with a 200. Both are "not shared". Anything this
+ * cannot tell (Google slow, an odd status, no network) is NOT a refusal: the
+ * link is saved and the answer says it could not be checked, because blocking
+ * somebody over our own failure to ask would be worse than the risk.
+ */
+async function checkShared(docId: string, tab: string | null): Promise<Reach> {
+  let res: Response;
+  try {
+    res = await fetch(briefExportUrl(docId, tab), {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    return { ok: true, verified: false };
+  }
+  if (res.status >= 300 && res.status < 400) {
+    await res.body?.cancel();
+    return /accounts\.google\.com|ServiceLogin/i.test(res.headers.get('location') ?? '')
+      ? { ok: false, error: NOT_SHARED }
+      : { ok: true, verified: false };
+  }
+  if (res.status === 401 || res.status === 403) {
+    await res.body?.cancel();
+    return { ok: false, error: NOT_SHARED };
+  }
+  if (res.status === 404) {
+    await res.body?.cancel();
+    return { ok: false, error: 'Google could not find that document. Check the link.' };
+  }
+  if (res.status !== 200) {
+    await res.body?.cancel();
+    return { ok: true, verified: false };
+  }
+  if (!/text\/plain/i.test(res.headers.get('content-type') ?? '')) {
+    await res.body?.cancel();
+    return { ok: false, error: NOT_SHARED };
+  }
+  const text = (await res.text()).trim();
+  /* "exported as empty text": a blank document, or a tab that has nothing in it. */
+  if (text.length < 40) {
+    return { ok: false, error: 'That document is empty, or the tab in the link has nothing in it.' };
+  }
+  return { ok: true, verified: true };
+}
+
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+async function briefAction(db: SupabaseClient, actor: Actor, body: BriefBody) {
+  const existing = await activeBriefs(db, body.brand);
+
+  if (body.action === 'brief.list') {
+    return { ok: true, briefs: existing.map(briefShape) };
+  }
+
+  /* ── brief.save ──────────────────────────────────────────────────────── */
+  const link = parseBriefUrl(body.brief_url);
+  if (!link.ok) return { ok: false, error: link.error };
+  const product = (body.product ?? '').trim();
+
+  const target = body.id ? existing.find((b) => b.id === body.id) : undefined;
+  if (body.id && !target) {
+    return { ok: false, error: 'That brief no longer exists. Close this and open it again.' };
+  }
+
+  /* The table allows one ACTIVE brief per brand and product (a unique index), and
+     the product is also the label the audit backend hands back. Say so in words
+     before the database says it in an error code. */
+  const clash = existing.find((b) => b.id !== target?.id && sameName(b.product ?? '', product));
+  if (clash) {
+    return {
+      ok: false,
+      error: product
+        ? `${body.brand} already has a brief for "${product}". Edit that one instead.`
+        : `${body.brand} already has a brief with no product name. Give this one a product name, ` +
+          'or edit the existing one.',
+    };
+  }
+
+  const reach = await checkShared(link.docId, link.tab);
+  if (!reach.ok) return reach;
+
+  let row: Brief | null = null;
+  if (target) {
+    /* A changed link means the concepts read from the old document are wrong, so
+       they are cleared and the backend reads the new one on the next run. Videos
+       already filed under the old concepts stay where they are. */
+    const { data, error } = await db.from('collab_brand_briefs')
+      .update({ brief_url: link.url, product, angles: [] })
+      .eq('id', target.id).eq('is_active', true)
+      .select(BRIEF_COLUMNS).maybeSingle();
+    if (error) throw new Error(error.message);
+    row = (data as Brief | null) ?? null;
+    if (!row) return { ok: false, error: 'That brief no longer exists. Close this and open it again.' };
+  } else {
+    const position = existing.length
+      ? Math.min(MAX_BRIEF_POSITION, Math.max(...existing.map((b) => b.position ?? 0)) + 1)
+      : 0;
+    const { data, error } = await db.from('collab_brand_briefs')
+      .insert({ brand: body.brand, aliases: [], product, position, brief_url: link.url, angles: [], is_active: true })
+      .select(BRIEF_COLUMNS).single();
+    if (error) {
+      if ((error as { code?: string }).code === '23505') {
+        return { ok: false, error: `${body.brand} already has a brief for that product. Edit it instead.` };
+      }
+      throw new Error(error.message);
+    }
+    row = data as Brief;
+  }
+
+  await audit(db, actor, 'collab_angles.brief_save', {
+    brand: body.brand,
+    product,
+    created: !target,
+    doc: link.docId,
+    tab: link.tab,
+    verified: reach.verified,
+  }, 'collab_brand_brief');
+  return { ok: true, created: !target, verified: reach.verified, brief: briefShape(row) };
+}
+
 Deno.serve(async (req) => {
   const reply = (body: unknown, status = 200) => json(body, status, req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders(req) });
@@ -584,6 +776,13 @@ Deno.serve(async (req) => {
        headers, which a browser reports as "the service did not answer". */
     if (body.action.startsWith('queue.')) {
       const res = await queueAction(admin, actor, body);
+      return reply(res, (res as { ok?: boolean }).ok === false ? 422 : 200);
+    }
+
+    /* Explicit comparisons, not a prefix test: they also narrow the type, so the
+       code below sees only angles.start and angles.progress. */
+    if (body.action === 'brief.list' || body.action === 'brief.save') {
+      const res = await briefAction(admin, actor, body);
       return reply(res, (res as { ok?: boolean }).ok === false ? 422 : 200);
     }
 

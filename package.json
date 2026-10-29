@@ -106,6 +106,7 @@
     "verify:angles-queue": "node scripts/verify/angles/check-angles-queue.mjs",
     "verify:angle-functions": "node scripts/verify/angles/check-angle-functions-types.mjs",
     "verify:angles-worker": "tsx --tsconfig scripts/lib/functions-tsconfig.json scripts/verify/angles/check-angles-worker.mjs",
+    "verify:angles-briefs": "tsx --tsconfig scripts/lib/functions-tsconfig.json scripts/verify/angles/check-angles-briefs.mjs",
     "verify:angles-live": "node scripts/verify/angles/check-angles-live.mjs",
     "verify:angle-products": "node scripts/verify/angles/check-angle-products.mjs",
     "verify:brand-search": "node scripts/verify/brands/check-brand-search.mjs",

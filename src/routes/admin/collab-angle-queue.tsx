@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal, Notice } from '@/components/admin/backups/Modal';
 import { cn } from '@/lib/utils';
 import { callAngles } from './collab-angles-api';
+import { CollabAngleBriefs } from './collab-angle-briefs';
 
 /**
  * THE CATEGORISE QUEUE, to look at and to edit.
@@ -207,6 +208,9 @@ export function CollabAngleQueue({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [confirm, setConfirm] = useState<string | null>(null);
+  /* How many creative briefs the brand on screen has: null until known. Zero
+     blocks Categorise, because there is nothing to judge the videos against. */
+  const [briefCount, setBriefCount] = useState<number | null>(null);
 
   const alive = useRef(true);
   const loading = useRef(false);
@@ -334,14 +338,23 @@ export function CollabAngleQueue({
                 {brand} {monthName(month)}
               </span>
               <span className="text-muted block text-[0.8125rem]">
-                Queue this brand's videos for the month that are not yet in an angle.
+                {briefCount === 0
+                  ? 'Add this brand\'s creative brief below to categorise its videos.'
+                  : 'Queue this brand\'s videos for the month that are not yet in an angle.'}
               </span>
             </div>
-            <Button size="sm" onClick={start} disabled={startBusy || busy !== null}>
+            <Button
+              size="sm"
+              onClick={start}
+              disabled={startBusy || busy !== null || briefCount === 0}
+              title={briefCount === 0 ? 'This brand has no creative brief yet' : undefined}
+            >
               <Sparkles size={14} aria-hidden /> Categorise {brand}
             </Button>
           </div>
         ) : null}
+
+        {brand ? <CollabAngleBriefs brand={brand} onCount={setBriefCount} onChanged={onChanged} /> : null}
 
         {startError ? <Notice tone="bad">{startError}</Notice> : null}
         {startNote && !startError ? <Notice tone="info">{startNote}</Notice> : null}
