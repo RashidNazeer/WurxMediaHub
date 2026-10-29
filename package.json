@@ -102,6 +102,7 @@
     "verify:site": "node scripts/check-public-site.mjs",
     "verify:angles-categorise": "node scripts/check-angles-categorise.mjs",
     "verify:angles-backoff": "tsx scripts/check-angles-backoff.mjs",
+    "verify:angles-queue": "node scripts/check-angles-queue.mjs",
     "verify:angles-live": "node scripts/check-angles-live.mjs",
     "verify:angle-products": "node scripts/check-angle-products.mjs",
     "verify:brand-search": "node scripts/check-brand-search.mjs",

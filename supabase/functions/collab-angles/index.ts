@@ -13,6 +13,20 @@
  *   angles.start     queue this brand's unfiled videos for this month
  *   angles.progress  how far along, for the ring around the button
  *
+ * AND THE QUEUE SCREEN (queue.*), for seeing what is waiting and editing it:
+ *   queue.list         every video in the queue with every status (waiting, in
+ *                      flight, failed, flagged for review, and the recent filed
+ *                      and skipped history), grouped by brand and month, plus
+ *                      why the worker is pausing if it is
+ *   queue.remove       take chosen videos out of the queue
+ *   queue.remove_group take a brand's month out of the queue
+ *   queue.retry        put failed or flagged videos back, with fresh attempts
+ *   queue.retry_group  the same for a whole brand and month
+ *   queue.prioritise   make a brand's month the next one the worker picks up
+ * None of them takes a video URL: they name rows by id, brand and month, so the
+ * audit machine can still only ever be given links this function derived. A
+ * video that is `sent` is at the audit machine right now and is never removed.
+ *
  * THE VIDEO LIST IS DERIVED HERE, NOT SENT BY THE BROWSER. The audit machine
  * downloads whatever link it is given, so a list that came from the page would
  * let anyone holding a staff token point it at any URL on the internet. The
@@ -28,6 +42,7 @@ import { z } from 'npm:zod@4.4.3';
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { tiktokVideoId } from '../_shared/audit-api.ts';
 import { filedVideoIds } from '../_shared/angle-store.ts';
+import { cooldownLeft, isEnvError, ENV_MARK } from '../_shared/angle-backoff.ts';
 
 const STAFF = ['ops', 'admin', 'ads_manager'];
 const MONTH = /^\d{4}-\d{2}$/;
@@ -40,6 +55,30 @@ const Body = z.discriminatedUnion('action', [
   }),
   z.object({
     action: z.literal('angles.progress'),
+    brand: z.string().trim().min(1).max(120),
+    month: z.string().regex(MONTH, 'month must be YYYY-MM'),
+  }),
+  z.object({ action: z.literal('queue.list') }),
+  z.object({
+    action: z.literal('queue.remove'),
+    ids: z.array(z.uuid()).min(1).max(200),
+  }),
+  z.object({
+    action: z.literal('queue.retry'),
+    ids: z.array(z.uuid()).min(1).max(200),
+  }),
+  z.object({
+    action: z.literal('queue.remove_group'),
+    brand: z.string().trim().min(1).max(120),
+    month: z.string().regex(MONTH, 'month must be YYYY-MM'),
+  }),
+  z.object({
+    action: z.literal('queue.retry_group'),
+    brand: z.string().trim().min(1).max(120),
+    month: z.string().regex(MONTH, 'month must be YYYY-MM'),
+  }),
+  z.object({
+    action: z.literal('queue.prioritise'),
     brand: z.string().trim().min(1).max(120),
     month: z.string().regex(MONTH, 'month must be YYYY-MM'),
   }),
@@ -268,6 +307,222 @@ async function progressOf(db: SupabaseClient, brand: string, month: string) {
   };
 }
 
+/* ── the queue screen ─────────────────────────────────────────────────────── */
+
+type Actor = { id: string; email: string | null; role: string | null };
+
+/* A video that is `sent` is in a batch at the audit machine and the worker is
+   about to file it, so it is never removed or re-queued from here. `filed` and
+   `skipped` are the record of what already happened: they are LISTED, so the
+   screen can show every status, but they cannot be removed or retried. */
+const REMOVABLE = ['queued', 'failed', 'needs_review'];
+const RETRYABLE = ['failed', 'needs_review'];
+const PENDING = ['queued', 'sent', 'failed', 'needs_review'];
+const DONE = ['filed', 'skipped'];
+/* PostgREST's own cap is 1000 rows. A queue bigger than that says so. */
+const LIST_LIMIT = 1000;
+/* The history is only ever the most recent part. It is fetched on its own so a
+   long run of filed videos can never push waiting ones off the end of the list. */
+const DONE_LIMIT = 400;
+
+async function audit(db: SupabaseClient, actor: Actor, action: string, detail: Record<string, unknown>) {
+  await db.from('audit_log').insert({
+    actor_id: actor.id,
+    actor_email: actor.email,
+    actor_role: actor.role,
+    action,
+    subject_type: 'collab_angle_queue',
+    detail,
+  });
+}
+
+async function listQueue(db: SupabaseClient) {
+  const COLUMNS =
+    'id, brand, month, video_id, video_url, creator, status, attempts, last_error, angle, created_at, updated_at';
+  const { data, error } = await db
+    .from('collab_angle_videos')
+    .select(COLUMNS)
+    .in('status', PENDING)
+    .order('created_at', { ascending: true })
+    .limit(LIST_LIMIT);
+  if (error) throw new Error(error.message);
+  const pending = (data ?? []) as Array<Record<string, unknown>>;
+
+  const { data: doneData, error: doneErr } = await db
+    .from('collab_angle_videos')
+    .select(COLUMNS)
+    .in('status', DONE)
+    .order('updated_at', { ascending: false })
+    .limit(DONE_LIMIT);
+  if (doneErr) throw new Error(doneErr.message);
+  const done = (doneData ?? []) as Array<Record<string, unknown>>;
+
+  /* Exact totals for the history, which the list above only samples. */
+  const exact: Record<string, number> = {};
+  for (const s of DONE) {
+    const { count } = await db.from('collab_angle_videos')
+      .select('id', { count: 'exact', head: true }).eq('status', s);
+    exact[s] = count ?? 0;
+  }
+  const rows = [...pending, ...done];
+
+  /* One group per brand and month, in the order the worker will take them: the
+     oldest WAITING video decides it. A group with nothing waiting (only failed,
+     flagged or finished videos) has no place in that order and goes after the
+     rest. */
+  const groups = new Map<string, {
+    brand: string;
+    month: string;
+    counts: Record<string, number>;
+    next_at: string | null;
+    videos: Array<Record<string, unknown>>;
+  }>();
+  for (const r of rows) {
+    const key = `${r.brand}|${r.month}`;
+    let g = groups.get(key);
+    if (!g) {
+      g = {
+        brand: String(r.brand),
+        month: String(r.month),
+        counts: { queued: 0, sent: 0, failed: 0, needs_review: 0, filed: 0, skipped: 0 },
+        next_at: null,
+        videos: [],
+      };
+      groups.set(key, g);
+    }
+    const st = String(r.status);
+    g.counts[st] = (g.counts[st] ?? 0) + 1;
+    if (st === 'queued' && !g.next_at) g.next_at = String(r.created_at);
+    g.videos.push({
+      id: r.id,
+      video_id: r.video_id,
+      video_url: r.video_url,
+      creator: r.creator,
+      status: st,
+      attempts: r.attempts ?? 0,
+      last_error: r.last_error ?? null,
+      angle: r.angle ?? null,
+    });
+  }
+  const ordered = [...groups.values()].sort((a, b) => {
+    if (a.next_at && b.next_at) return a.next_at < b.next_at ? -1 : 1;
+    if (a.next_at) return -1;
+    if (b.next_at) return 1;
+    return `${a.brand}|${a.month}`.localeCompare(`${b.brand}|${b.month}`);
+  });
+
+  const totals = { queued: 0, sent: 0, failed: 0, needs_review: 0, filed: 0, skipped: 0 };
+  for (const g of ordered) {
+    for (const k of PENDING) totals[k as keyof typeof totals] += g.counts[k] ?? 0;
+  }
+  /* The history is counted exactly, not from the sample. */
+  totals.filed = exact.filed ?? 0;
+  totals.skipped = exact.skipped ?? 0;
+
+  /* WHY NOTHING IS MOVING, when the worker is deliberately waiting. It is the
+     same test the worker applies before making a batch, so the screen and the
+     worker cannot disagree. */
+  const { data: finished } = await db
+    .from('collab_angle_batches')
+    .select('finished_at, error')
+    .not('finished_at', 'is', null)
+    .order('finished_at', { ascending: false })
+    .limit(10);
+  const batches = (finished ?? []) as Array<{ finished_at: string | null; error: string | null }>;
+  const wait = cooldownLeft(batches);
+  const lastEnv = batches[0]?.error;
+
+  return {
+    groups: ordered,
+    totals,
+    truncated: pending.length >= LIST_LIMIT,
+    /* Only the latest finished videos are listed; the totals above are exact. */
+    history_truncated: totals.filed + totals.skipped > done.length,
+    wait_seconds: Math.ceil(wait / 1000),
+    wait_reason: wait > 0 && isEnvError(lastEnv)
+      ? String(lastEnv).slice(ENV_MARK.length).trim().slice(0, 300)
+      : null,
+  };
+}
+
+async function queueAction(db: SupabaseClient, actor: Actor, body: z.infer<typeof Body>) {
+  switch (body.action) {
+    case 'queue.list':
+      return { ok: true, ...(await listQueue(db)) };
+
+    case 'queue.remove': {
+      const { data, error } = await db.from('collab_angle_videos').delete()
+        .in('id', body.ids).in('status', REMOVABLE).select('id, brand, month');
+      if (error) throw new Error(error.message);
+      const removed = (data ?? []).length;
+      await audit(db, actor, 'collab_angles.queue_remove', { asked: body.ids.length, removed });
+      return { ok: true, removed, skipped: body.ids.length - removed };
+    }
+
+    case 'queue.remove_group': {
+      const { data, error } = await db.from('collab_angle_videos').delete()
+        .eq('brand', body.brand).eq('month', body.month).in('status', REMOVABLE).select('id');
+      if (error) throw new Error(error.message);
+      const removed = (data ?? []).length;
+      await audit(db, actor, 'collab_angles.queue_remove_group', {
+        brand: body.brand,
+        month: body.month,
+        removed,
+      });
+      return { ok: true, removed };
+    }
+
+    case 'queue.retry':
+    case 'queue.retry_group': {
+      /* Fresh attempts, so a video that failed three times gets three more
+         tries rather than failing again on the first. It keeps its place in
+         its brand's line, because its created_at is left alone. */
+      let q = db.from('collab_angle_videos')
+        .update({ status: 'queued', attempts: 0, last_error: null, batch_id: null })
+        .in('status', RETRYABLE);
+      q = body.action === 'queue.retry'
+        ? q.in('id', body.ids)
+        : q.eq('brand', body.brand).eq('month', body.month);
+      const { data, error } = await q.select('id');
+      if (error) throw new Error(error.message);
+      const retried = (data ?? []).length;
+      await audit(
+        db,
+        actor,
+        body.action === 'queue.retry' ? 'collab_angles.queue_retry' : 'collab_angles.queue_retry_group',
+        body.action === 'queue.retry'
+          ? { asked: body.ids.length, retried }
+          : { brand: body.brand, month: body.month, retried },
+      );
+      return { ok: true, retried };
+    }
+
+    case 'queue.prioritise': {
+      /* The worker takes the oldest waiting video's brand and month, so "next"
+         is "older than everything else that is waiting". One second is enough:
+         ordering is all that is read from this column. */
+      const { data: first } = await db.from('collab_angle_videos').select('created_at')
+        .eq('status', 'queued').order('created_at', { ascending: true }).limit(1).maybeSingle();
+      if (!first) return { ok: false, error: 'Nothing is waiting in the queue.' };
+      const ts = new Date(Date.parse((first as { created_at: string }).created_at) - 1000).toISOString();
+      const { data, error } = await db.from('collab_angle_videos').update({ created_at: ts })
+        .eq('brand', body.brand).eq('month', body.month).eq('status', 'queued').select('id');
+      if (error) throw new Error(error.message);
+      const moved = (data ?? []).length;
+      if (!moved) return { ok: false, error: `${body.brand} has nothing waiting for that month.` };
+      await audit(db, actor, 'collab_angles.queue_prioritise', {
+        brand: body.brand,
+        month: body.month,
+        moved,
+      });
+      return { ok: true, moved };
+    }
+
+    default:
+      throw new Error('not a queue action');
+  }
+}
+
 Deno.serve(async (req) => {
   const reply = (body: unknown, status = 200) => json(body, status, req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders(req) });
@@ -320,6 +575,11 @@ Deno.serve(async (req) => {
   const brand = body.brand.trim();
 
   try {
+    if (body.action.startsWith('queue.')) {
+      const res = await queueAction(admin, actor, body);
+      return reply(res, (res as { ok?: boolean }).ok === false ? 422 : 200);
+    }
+
     if (body.action === 'angles.progress') {
       return reply({ ok: true, ...(await progressOf(admin, brand, body.month)) });
     }

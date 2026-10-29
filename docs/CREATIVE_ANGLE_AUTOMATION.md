@@ -794,3 +794,44 @@ with three changes made while applying them so they fit the worker above):
 
 Needs `supabase functions deploy collab-angles --project-ref qinxwfdwvpkzfhcijuqw`
 for the note to appear; the screen works against the old function (it reads 0).
+
+### 2026-10-30, the Categorise queue screen
+
+Umar: staff must be able to SEE the queue, see which brands' videos are in it,
+and EDIT it; then: the Categorise button should open the queue showing every
+status and those features.
+
+**The Categorise button now opens a dialog instead of starting a run.** Starting
+this brand's month is the first control inside it. Below that is every brand and
+month in the queue, in the order the worker will take them, with a chip per
+status (All, Waiting, With the audit server, Failed, Needs a look, Filed,
+Skipped) and a count badge on the button for what is still to do. A pause shows
+as a notice with the reason in plain words ("TikTok is refusing downloads from
+the audit server...") instead of a queue that silently does nothing.
+
+**Edits**, per brand and month or per selected video: move a brand to the front
+("Run next"), remove the whole brand or chosen videos, put failed or flagged
+videos back with fresh attempts. Removing only takes a video out of the queue;
+Categorise queues it again.
+
+**Where it lives.** Reads and writes are `queue.*` actions on `collab-angles`
+(list, remove, remove_group, retry, retry_group, prioritise), behind the same
+staff check, audited, and naming rows by id, brand and month only, never a link.
+The screen is `src/routes/admin/collab-angle-queue.tsx`, mounted from the
+Categorise button, so the vendored `CreativeAngles.jsx` is untouched. The shared
+call helper moved to `collab-angles-api.ts` because the two files would
+otherwise import each other.
+
+**Rules the function enforces, not only the screen:** a video that is `sent` is
+at the audit machine and is never removed or retried; `filed` and `skipped` are
+history and are listed but read-only; the history is fetched separately from the
+pending list so a long run of filed videos cannot push waiting ones off the end;
+history totals are exact while the listed history is the latest 400. "Run next"
+works by making the brand's waiting videos one second older than the oldest
+waiting video, since the worker orders by `created_at`.
+
+**Proven:** `pnpm verify:angles-queue` (42 checks, and it was shown to fail when
+the removable list or an action name is broken), `pnpm build`, the function's
+exact selects run against CreatorHub. **Not proven:** the dialog in a browser and
+the edits against a real staff session. Nobody on this machine has a staff
+login, so the first real use is the first real test.

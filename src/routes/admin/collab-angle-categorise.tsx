@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getSupabase } from '@/lib/supabase';
+import { callAngles } from './collab-angles-api';
+import { CollabAngleQueue } from './collab-angle-queue';
 
 /**
  * The "Categorise" button in the Creative angle testing header.
@@ -83,110 +84,6 @@ const PHASE_WORDS: Record<string, string> = {
   phase7: 'Judging',
   done: 'Done',
 };
-
-/**
- * `functions.invoke` hides the real error body behind `error.context`, which is
- * the raw Response. Same approach as `messageFrom` in `src/lib/tiktok.ts`.
- */
-/** The HTTP status behind a `functions.invoke` error, when there was a response. */
-function statusOf(error: unknown): number | undefined {
-  const status = (error as { context?: Response })?.context?.status;
-  return typeof status === 'number' ? status : undefined;
-}
-
-async function messageFrom(error: unknown, fallback: string): Promise<string> {
-  const ctx = (error as { context?: Response })?.context;
-  const status = statusOf(error);
-  let detail = '';
-  if (ctx && typeof ctx.json === 'function') {
-    try {
-      const body = await ctx.clone().json();
-      if (body?.error) return String(body.error);
-      /* The gateway and the edge runtime answer in their own shape, with
-         `message` and no `error`: {"code":401,"message":"Invalid JWT"}, or a
-         boot error. Without reading it the screen can only say "refused",
-         which is how one transient 503 became a mystery. */
-      if (typeof body?.message === 'string') detail = body.message;
-    } catch {
-      /* not JSON: fall through to the translations below */
-    }
-  }
-  const raw = (error as Error)?.message || fallback;
-
-  /* SUPABASE'S OWN WORDING IS NOT AN ANSWER. "Failed to send a request to the
-     Edge Function" is what a browser reports when the request never completed
-     at all, and the commonest reason by far is that the function is not
-     deployed on this project: there is nothing there to answer the browser's
-     preflight, so it never even gets as far as a status code. Saying that is
-     the difference between a person knowing what to do and filing a bug. */
-  if (/failed to send a request/i.test(raw)) {
-    return 'The categorising service did not answer. It may not be deployed on ' +
-      'this project yet, or something between here and Supabase is blocking ' +
-      'the request.';
-  }
-  if (/non-2xx/i.test(raw)) {
-    if (status === 401) {
-      return 'Your sign-in was not accepted. Sign out and back in, then try again.';
-    }
-    return `The categorising service returned an error${status ? ` (${status})` : ''}` +
-      `${detail ? `: ${detail}` : ''}. ` +
-      (status !== undefined && status >= 500
-        ? 'This is usually temporary, so try again in a moment. '
-        : 'Try again. ') +
-      'If it keeps happening, the collab-angles function log will say why.';
-  }
-  return raw;
-}
-
-/**
- * A CALL THAT CANNOT HANG. `functions.invoke` has no timeout of its own, so a
- * request that never completes, which is what a dead tunnel or a sleeping
- * laptop looks like from here, would leave the button disabled with a ring at
- * nought and no way back except reloading the page.
- */
-const CALL_TIMEOUT_MS = 20_000;
-
-/* A 502, 503 or 504 comes from the platform in front of the function, and
-   retrying is safe: collab-angles is idempotent. `angles.progress` only reads,
-   and `angles.start` skips every video that is already filed or queued. One
-   transient 503 once reached the screen as "refused the request" when the very
-   next call would have worked. A 500 is NOT retried: that is the function's own
-   handler failing, and it may already have written part of its work. */
-const TRANSIENT_STATUSES = new Set([502, 503, 504]);
-const RETRY_DELAYS_MS = [1_000, 3_000];
-
-async function callAngles<T>(body: Record<string, unknown>, fallback: string): Promise<T> {
-  for (let attempt = 0; ; attempt += 1) {
-    const abort = new AbortController();
-    const timer = window.setTimeout(() => abort.abort(), CALL_TIMEOUT_MS);
-    let data: unknown;
-    let error: unknown;
-    try {
-      ({ data, error } = await getSupabase().functions.invoke('collab-angles', {
-        body,
-        signal: abort.signal,
-      }));
-    } catch (e) {
-      throw new Error(
-        abort.signal.aborted
-          ? 'The server did not answer in 20 seconds. Try again in a moment.'
-          : await messageFrom(e, fallback),
-      );
-    } finally {
-      window.clearTimeout(timer);
-    }
-    if (error) {
-      const status = statusOf(error);
-      if (status !== undefined && TRANSIENT_STATUSES.has(status) && attempt < RETRY_DELAYS_MS.length) {
-        await new Promise<void>((resolve) => window.setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
-        continue;
-      }
-      throw new Error(await messageFrom(error, fallback));
-    }
-    if ((data as { error?: string } | null)?.error) throw new Error((data as { error: string }).error);
-    return data as T;
-  }
-}
 
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
@@ -303,6 +200,10 @@ export function CollabAngleCategorise({ brand, month, canEdit, onFiled }: Props)
   /* True once a run was started or seen in flight, so a finished run keeps its
      "12 of 12 done" line but a brand nobody has touched stays quiet. */
   const [touched, setTouched] = useState(false);
+  /* The queue dialog, which the button opens. Its count is what is still to do
+     across every brand, so it is held here for the button to show. */
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [queueCount, setQueueCount] = useState(0);
 
   /* ALIVE IS SET ON THE WAY IN AS WELL AS CLEARED ON THE WAY OUT, and leaving
      that out is not a style point. StrictMode mounts, unmounts and remounts
@@ -476,9 +377,9 @@ export function CollabAngleCategorise({ brand, month, canEdit, onFiled }: Props)
         <button
           type="button"
           className="wx-cat-btn"
-          onClick={start}
-          disabled={busy}
-          title={line || 'Sort the videos for this month into angles'}
+          onClick={() => setQueueOpen(true)}
+          aria-haspopup="dialog"
+          title={line || 'Open the queue, and categorise this brand'}
           aria-busy={busy}
         >
           <svg
@@ -496,6 +397,14 @@ export function CollabAngleCategorise({ brand, month, canEdit, onFiled }: Props)
             <path d="M19 16v4M17 18h4" />
           </svg>
           Categorise
+          {queueCount > 0 ? (
+            <span
+              aria-label={`${queueCount} videos in the queue`}
+              className="ml-1 rounded-full bg-[color:var(--wx-accent)] px-1.5 text-[0.6875rem] leading-5 text-[color:var(--wx-on-accent)]"
+            >
+              {queueCount}
+            </span>
+          ) : null}
         </button>
         {busy && (
           <svg className="wx-cat-ring" aria-hidden="true" focusable="false">
@@ -530,6 +439,24 @@ export function CollabAngleCategorise({ brand, month, canEdit, onFiled }: Props)
           {shown}
         </p>
       )}
+      {/* THE BUTTON OPENS THE QUEUE, and starting this brand's month is the first
+          thing inside it. The queue is mounted here, always, so the count on the
+          button stays current while it is closed. */}
+      <CollabAngleQueue
+        open={queueOpen}
+        onClose={() => setQueueOpen(false)}
+        canEdit={canEdit}
+        brand={brand}
+        month={month}
+        onStart={start}
+        startBusy={busy}
+        startNote={note}
+        startError={error}
+        onCount={setQueueCount}
+        onChanged={() => {
+          look().catch(() => {});
+        }}
+      />
     </div>
   );
 }
