@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router';
-import { ContestsView } from '@/routes/app/Contests';
+import { ContestsView } from '@/components/creator/earn/ContestsView';
 import type { CreatorContest, CreatorContestEntry } from '@/lib/creator/useCreatorContests';
 
 /**

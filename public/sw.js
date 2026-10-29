@@ -39,7 +39,6 @@ const PRECACHE = [
   OFFLINE_URL,
   '/icons/icon-192.png',
   '/fonts/figtree-latin.woff2',
-  '/fonts/figtree-latin.woff2',
 ];
 
 self.addEventListener('install', (event) => {

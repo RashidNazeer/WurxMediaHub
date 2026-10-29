@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { ContestsView } from '@/routes/app/Contests';
+import { ContestsView } from '@/components/creator/earn/ContestsView';
 import {
   isLiveForThem,
   useCreatorContests,

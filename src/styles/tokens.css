@@ -142,7 +142,7 @@
    * already says the same thing another way, so colour is never the only route
    * to the meaning. Never use two of them for two series that have to be told
    * apart: that takes two clearly different hues and a direct label, which is
-   * what `PerformanceChart` does.
+   * what the Home chart does.
    */
   --wx-chart-1: #9b93e6;
   --wx-chart-2: #6fa3f1;
@@ -1037,7 +1037,7 @@
    * background-color at all — is that our ground is a PHOTOGRAPH where his is
    * a smooth 125° ramp. A pane at literally zero reads as a crop of the
    * picture rather than as glass over it. 0.14 is the least that still holds
-   * the pane together over `glass-waves.webp`, and it is 3× more transparent
+   * the pane together over the wave ground, and it is 3× more transparent
    * than what it replaces.
    */
   --wx-glass-fill: rgba(255, 255, 255, 0.1);

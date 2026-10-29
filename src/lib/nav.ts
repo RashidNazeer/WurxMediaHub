@@ -91,7 +91,7 @@ export interface NavItem {
   adminOnly?: boolean;
 }
 
-export interface NavGroup {
+interface NavGroup {
   label: string;
   items: NavItem[];
 }

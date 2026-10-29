@@ -432,7 +432,7 @@ try {
 
   await applicantPage.getByRole('button', { name: /see my hub/i }).click();
   /*
-   * WAITED FOR, not slept on. What they land on is `FirstDay`, which is a
+   * WAITED FOR, not slept on. What they land on is the first-day screen, which is a
    * LAZILY LOADED chunk on purpose (it drags the apply dialog and the whole Zod
    * schema chunk behind it), so a fixed two second pause is a guess about how
    * fast somebody else's machine is on the day.

@@ -29,7 +29,7 @@ import { BRANDS, STATS } from '@/content/site';
  *
  * The ORDER is left exactly as it was — violet first, because it is the
  * interactive one. Nothing in the brief asks these three to run in palette
- * order; the fixed order it does ask for is the chart ramp in `VelocityChart`,
+ * order; the fixed order it does ask for is the chart ramp in the Home chart,
  * where the position of a mark on the ramp is carrying meaning.
  */
 const BARS = ['bg-accent', 'bg-info', 'bg-success'] as const;

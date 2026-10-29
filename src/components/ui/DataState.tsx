@@ -122,25 +122,3 @@ export function EmptyState({
     </div>
   );
 }
-
-/**
- * How current the figures are, in the creator's words.
- *
- * Results run to the end of yesterday, never to this minute, and a screen that
- * does not say so invites "why is today missing". One line, always present
- * wherever a figure is, so the answer is already there when the question
- * arrives.
- */
-export function Freshness({ to, className }: { to: string | null; className?: string }) {
-  if (!to) return null;
-  const when = new Date(`${to}T00:00:00Z`).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  });
-  return (
-    <span className={cn('text-subtle text-[0.6875rem] leading-none', className)}>
-      Current to {when}
-    </span>
-  );
-}

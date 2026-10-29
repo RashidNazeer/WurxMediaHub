@@ -11,7 +11,7 @@ import { OfferCard } from '@/components/creator/OfferCard';
 import { EarnGrid, EarnPanel } from '@/components/creator/earn/EarnPanel';
 import { BrandMark } from '@/components/creator/brand/BrandHeader';
 import { Brands } from '@/routes/app/Brands';
-import { ContestsView } from '@/routes/app/Contests';
+import { ContestsView } from '@/components/creator/earn/ContestsView';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useProfile } from '@/lib/auth/useProfile';
 import {

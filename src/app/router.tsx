@@ -818,11 +818,6 @@ export const router = createBrowserRouter([
         /* PRE-REGISTERED PREVIEW ROUTES, 2026-10-19 — one per page, each backed by a
            stub its owner replaces, so no one edits this file to add their own. */
         {
-          path: '/dev/numbers',
-          HydrateFallback: RouteFallback,
-          lazy: lazyRoute(() => import('@/routes/dev/NumbersPreview'), 'NumbersPreview'),
-        },
-        {
           path: '/dev/offers',
           HydrateFallback: RouteFallback,
           lazy: lazyRoute(() => import('@/routes/dev/OffersPreview'), 'OffersPreview'),
@@ -857,13 +852,6 @@ export const router = createBrowserRouter([
           path: '/dev/notifications',
           HydrateFallback: RouteFallback,
           lazy: lazyRoute(() => import('@/routes/dev/NotificationsPreview'), 'NotificationsPreview'),
-        },
-        {
-          /* The content grid at 1, 2, 3 and many videos — the counts where a
-             stretched column shows up and a full page never does. */
-          path: '/dev/content',
-          HydrateFallback: RouteFallback,
-          lazy: lazyRoute(() => import('@/routes/dev/ContentPreview'), 'ContentPreview'),
         },
         {
           /* Home against made-up figures, both themes, because there is no
