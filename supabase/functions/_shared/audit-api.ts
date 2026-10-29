@@ -131,16 +131,6 @@ async function call(
   return body;
 }
 
-/** `true` when the backend is up and ready to take work. */
-export async function auditReady(creds: AuditCreds): Promise<boolean> {
-  try {
-    const r = await call(creds, '/ready') as { ready?: boolean };
-    return r?.ready === true;
-  } catch {
-    return false;
-  }
-}
-
 export interface BriefRef {
   url: string;
   label: string;

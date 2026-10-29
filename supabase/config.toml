@@ -414,12 +414,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 
 # ---------------------------------------------------------------- functions --
 
-# The TikTok OAuth callback is the one function a signed-out browser must be
-# able to reach: TikTok sends the admin back to our callback page, and that
-# person may have no hub session by the time they land. What makes it safe is
-# the single-use `state` nonce, which only an admin could have minted, not the
-# platform's JWT check. See the header of tiktok-callback/index.ts.
-# The creator half of TikTok, and the same split as the ads pair above: the
+# The creator half of TikTok, and the same split as the ads pair below: the
 # callback is public because somebody returning from tiktok.com may have no
 # session in that tab, and everything else demands one.
 [functions.tiktok-creator]
@@ -436,6 +431,11 @@ verify_jwt = false
 [functions.tiktok-signup]
 verify_jwt = false
 
+# The TikTok OAuth callback is the one function a signed-out browser must be
+# able to reach: TikTok sends the admin back to our callback page, and that
+# person may have no hub session by the time they land. What makes it safe is
+# the single-use `state` nonce, which only an admin could have minted, not the
+# platform's JWT check. See the header of tiktok-callback/index.ts.
 [functions.tiktok-callback]
 verify_jwt = false
 

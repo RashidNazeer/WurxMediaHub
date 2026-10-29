@@ -216,7 +216,6 @@ Deno.serve(async (req) => {
     return reply({ error: parsed.error.issues[0]?.message ?? 'That request is not valid.' }, 400);
   }
   const body = parsed.data;
-  const t0 = Date.now();
   console.log(JSON.stringify({ at: new Date().toISOString(), req: body.action }));
 
   // ---------------------------------------------------------- shared bits --
