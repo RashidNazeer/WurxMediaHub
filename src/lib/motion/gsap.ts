@@ -9,7 +9,7 @@ import { useReducedMotion } from 'motion/react';
  * GSAP is the SECOND animation library in this app and it earns its place on
  * exactly one job: a timeline with several steps that have to be sequenced,
  * labelled, reversed or scrubbed as a unit. Motion is the default for
- * everything else and `docs/MOTION.md` says where the line is.
+ * everything else and `docs/guides/MOTION.md` says where the line is.
  *
  * This file exists because raw `gsap.to(el, {...})` can do three things that
  * are already recorded bugs in this project, and TypeScript will happily let
@@ -60,7 +60,7 @@ import { useReducedMotion } from 'motion/react';
  * opacity. Nothing that paints, nothing that lays out.
  *
  * If you want something that is not here, you want CSS or you want a different
- * design. `docs/MOTION.md` has the list of things that must never be animated
+ * design. `docs/guides/MOTION.md` has the list of things that must never be animated
  * and why each one is on it.
  */
 export type MotionSafeVars = {
@@ -177,7 +177,7 @@ function explain(key: string): string {
   const why = WHY[key];
   return why
     ? `\`${key}\` cannot be animated here. ${why}`
-    : `\`${key}\` is not on the allowed list. Only transform components and opacity may be animated (GLASS_PLAN §4.3). See docs/MOTION.md.`;
+    : `\`${key}\` is not on the allowed list. Only transform components and opacity may be animated (GLASS_PLAN §4.3). See docs/guides/MOTION.md.`;
 }
 
 /**
@@ -268,7 +268,7 @@ export function registerGsapPlugins(api: GsapApi, ...plugins: object[]): void {
     const banned = BANNED_PLUGINS[name];
     if (banned) {
       throw new Error(
-        `[motion/gsap] ${name} must not be registered in this app: ${banned} See docs/MOTION.md.`
+        `[motion/gsap] ${name} must not be registered in this app: ${banned} See docs/guides/MOTION.md.`
       );
     }
     if (registered.has(plugin)) continue;

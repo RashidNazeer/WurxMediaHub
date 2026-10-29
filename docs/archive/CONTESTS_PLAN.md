@@ -1,5 +1,7 @@
 # Contests
 
+> **Archived 2026-10-30.** Finished or superseded work, kept for history. It describes the code and decisions as they were when it was written, so file names in it may be gone. For where things stand now read `docs/PROJECT_STATE.md`; the docs index is `docs/README.md`.
+
 **Written:** 2026-08-12, from Rashid's brief plus a full audit of the schema, the
 Edge Functions, the RLS split, both dashboards and the design system.
 **Nothing in here is built.** This is the plan Rashid approves from, one step at
@@ -32,7 +34,7 @@ about another entrant**, which closes Q6 in its strongest form and cuts the
 published standing from the design. **D8, the banner sits inside the reading
 column at a fixed 3:1**, which cuts the full width strip. Plus two rulings that
 correct documents rather than add features: the colour contradiction between
-`UI_BRIEF_CONTESTS.md` and `UI_BRIEF_CONTESTS_HANDBACK2.md` is settled in favour
+`docs/archive/UI_BRIEF_CONTESTS.md` and `docs/archive/UI_BRIEF_CONTESTS_HANDBACK2.md` is settled in favour
 of what the designer actually built (3.12, rule C1), and the light mode contrast
 failure is fixed in the layout rather than in the product wide tokens (3.12,
 rules C2 to C4).
@@ -154,7 +156,7 @@ currency of its own: it is denominated in `contests.currency` by definition. One
 column cannot disagree with another column that does not exist.
 
 **RULED HERE, no maintained running total.** `brand_commercials.budget_used` is a
-maintained total with exactly one writer, and `scripts/reconcile-budgets.mjs`
+maintained total with exactly one writer, and `scripts/ops/reconcile-budgets.mjs`
 exists only because a hand cleanup made it drift
 (`docs/FEATURE_MAP.md:541-547`). Contests keep no `budget_used` column at all.
 Every contest money figure is derived by summing the frozen per entrant rows,
@@ -2474,7 +2476,7 @@ the creator's screen dressed as a progress bar.
 **M3. Contests keep no maintained running total. Every contest money figure is
 derived by summing frozen entry rows through `contest_totals`.** Enforced in the
 database (no `budget_used` column exists to write). **Without it:** contests
-inherit the failure that produced `scripts/reconcile-budgets.mjs`, and a second
+inherit the failure that produced `scripts/ops/reconcile-budgets.mjs`, and a second
 writer on a running total with no shared helper is how the total and the rows
 come to disagree.
 
@@ -2487,7 +2489,7 @@ Enforced in the database (nothing in the contest functions names
 `brand_commercials`) and in the client (the bar's label, the brand list spend
 filter's label, and the admin home "at risk" line). **Without it, either way:**
 if contest money silently enters `budget_used`, the next run of
-`scripts/reconcile-budgets.mjs:51-84` recomputes the total from
+`scripts/ops/reconcile-budgets.mjs:51-84` recomputes the total from
 `offer_applications` alone and deletes every contest commitment while printing it
 as a correction. If it does not enter and nothing says so, a brand shows 78%
 committed, is not flagged at risk, and is actually overspent.
@@ -2992,7 +2994,7 @@ brand it belongs to.
 and the top of the join popup. In a scrollable list it is small or absent, never
 full bleed.** Enforced in the client, in the one contest card component that both
 the hub tab and the contests screen use. The whole argument for that scannable
-list, direction 1A in `docs/UI_BRIEF_CONTESTS_HANDBACK2.md`, is that a creator
+list, direction 1A in `docs/archive/UI_BRIEF_CONTESTS_HANDBACK2.md`, is that a creator
 can go six contests deep with one thumb; a full width image per row costs four of
 those six.
 **Without it:** the list becomes a carousel of pictures, the names stop being
@@ -3002,7 +3004,7 @@ closes, is below the fold on every row.
 **B3. No words ever sit on top of the banner without a solid scrim behind them.
 The preferred shape is no overlay at all: the banner is a band, and the text sits
 below it on a solid surface token.** Enforced in the component and in review,
-because it CANNOT be enforced by the guard. `scripts/check-contrast.mjs` compares
+because it CANNOT be enforced by the guard. `scripts/build/check-contrast.mjs` compares
 token against token; it has no way to evaluate text over a photograph, whose
 contrast changes pixel by pixel and changes again when the admin swaps the image.
 **This is the one place in the whole product where a WCAG failure can ship
@@ -3267,7 +3269,7 @@ sounds final and is not) nor "still to film" (W3) nor "in review" (W1, and we
 have already reviewed it).
 
 **W5. `withdrawn` is the one word for a creator pulling out, in the database and
-on every screen.** Gap 6: `UI_BRIEF_CONTESTS.md` said "Left", the enum says
+on every screen.** Gap 6: `docs/archive/UI_BRIEF_CONTESTS.md` said "Left", the enum says
 `withdrawn`. **RULED HERE, `withdrawn` wins and "Left" is cut**, and the brief
 was corrected on 2026-08-13 in both places it carried the word, the state list
 and the mock data's `state` union, so the two documents no longer hand a
@@ -3336,11 +3338,11 @@ that has not started.
 own documents. The three stage tokens ARE used for an entry STATE. They are NOT
 used for a rank, a countdown, or decoration.**
 
-`UI_BRIEF_CONTESTS.md:640-655` says the three reserved tokens are "the only
+`docs/archive/UI_BRIEF_CONTESTS.md:640-655` says the three reserved tokens are "the only
 thing in the whole product allowed to say where money or work has got to" and,
 before it was corrected, told the designer not to borrow them "for a rank, a
 countdown, a contest state or anything decorative".
-`UI_BRIEF_CONTESTS_HANDBACK2.md:79-83` then says the four state colours "must be
+`docs/archive/UI_BRIEF_CONTESTS_HANDBACK2.md:79-83` then says the four state colours "must be
 expressed as the three stage tokens the product already has". The two disagreed,
 and the designer obeyed the later one, which was the right call.
 
@@ -3352,7 +3354,7 @@ accepted carry no colour at all because nothing has moved and nothing is owed.
 The original brief's "a contest state" meant the CONTEST's state, active or
 expired or settled, which is a property of the event rather than of anybody's
 work, and borrowing a money token for it is what the line was written against.
-**`UI_BRIEF_CONTESTS.md` is the document that changes**, and the line now reads:
+**`docs/archive/UI_BRIEF_CONTESTS.md` is the document that changes**, and the line now reads:
 not for a rank, not for a countdown, not for the contest's own lifecycle state,
 and not for decoration. **Corrected in the brief on 2026-08-13**, in the
 reserved-vocabulary bullet and again in "What not to do", so the ban is four
@@ -3367,7 +3369,7 @@ with measured ratios, and they exist precisely so nothing has to borrow.
 **C2. RULED BY RASHID 2026-08-13. The light mode contrast failure is fixed in
 the layout, not in the tokens.** Direction 1A puts muted text and accent text on
 `--wx-surface-3`, measured at 4.15:1 and 4.40:1 in light mode, both under AA, and
-`scripts/check-contrast.mjs` does not test that surface so the build passes.
+`scripts/build/check-contrast.mjs` does not test that surface so the build passes.
 **Do not darken `--wx-text-muted` or `--wx-accent`.** Both are product wide and
 both are already shipped on every screen we have; moving them to fix one panel
 on one unbuilt screen is a change to everything in exchange for a change to one
@@ -3472,7 +3474,7 @@ decision before contests add a fifth.
   mixes with in light mode, rather than pure black, which sits on cream like a
   hole rather than like a dimmed page.
 - **Parity is enforced from the day it lands, for free.**
-  `scripts/check-contrast.mjs` fails the build when a colour token exists in one
+  `scripts/build/check-contrast.mjs` fails the build when a colour token exists in one
   mode and is missing from the other (`check-contrast.mjs:138-143`), which is
   exactly the failure a hand-mixed backdrop commits. It carries no `PAIRS` entry
   and needs none: the contrast pass deliberately skips translucent values
@@ -3576,7 +3578,7 @@ filter for staff). Those five are the price of the two decisions Rashid made on
 |---|---|---|---|
 | 1 | `src/routes/admin/BrandHub.tsx:69`, `:75`, `:237-253` | Remove `soon` from the Contests entry, add `'contests'` to `BUILT`, add a `section === 'contests'` branch, and **link from that tab to the setup form's own route** rather than opening a dialog in place (Q14, rule F13) | The switch at `:243` falls through to `<Offers>`, so an admin clicks Contests and gets the Offers list under a Contests heading, silently. And a New contest button with nothing behind it is the half of the tab that makes the other half pointless |
 | 2 | `src/routes/app/BrandHub.tsx:48`, `:52`, `:152-167` | The identical three edits | The creator ternary at `:159` falls through to `<Overview>`, so a creator clicks Contests and lands on the brand's story. Building only the admin half is the thing that already cost trust once |
-| 3 | `src/routes/app/BrandHub.tsx:122-148` | The remaining unbuilt tabs stop being `disabled` buttons whose only explanation is a `title` attribute, and their `soon: 'Step 8'` / `'Step 9'` labels become "Next" / "Later" | Most of the roster is on a phone, where four grey pills carry no explanation and cannot be reached by keyboard. This is confirmed defect 4 in `UI_CONNECTIONS_PLAN.md:211-214`, and a badge naming a step that already shipped reads as a broken promise |
+| 3 | `src/routes/app/BrandHub.tsx:122-148` | The remaining unbuilt tabs stop being `disabled` buttons whose only explanation is a `title` attribute, and their `soon: 'Step 8'` / `'Step 9'` labels become "Next" / "Later" | Most of the roster is on a phone, where four grey pills carry no explanation and cannot be reached by keyboard. This is confirmed defect 4 in `docs/archive/UI_CONNECTIONS_PLAN.md:211-214`, and a badge naming a step that already shipped reads as a broken promise |
 | 4 | `src/lib/admin/useOpsHome.ts:37-56` | A fourth head-only count of pending contest entries, inside the SAME `Promise.all` | A second racing query lets the sentence flicker through "all clear" on the way to the truth, which the comment at `:14-16` forbids |
 | 5 | `src/routes/admin/AdminDashboard.tsx:49-71`, `:100-102`, `:104`, `:110` | The `queues` array, the words "of the three queues", the all-clear sentence naming three things, and `sm:grid-cols-3` | The first screen Rashid opens says the day is clear while forty creators sit unanswered on a contest. That is the exact lie step 8 was built to stop telling |
 | 6 | `src/routes/admin/AdminDashboard.tsx:355`, `src/lib/admin/useOpsHome.ts:133-157` | A second, separately labelled money block from `brand_contest_totals`, in the same query batch and the same view as the offer block, never summed with it (rule M10), and the heading "Committed across every brand" reworded to name what it counts | The home claims to be every brand's committed money while reading one view built from `offer_applications`. Contest money that is not in it makes the claim false while looking complete, and a number here disagrees with the number on the contest screens |
@@ -3587,8 +3589,8 @@ filter for staff). Those five are the price of the two decisions Rashid made on
 | 11 | `src/lib/creator/useCatalogueLive.ts:38-51` | A `contests` branch on the existing shared channel, every caller passing a unique key, **and the `subscribe()` status callback wired for the first time in this codebase, exposed as connected / reconnecting / offline** (rule S9) | An admin closes a contest and creators keep applying until they happen to refetch. Two channels with one name means the second subscribe is silently ignored. And without the status, the waiting screen's dot keeps promising a live connection through a dropped socket, on the one screen that tells a creator they can stop checking |
 | 12 | `src/lib/creator/useCreatorBrands.ts` (`useOfferCounts` shape), `src/lib/admin/useBrands.ts:383-405` | Brand cards on `/app/brands` and `/admin/brands` say a contest is running, from one grouped read over the page | A creator scrolls past the brand running the contest they would have entered, because every card still looks identical |
 | 13 | `src/components/work/JobProgress.tsx` | Contest deliverable progress uses `JobProgressBar` or a sibling in the same neutral folder, taking staff-only data as a prop | The seven-bar tracker is already drawn twice and agrees only by luck. Per-unit spans (`Content.tsx:480-493`) also fall apart on an open-ended deliverable count; the percentage-width bar does not |
-| 14 | `src/components/creator/PostContentDialog.tsx:38-108` or a new dialog | **ONE route for a creator to file any work.** Wherever a creator posts a video today they are offered contest entries and offer jobs together in the same picker, from one dialog, and a contest card saying "2 still to film" carries that same button. Today that dialog builds its dropdowns from `MyWorkRow[]`, approved offer applications only, so the source becomes both. This is the D4 mitigation and is not optional | Step 1 of `UI_CONNECTIONS_PLAN.md` existed to remove dead-end counts. A count you cannot act on is decoration. And the separate `contest_submissions` table was chosen on the promise that a creator would never have two places to go to post a video: two dialogs is that promise broken on the creator's screen, where they are least able to tell which one their video belongs in |
-| 15 | `scripts/check-responsive.mjs:44-105` | Every new contest screen in `SCREENS`, a `via` selector for anything behind an id, a **PAGE case for the contest setup form at 375, 768, 1024 and 1440** (Q14, rule F13: it is a route, not a dialog, and this line asked for a modal case until he answered), and a modal case for the creator entry dialog, which is unaffected and stays a dialog | A screen behind an id is invisible to the suite. Adding the application detail screen found a 375px overflow that had existed since it was built, and a page can pass at every width while a modal opened on it does not. And a modal case pointed at a route tests nothing at all: it waits for a panel that never opens |
+| 14 | `src/components/creator/PostContentDialog.tsx:38-108` or a new dialog | **ONE route for a creator to file any work.** Wherever a creator posts a video today they are offered contest entries and offer jobs together in the same picker, from one dialog, and a contest card saying "2 still to film" carries that same button. Today that dialog builds its dropdowns from `MyWorkRow[]`, approved offer applications only, so the source becomes both. This is the D4 mitigation and is not optional | Step 1 of `docs/archive/UI_CONNECTIONS_PLAN.md` existed to remove dead-end counts. A count you cannot act on is decoration. And the separate `contest_submissions` table was chosen on the promise that a creator would never have two places to go to post a video: two dialogs is that promise broken on the creator's screen, where they are least able to tell which one their video belongs in |
+| 15 | `scripts/verify/design/check-responsive.mjs:44-105` | Every new contest screen in `SCREENS`, a `via` selector for anything behind an id, a **PAGE case for the contest setup form at 375, 768, 1024 and 1440** (Q14, rule F13: it is a route, not a dialog, and this line asked for a modal case until he answered), and a modal case for the creator entry dialog, which is unaffected and stays a dialog | A screen behind an id is invisible to the suite. Adding the application detail screen found a 375px overflow that had existed since it was built, and a page can pass at every width while a modal opened on it does not. And a modal case pointed at a route tests nothing at all: it waits for a panel that never opens |
 | 16 | `src/routes/admin/Content.tsx` and its queue hook, plus wherever `manage-contest`'s `contest_content.review` lands | **Two review queues that read as one job with a filter.** Contest submissions and offer submissions are reviewed from the same screen, with one set of controls, one approve and one needs-another-take action, and a filter that says which kind you are looking at. They stay two tables and two functions underneath (decision 4) and that seam never reaches the reviewer. The default view is everything waiting, not one kind | The second cost Rashid accepted when he chose the separate submission path was two queues in his team's day, and he was promised they would feel like one job with a filter. Two unrelated screens is that promise broken: the day's work is now in two places, one of them gets checked less often, and a creator waits on a video nobody is looking at |
 
 Six more that are not screens but are the same class of omission:
@@ -3611,7 +3613,7 @@ Six more that are not screens but are the same class of omission:
   the upload has succeeded, and nothing beyond what that admin can already read
   on that screen. It is the whole implementation of "come back to it later", and
   it is a browser concern rather than a schema one, which is the answer.
-- **`scripts/check-contrast.mjs`** gains the `KNOWN_BAD` list and its drift
+- **`scripts/build/check-contrast.mjs`** gains the `KNOWN_BAD` list and its drift
   check (rule C3), and `src/styles/tokens.css` gains `--wx-deadline` and
   `--wx-rank-1/-2/-3` in **both** modes with their `PAIRS` entries, in the same
   commit as the first screen that uses them (rule C5). Skipping this leaves
@@ -3631,7 +3633,7 @@ Six more that are not screens but are the same class of omission:
   no date formatter anywhere in `src/lib/` today. Two of them is how the same
   contest comes to read 50 days on one screen and 49 on another, which it
   currently does in the design.
-- **`scripts/seed-brands.mjs`** grows a contest in each state, written through
+- **`scripts/seed/seed-brands.mjs`** grows a contest in each state, written through
   the real functions so seeded rows carry every snapshot column. The dev database
   has been deliberately empty since 2026-08-12, so without this the first thing
   Rashid sees of contests is six empty states, and six `SCREENS` entries in the
@@ -3694,12 +3696,12 @@ silently omitted, and the eighty percent warning on the budget bar keeps meaning
 offers only and says so. Written up as rule M10 in 3.3, ruled in 2.0, and carried
 by joins 6, 7 and 8.
 
-**Why, kept for the record:** `scripts/reconcile-budgets.mjs` needs no change to
+**Why, kept for the record:** `scripts/ops/reconcile-budgets.mjs` needs no change to
 its truth query and cannot erase contest money; `budget_used` keeps its single
 writer; the currency bug at `20260811200000:148-152` is not inherited. A shared
 pot would have meant extracting the increment into one helper called by both
 `review_offer_application` and `review_contest_entry`, teaching
-`scripts/reconcile-budgets.mjs:51-84` about contests in the SAME commit or the
+`scripts/ops/reconcile-budgets.mjs:51-84` about contests in the SAME commit or the
 next run silently deletes them and prints it as a correction, adding a currency
 check `budget_used` does not have today, and giving `budget_used` a second writer,
 which is exactly how the running total and the rows came to disagree on
@@ -3798,10 +3800,10 @@ upload in the contest. The agreed shape, which he was shown and accepted:
 - **It appears where a contest is being sold:** the contest's own page and the
   top of the join popup. In a scrollable list it is small or absent, never full
   bleed, because direction 1A's entire argument in
-  `docs/UI_BRIEF_CONTESTS_HANDBACK2.md` is that a creator can scan six contests
+  `docs/archive/UI_BRIEF_CONTESTS_HANDBACK2.md` is that a creator can scan six contests
   deep with one thumb (rule B2).
 - **Words never sit on top of it without a solid scrim**, and the preferred shape
-  is a band with the text below it on a solid surface. `scripts/check-contrast.mjs`
+  is a band with the text below it on a solid surface. `scripts/build/check-contrast.mjs`
   cannot evaluate text over a photograph, so this is the one place in the product
   where a WCAG failure could ship silently (rule B3).
 - **One fixed crop, 3:1, inside the reading column, with the space reserved
@@ -4212,7 +4214,7 @@ unbuilt rather than fixed. **The form still needs 375, 768 and 1024**, which tur
 ## 6. The build order
 
 One step per approval, each one shippable and clickable on its own, in the style
-of `UI_CONNECTIONS_PLAN.md`. Migration stamps continue from `20260812000000`.
+of `docs/archive/UI_CONNECTIONS_PLAN.md`. Migration stamps continue from `20260812000000`.
 
 ### Step 0. Generate the database types  (half a day, no user-visible change)
 
@@ -4270,7 +4272,7 @@ it (Q12, rule F12).
    its refusal sentences, which the client's Zod messages then match word for
    word. Its contract is settled (2.13, rule S1) and no part of it depends on how
    the form is arranged.
-5. **`scripts/seed-brands.mjs`'s contest seed** and `scripts/check-contests.mjs`
+5. **`scripts/seed/seed-brands.mjs`'s contest seed** and `scripts/verify/creator/check-contests.mjs`
    phase one, including the three storage checks in section 7. Both drive the
    functions rather than the screens, so both run before a form exists. **Ask
    before seeding; he may want the database empty.**
@@ -4353,7 +4355,7 @@ product with unstyled OS controls on a `#1a1714` panel.
 on top of it: `--wx-deadline` and `--wx-rank-1/-2/-3` into `tokens.css` in both
 modes with their `PAIRS` entries, **`--wx-scrim` into `tokens.css` in both modes
 with the four hardcoded dialog backdrops moved onto it in the same commit (rule
-C7)**, the `KNOWN_BAD` list and its drift check in `scripts/check-contrast.mjs`
+C7)**, the `KNOWN_BAD` list and its drift check in `scripts/build/check-contrast.mjs`
 (rule C3), and the layout fix that keeps muted and accent text off surface 3 (rule
 C2). The secondary button variant is used rather than an inline border (rule C6)
 and every duration is one of the three already in `tokens.css` (rule C8), from the
@@ -4373,7 +4375,7 @@ audits it. The admin-side rendering of the banner is done to rules B3 to B5 here
 even though no creator can see anything yet, because the alternative is drawing it
 twice and letting the two disagree.
 
-Also here: joins 1, 8 and 10 (admin half), and `scripts/check-contests.mjs` phase
+Also here: joins 1, 8 and 10 (admin half), and `scripts/verify/creator/check-contests.mjs` phase
 one, including the three storage checks in section 7.
 
 At the end of this step an admin can set a contest up properly and nobody else
@@ -4432,7 +4434,7 @@ tick from rule L5, **and the realtime status from rule S9, which the waiting
 screen's dot and copy read.** The waiting and locked screens ship with rule W7's
 copy, promising this screen and not an email.
 
-`scripts/check-contests.mjs` reaches its full attack list.
+`scripts/verify/creator/check-contests.mjs` reaches its full attack list.
 
 At the end of this step the whole of Rashid's brief works except deliverable
 submission and settlement.
@@ -4443,7 +4445,7 @@ submission and settlement.
 admin home, joins 6, 7 and 8, and the M7 budget check on `save_contest`. This is
 the step that puts decision 2 into code: the contest pot stays separate,
 `brand_commercials.budget_used` is not touched by anything here, and
-`scripts/reconcile-budgets.mjs` is not opened at all.
+`scripts/ops/reconcile-budgets.mjs` is not opened at all.
 
 **Rule M10 ships inside this step, not after it.** Every surface this step touches
 comes out of it showing contest money beside offer money, each block labelled,
@@ -4516,8 +4518,8 @@ one of them is the shape that returns a creator the number 1 with no error.
 
 ## 7. What the verification suite must prove
 
-`scripts/check-contests.mjs`, wired as `verify:contests` in `package.json`,
-following `scripts/check-brands.mjs`: real accounts created and deleted in a
+`scripts/verify/creator/check-contests.mjs`, wired as `verify:contests` in `package.json`,
+following `scripts/verify/brands/check-brands.mjs`: real accounts created and deleted in a
 `finally` block, `asUser(page, path, init)` running `fetch` INSIDE the signed-in
 page with the token pulled from `localStorage.getItem('wurxmediahub-auth')` so
 the request is byte for byte what a creator's browser could send, a RIVAL

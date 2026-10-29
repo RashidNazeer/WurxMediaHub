@@ -1,5 +1,7 @@
 # Joining the product up
 
+> **Archived 2026-10-30.** Finished or superseded work, kept for history. It describes the code and decisions as they were when it was written, so file names in it may be gone. For where things stand now read `docs/PROJECT_STATE.md`; the docs index is `docs/README.md`.
+
 **Written:** 2026-08-11, from a 12 agent audit of every screen and the whole
 data layer. Nothing in here is built. This is the plan Rashid approves from,
 one step at a time.

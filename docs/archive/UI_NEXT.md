@@ -1,5 +1,7 @@
 # PRISM, what to build next in the UI
 
+> **Archived 2026-10-30.** Finished or superseded work, kept for history. It describes the code and decisions as they were when it was written, so file names in it may be gone. For where things stand now read `docs/PROJECT_STATE.md`; the docs index is `docs/README.md`.
+
 Written 2026-10-09, after the rebrand landed on `feature/prism-phase-1-tokens`.
 
 This is a working plan, not a wish list. Every item says what it is, why it is
@@ -143,7 +145,7 @@ Realtime on a dashboard that does not change is a socket held open for nothing.
 
 ### 2.4 Chart interaction
 
-`PerformanceChart` has tooltips. Add a crosshair that reads **both** series at
+`PerformanceChart` (removed 2026-10-30) has tooltips. Add a crosshair that reads **both** series at
 the hovered date, and make the legend a toggle. On touch there is no hover, so
 the crosshair must follow a drag — that is the whole reason this is listed as
 work rather than a one-liner.

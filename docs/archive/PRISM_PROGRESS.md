@@ -1,5 +1,7 @@
 # PRISM rebuild — progress
 
+> **Archived 2026-10-30.** Finished or superseded work, kept for history. It describes the code and decisions as they were when it was written, so file names in it may be gone. For where things stand now read `docs/PROJECT_STATE.md`; the docs index is `docs/README.md`.
+
 **Read this first if you are picking the PRISM frontend rebuild up cold.** It is the running
 record of what is done, what is next, and the decisions already taken. Update it in the same
 commit as the work it describes.
@@ -17,13 +19,13 @@ wells, one light source from the top-left. Light-first, dark retained. Mobile-fi
 
 |                                          |                                                            |
 | ---------------------------------------- | ---------------------------------------------------------- |
-| Brand kit (colours, logos, fonts, radii) | `Redesign UI/prism_brand_kit/` — **UNTRACKED**, local only |
-| The plan (phases, team, QA, risks)       | `Redesign UI/IMPLEMENTATION_PLAN.md` — untracked           |
-| Token map with contrast maths            | `Redesign UI/PRISM_TOKEN_MAP.md` — untracked               |
-| Stitch design prompts (3 directions)     | `Redesign UI/stitch-prompt-A/B/C-*.md` — untracked         |
+| Brand kit (colours, logos, fonts, radii) | `design/prism_brand_kit/` — now tracked in git |
+| The plan (phases, team, QA, risks)       | `design/IMPLEMENTATION_PLAN.md` — now tracked       |
+| Token map with contrast maths            | `design/PRISM_TOKEN_MAP.md` — now tracked          |
+| Stitch design prompts (3 directions)     | not in the repo (were in the old `Redesign UI/` folder)|
 
-**Warning:** `Redesign UI/` is not in git. If that folder is lost, the brand kit and the three
-design prompts are lost with it. The essential parts are reproduced below so this file alone
+**Warning (when written):** the old `Redesign UI/` folder was not in git; it is now `design/` and is. The three
+design prompts were not carried over. The essential parts are reproduced below so this file alone
 is enough to continue.
 
 ---
@@ -48,7 +50,7 @@ each is a single token or a small change, and any can be revisited.
 ## The two rules that everything depends on
 
 **1. Keep every `--wx-*` token NAME. Change only its VALUE.**
-`scripts/check-contrast.mjs` hardcodes ~40 token names and fails with "token not found" if one
+`scripts/build/check-contrast.mjs` hardcodes ~40 token names and fails with "token not found" if one
 goes missing. Renaming to `--prism-*` breaks the build everywhere at once.
 
 **2. `--wx-bg` is `#ECECF3`, not white or mist.**
@@ -84,7 +86,7 @@ zero console errors.
 
 Started 2026-10-08. Branched from `origin/dev` at `58ada7c`.
 
-Scope: `src/styles/tokens.css` (both theme blocks) and `scripts/check-contrast.mjs`, in one
+Scope: `src/styles/tokens.css` (both theme blocks) and `scripts/build/check-contrast.mjs`, in one
 commit — the guard must change with the values or the build breaks.
 
 Not in scope: fonts, the logo, the rename, and any screen. Screens will look half-dressed

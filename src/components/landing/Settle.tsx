@@ -9,7 +9,7 @@ import { useReducedMotion } from 'motion/react';
  * TWO REVIEWERS, THE SAME REPORT, INDEPENDENTLY: "there is a bug when
  * scrolling up and down the landing page, causing the text to disappear."
  *
- * They are describing `ScrollDepth` and `ScrollWords` in
+ * They are describing `ScrollDepth` and `ScrollWords` (since removed) in
  * `src/components/layout/Section.tsx`, which this file replaces for the
  * landing sections. Both drive OPACITY from a `useScroll` progress as a pure
  * function of where the page is — so the value is not an entrance at all, it
@@ -61,7 +61,7 @@ import { useReducedMotion } from 'motion/react';
  * belongs to another owner. These are the landing sections' own reveals, so
  * they live beside the landing sections.
  *
- * Transform and opacity only, which is what `scripts/check-blur-budget.mjs`
+ * Transform and opacity only, which is what `scripts/verify/design/check-blur-budget.mjs`
  * enforces, and off entirely under `prefers-reduced-motion`. Travel is written
  * in `rem`, not `px`, so it tracks the text-size setting like everything else.
  */

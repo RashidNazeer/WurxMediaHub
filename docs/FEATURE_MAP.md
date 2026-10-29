@@ -26,8 +26,8 @@ tables `public.data_backups` and `public.data_restore_runs`),
 `supabase/functions/backup-data/index.ts`, `src/routes/admin/Backups.tsx`,
 `src/components/admin/backups/*`, `src/lib/admin/useBackups.ts`,
 `src/lib/backup/*` (file format, encryption, download and upload orchestration),
-`scripts/backup-database.mjs`, `scripts/restore-database.mjs`, `scripts/test-backup-*.mjs`.
-Full description and the disaster-recovery steps: `docs/BACKUPS.md`.
+`scripts/ops/backup-database.mjs`, `scripts/ops/restore-database.mjs`, `scripts/test-backup-*.mjs`.
+Full description and the disaster-recovery steps: `docs/guides/BACKUPS.md`.
 
 **What it reads:** every table in every application schema (`public`, `wurxbase`, and any
 added later; found from the catalogue, not from a list), plus `auth.users` and `auth.identities`.
@@ -58,12 +58,12 @@ transaction); always `audit_log`, `data_backups`, `data_restore_runs`, `backup.c
 `src/components/creator/OfferCard.tsx`, `src/components/content/ContentCard.tsx`,
 `.oxlintrc.json`,
 `supabase/migrations/*_deliverables_freeze_and_job_progress.sql`,
-`scripts/seed-pipeline.mjs`
+`scripts/seed/seed-pipeline.mjs`
 **Tables:** `offer_applications.committed_video_count` (new),
 **View:** `job_progress` (the project's FIRST view)
 
 Built 2026-08-11, the first step of joining the product up (see
-`UI_CONNECTIONS_PLAN.md`). Rashid: "he has offers page where he should be seen
+`docs/archive/UI_CONNECTIONS_PLAN.md`). Rashid: "he has offers page where he should be seen
 how much content he has posted maybe a progress bar".
 
 **Change rules**
@@ -121,7 +121,7 @@ how much content he has posted maybe a progress bar".
   `creator_id=eq.<uid>`. `postgres_changes` does not apply row security to
   DELETE events and the table has `replica identity full`, so the whole old row
   of somebody else's deleted submission would otherwise arrive.
-- `node scripts/seed-pipeline.mjs` puts videos against dev's approved jobs in
+- `node scripts/seed/seed-pipeline.mjs` puts videos against dev's approved jobs in
   five states (`--clean` removes them). It approves through the REAL
   `review_content` rather than setting stages by hand, so it cannot drift from
   the rule and it exercises the finish path on every run.
@@ -182,7 +182,7 @@ Files: `src/lib/work/stage-moves.ts`, `src/routes/admin/OfferRequests.tsx`,
 **Views:** `brand_stage_totals`, `brand_content_totals`, `brand_creator_roster`,
 `creator_directory`
 
-Steps 5 to 8 of `UI_CONNECTIONS_PLAN.md`, built 2026-08-11.
+Steps 5 to 8 of `docs/archive/UI_CONNECTIONS_PLAN.md`, built 2026-08-11.
 
 **Change rules**
 
@@ -237,7 +237,7 @@ Steps 5 to 8 of `UI_CONNECTIONS_PLAN.md`, built 2026-08-11.
 `src/lib/admin/useAdminContent.ts`, `src/routes/app/Content.tsx`,
 `src/routes/admin/Content.tsx`, `src/components/content/*`,
 `src/components/creator/PostContentDialog.tsx`,
-`supabase/functions/manage-content/`, `scripts/check-content.mjs`
+`supabase/functions/manage-content/`, `scripts/verify/creator/check-content.mjs`
 **Tables:** `content_submissions`
 
 "Content pending" was the one stage with nothing to do in it. A creator was
@@ -298,7 +298,7 @@ told to film and had nowhere to put the result.
 ## Design tokens & theming
 
 **Files:** `src/styles/tokens.css`, `src/styles/global.css`,
-`scripts/check-contrast.mjs`, `src/components/theme/*`
+`scripts/build/check-contrast.mjs`, `src/components/theme/*`
 **Tables:** none yet. Brand Hub theming (Step 6) will add `brands.theme` and
 override `--wx-*` at the hub level.
 
@@ -311,7 +311,7 @@ override `--wx-*` at the hub level.
 - A token added to `[data-theme='dark']` MUST also be added to
   `[data-theme='light']` and vice versa. `pnpm build` fails otherwise.
 - Adding a new text/background combination means adding it to the `PAIRS` list
-  in `scripts/check-contrast.mjs` so it is contrast-checked in both themes.
+  in `scripts/build/check-contrast.mjs` so it is contrast-checked in both themes.
 - **`--wx-stage-live`, `--wx-stage-due` and `--wx-stage-paid` are the only
   colours allowed to say where money has got to**, and each of the seven
   pipeline stages maps to exactly one of them through `STAGE_META.bucket`.
@@ -530,7 +530,7 @@ override `--wx-*` at the hub level.
   same sign in. This is a different DOOR, not a different LOCK, and must never
   be described or relied on as a security control.
 - No sign up link may ever appear on the staff screen. Staff accounts come from
-  `scripts/create-admin.mjs` and nowhere else.
+  `scripts/ops/create-admin.mjs` and nowhere else.
 - `RequireAuth` picks the door from the path being attempted, so signing out of
   the admin panel returns you to the staff screen. Adding a new staff area means
   extending that check.
@@ -569,8 +569,8 @@ anything that reacts to "signed in" during that window will race the insert.
 `src/lib/schemas/brand.ts`, `supabase/functions/manage-brand/`,
 `supabase/migrations/*_brands_and_offers.sql`,
 `supabase/migrations/*_brand_about_products_and_creator_access.sql`,
-`supabase/migrations/*_brand_assets_storage.sql`, `scripts/check-brands.mjs`,
-`scripts/seed-brands.mjs`
+`supabase/migrations/*_brand_assets_storage.sql`, `scripts/verify/brands/check-brands.mjs`,
+`scripts/seed/seed-brands.mjs`
 **Tables:** `brands`, `brand_commercials`, `brand_products`, `offers`
 **Storage:** `brand-assets` bucket
 
@@ -605,7 +605,7 @@ offers.
   `review_offer_application`. Nothing a browser can reach does that, so it
   cannot happen in normal use, but a cleanup script did it on 2026-08-01 and
   left three brands claiming money nobody had promised.
-  `node scripts/reconcile-budgets.mjs` puts it right, and `--dry-run` reports
+  `node scripts/ops/reconcile-budgets.mjs` puts it right, and `--dry-run` reports
   without writing. Run it after any hand cleanup that touches requests. That split is what
   makes it safe to show a brand to a creator: the budget is not a column they
   are filtered away from, it is a column that does not exist on anything they
@@ -781,7 +781,7 @@ even though Requests no longer sits under an Offers heading.
 
 ## The contest card a creator sees (2026-08-22)
 
-**Files:** `src/routes/app/Contests.tsx`, `src/lib/creator/useCreatorContests.ts`
+**Files:** `src/components/creator/earn/ContestsView.tsx` (moved here from `src/routes/app/Contests.tsx` on 2026-10-30), `src/lib/creator/useCreatorContests.ts`
 
 Rashid: _"contest is not a normal thing dude it must represent a brand with
 images emojis taglines"_. It was a bordered box with a heading and some labelled
@@ -835,7 +835,7 @@ reads as a broken clock. Days, hours, minutes only.
 **Files:** `src/routes/admin/ContestSetup.tsx`,
 `supabase/migrations/20260821200959_contest_artwork_and_perks.sql`,
 `supabase/functions/manage-contest/index.ts`, `src/lib/admin/useContests.ts`,
-`scripts/check-contests.mjs`
+`scripts/verify/creator/check-contests.mjs`
 
 Rashid, with a design: _"admin has to sroll on one page to see who accepted
 what's going on each and everything this is very bad"_. He was right. That
@@ -903,7 +903,7 @@ the other half of what he asked for and is the next step.
 `supabase/functions/manage-brand/index.ts`, `src/lib/schemas/brand.ts`,
 `src/components/admin/OfferDialog.tsx`, `src/lib/admin/useAllOffers.ts`,
 `src/lib/admin/useManageBrand.ts`, `src/components/creator/OfferCard.tsx`,
-`scripts/check-offers.mjs`
+`scripts/verify/creator/check-offers.mjs`
 
 Rashid, from his boss: offers divide into three, and the type carries a guard
 rail rather than a note in the description.
@@ -974,7 +974,7 @@ same deal, every creator on exactly one.
   word for `needs_application` (`'all' | 'application' | 'open'`). It is
   `access` now, with its own dropdown beside the new one. Two "kind"s on one
   filter bar is the mix-up where an admin filters by one, gets the other, and
-  every test still passes. `scripts/check-offer-requests.mjs` drives both.
+  every test still passes. `scripts/verify/creator/check-offer-requests.mjs` drives both.
 - **OfferCard stopped claiming "Open to every approved creator."** That is a
   statement about audience and it is false on every restricted offer. It says
   "It is yours to take" now, which is true of everything reaching that branch.
@@ -988,7 +988,7 @@ on.
 
 ## The applications queue, as cards (2026-08-21)
 
-**Files:** `src/routes/admin/Applications.tsx`, `scripts/shots-admin.mjs`
+**Files:** `src/routes/admin/Applications.tsx`, `scripts/shots/shots-admin.mjs`
 
 Rashid, and he was right to be sharp about it: _"this is not waht i expcected
 make it more beautiful ... like horiontal cards you are always ptting content in
@@ -1036,7 +1036,7 @@ tool lie rather than fail:
 ## The requests queue, as cards (2026-08-21)
 
 **Files:** `src/routes/admin/OfferRequests.tsx`,
-`src/components/layout/FilterBar.tsx`, `scripts/check-offer-requests.mjs`
+`src/components/layout/FilterBar.tsx`, `scripts/verify/creator/check-offer-requests.mjs`
 
 Rashid, straight after the offers grid: _"i like it do something with this as
 well do the same"_. Same language throughout â€” `rounded-md`, three sections
@@ -1088,7 +1088,7 @@ no idea how many videos buys it is exactly what that check exists to catch.
 
 **Files:** `src/routes/admin/AllOffers.tsx`, `src/lib/admin/useAllOffers.ts`,
 `src/components/work/CreatorStack.tsx`, `src/components/work/CreatorFace.tsx`,
-`scripts/shots-admin.mjs`
+`scripts/shots/shots-admin.mjs`
 
 Rashid: _"Look at the offers ui how boring it is ... horizontal cards rather
 than having one row it's wasting the time ... card will be minimal ... just
@@ -1156,8 +1156,8 @@ invisible in a shot of its resting state.
 ## The pipeline, and the creator's dashboard
 
 **Files:** `src/lib/offer-stages.ts`, `src/lib/creator/useMyWork.ts`,
-`src/routes/app/Dashboard.tsx`, `src/components/creator/FirstDay.tsx`,
-`src/components/creator/StageTracker.tsx`, `scripts/shots-creator.mjs`,
+`src/routes/app/Dashboard.tsx`, `src/components/creator/FirstDay.tsx` (removed 2026-10-30),
+`src/components/creator/StageTracker.tsx`, `scripts/shots/shots-creator.mjs`,
 `src/lib/money.ts`,
 `supabase/migrations/*_offer_pipeline.sql`,
 `supabase/migrations/*_read_offers_you_asked_for.sql`
@@ -1214,7 +1214,7 @@ from Pending request to Paid, moved by staff and watched by the creator.
 - **Two views, both from the design, switched in the URL (`?view=pipeline`).**
   Overview answers "have I been paid and what is coming". Pipeline answers
   "what is sitting where", which is what somebody asks when three jobs are in
-  flight and one has gone quiet. `PipelineBoard` is the only thing that reads
+  flight and one has gone quiet. `PipelineBoard` (removed 2026-10-30) is the only thing that reads
   `summary.byStage`, which `summarise()` had always computed and nothing used.
 - **The rail draws dots and labels, never a job card. `PipelineBoard` is the
   rail, `PipelineJobs` is the work on it, and they must stay apart.** They were
@@ -1228,11 +1228,11 @@ from Pending request to Paid, moved by staff and watched by the creator.
   unequal gaps is telling the creator something false about distance.
 - **Both tabs use the same `wx-golden` frame, and the narrow column must always
   have something in it.** Pipeline used to put `Activity` on the wide side and
-  `ContestEarnings` on the narrow one. `ContestEarnings` renders nothing for a
+  `ContestEarnings` (removed 2026-10-30) on the narrow one. `ContestEarnings` renders nothing for a
   creator with no contest money, which is most of them, so the right-hand third
   of the page was simply blank. A component that is only sometimes there cannot
   be half the frame.
-- **Home leads with `VelocityCard`, and My numbers shows the same panel from the
+- **Home leads with `VelocityCard` (removed 2026-10-30), and My numbers shows the same panel from the
   same hook.** Rashid's design, 2026-10-10. `useVelocityData` fetches the window
   and the one before it, `VelocityPanel` draws, `VelocityCard` is Home's
   container that owns a date range. The split exists because the two screens
@@ -1247,7 +1247,7 @@ from Pending request to Paid, moved by staff and watched by the creator.
   a smooth decline across seven week labels and read as a gradual wind-down of
   something that had simply stopped. ROI is the exception because it is a RATE:
   days do not add up to a total ROI, and what anybody reads off it is direction.
-  `shapeFor()` in `VelocityChart.tsx` is the whole rule.
+  `shapeFor()` in `VelocityChart.tsx` (removed 2026-10-30) is the whole rule.
 - **The bar colour ramp is keyed to RANK, not to the calendar, and it is
   ordinal.** Oldest magenta, newest cyan, through the four kit accents in the
   order the brand guidelines fix them, ending on cyan because the kit calls cyan
@@ -1295,7 +1295,7 @@ from Pending request to Paid, moved by staff and watched by the creator.
 `src/lib/schemas/offer-application.ts`,
 `supabase/functions/manage-offer-application/`,
 `supabase/migrations/*_offer_applications.sql`,
-`scripts/check-offer-requests.mjs`
+`scripts/verify/creator/check-offer-requests.mjs`
 **Tables:** `offer_applications`
 
 A creator asks for the offer as it is written. An offer that needs no
@@ -1374,7 +1374,7 @@ application` is the only door, and it checks the role PER ACTION: create and
 ## Creator onboarding moments
 
 **Files:** `src/lib/creator/useOnboarding.ts`, `src/components/creator/*`,
-`src/routes/app/Dashboard.tsx`, `src/routes/app/Profile.tsx`,
+`src/routes/app/Dashboard.tsx`, `src/routes/app/Profile.tsx` (removed 2026-10-19),
 `supabase/migrations/*_creator_onboarding_moments.sql`
 **Tables:** `profiles.welcomed_at`, `profiles.approval_celebrated_at`
 
@@ -1454,7 +1454,7 @@ Rashid's rules, recorded in CLAUDE.md and binding on new features.
 
 ## Responsiveness
 
-**Files:** `scripts/check-responsive.mjs`, every screen.
+**Files:** `scripts/verify/design/check-responsive.mjs`, every screen.
 
 CLAUDE.md makes "works on phone, tablet, laptop and desktop" a binding rule,
 because Wurx targets US and UK creators who are mostly on phones. This suite
@@ -1502,7 +1502,7 @@ the element that is too wide.
 `src/lib/admin/*`, `src/lib/schemas/review.ts`,
 `supabase/functions/review-application/`, `supabase/functions/_shared/cors.ts`,
 `supabase/migrations/*_admin_review_audit_log.sql`,
-`scripts/check-review.mjs`, `scripts/seed-applications.mjs`
+`scripts/verify/creator/check-review.mjs`, `scripts/seed/seed-applications.mjs`
 **Tables:** `audit_log` (new), reads and writes `applications` and `profiles`
 
 **Depends on:** Applications, Auth/profiles/roles, Realtime.
@@ -1576,7 +1576,7 @@ early.
 
 ## Contests
 
-Built 2026-08-13 and 14. **Read docs/CONTESTS_PLAN.md before touching it**, it
+Built 2026-08-13 and 14. **Read docs/archive/CONTESTS_PLAN.md before touching it**, it
 holds the numbered rules and most were learned the hard way in one night.
 
 **A contest is a list of DELIVERABLES**: a type (gmv or video_count), a target,
@@ -1645,8 +1645,8 @@ creator. A creator must never reach the staff door and cannot.
 
 **CONTEST MONEY IS ON THE CREATOR HOME, BESIDE OFFER MONEY, NEVER IN IT.** Added
 2026-08-14. `/app` used to count offer money only, which was complete until
-contest rewards existed. `ContestEarnings` is its own card reading its own query
-(`useContestEarnings`, one read of `contest_awards`), and the separation is
+contest rewards existed. `ContestEarnings` (removed 2026-10-30) is its own card reading its own query
+(`useContestEarnings`, also removed, one read of `contest_awards`), and the separation is
 STRUCTURAL rather than a label: the offer money card's three cells add up to its
 own headline by construction, which is the property that lets a creator check
 our arithmetic, and a contest reward dropped in there would quietly make that
@@ -1711,7 +1711,7 @@ the screen belongs to whoever has been waiting longest.
 `supabase/functions/manage-contest/index.ts`,
 `supabase/migrations/20260820090000_contest_money_follows_the_videos.sql`,
 `supabase/migrations/20260820100000_restore_review_contest_progress.sql`,
-`scripts/seed-penetrex-contest.mjs`
+`scripts/seed/seed-penetrex-contest.mjs`
 **Tables:** `contest_submissions`, `contest_awards`, `contest_entry_events`
 
 Rashid, walking the flow: _"money is only owed when all videos are up for both
@@ -1771,7 +1771,7 @@ and all are approved only then money is owed."_
   rejection must carry a sentence. And adding a second queue to the claims
   screen broke a page-wide text assertion that had only ever been a proxy for
   "the row went away"; it now waits for the row itself to detach.
-- `node scripts/seed-penetrex-contest.mjs` builds one contest on dev in five
+- `node scripts/seed/seed-penetrex-contest.mjs` builds one contest on dev in five
   deliberate states, walking the real functions rather than writing rows.
 
 ## One pipeline for every video (2026-08-20)
@@ -1780,7 +1780,7 @@ and all are approved only then money is owed."_
 `supabase/migrations/20260820180000_drop_old_performance_arity.sql`,
 `supabase/functions/tiktok-sync/index.ts`,
 `supabase/functions/enter-contest/index.ts`,
-`src/lib/creator/usePerformance.ts`, `src/routes/app/MyNumbers.tsx`
+`src/lib/creator/usePerformance.ts`, `src/routes/app/MyNumbers.tsx` (removed 2026-10-19)
 **View:** `creator_videos`
 
 Rashid: _"we are receiving videos from user from 2 channels that is offers and
@@ -1827,7 +1827,7 @@ to see the stats of contest videos."_
 **Files:** `supabase/migrations/20260820160000_creator_leaderboard.sql`,
 `supabase/migrations/20260820170000_leaderboard_grants.sql`,
 `src/lib/creator/useLeaderboard.ts`, `src/routes/app/Leaderboards.tsx`,
-`src/components/work/CreatorFace.tsx`, `scripts/check-leaderboard.mjs`
+`src/components/work/CreatorFace.tsx`, `scripts/verify/creator/check-leaderboard.mjs`
 
 Step 9, unlocked. Rashid: _"it should show the actual money other creators have
 made and where do the creator himself stands ... by gmv i mean the sum of the
@@ -1890,7 +1890,7 @@ gmv of all the videos of creator X."_
 `supabase/functions/tiktok-connect/index.ts`,
 `src/routes/admin/TikTokSettings.tsx`, `src/lib/admin/useTikTok.ts`,
 `src/lib/creator/usePerformance.ts`, `src/routes/app/MyNumbers.tsx`,
-`scripts/check-leaderboard.mjs`, `scripts/check-performance.mjs`
+`scripts/verify/creator/check-leaderboard.mjs`, `scripts/verify/creator/check-performance.mjs`
 
 Rashid, before onboarding brands with their own ad accounts: _"there should be
 proper matching of the brands with ad account ... their gmv should always be the
@@ -2028,7 +2028,7 @@ query directly instead.
 
 **Files:** `src/app/router.tsx`, `src/components/layout/ShellLayout.tsx`,
 `src/components/layout/ScreenFallback.tsx`, `src/components/layout/AppSidebar.tsx`,
-`scripts/measure-nav.mjs`
+`scripts/perf/measure-nav.mjs`
 
 Rebuilt 2026-08-15. Rashid said at the very start that a laggy app is the one
 thing he cannot tolerate, and it is why he refused Next.js. He was describing
@@ -2087,7 +2087,7 @@ no mention of TikTok as a data source, nothing in their nav.
 | queries                     | `src/lib/admin/useTikTok.ts`                                            |
 | the screen                  | `src/routes/admin/TikTokSettings.tsx` (Data â†’ TikTok)                 |
 | the callback page           | `src/routes/OAuthTikTokCallback.tsx` (`/oauth/tiktok/callback`, PUBLIC) |
-| the suite                   | `scripts/check-tiktok.mjs`, `pnpm verify:tiktok`, 37 checks             |
+| the suite                   | `scripts/verify/tiktok/check-tiktok.mjs`, `pnpm verify:tiktok`, 37 checks             |
 
 **Four things about this that are load-bearing and easy to undo by accident:**
 
@@ -2119,9 +2119,9 @@ the spend, GMV, orders and ROI behind their own videos. Two tabs: **Dashboard**
 | the nightly schedule             | `..._tiktok_nightly_schedule.sql`, `..._tiktok_schedule_url.sql`  |
 | the only thing that calls TikTok | `supabase/functions/tiktok-sync/index.ts`                         |
 | creator queries                  | `src/lib/creator/usePerformance.ts`                               |
-| charts                           | `src/components/creator/PerformanceChart.tsx`                     |
+| charts                           | `src/components/creator/PerformanceChart.tsx` (removed 2026-10-30; charts now live in `src/components/charts/`) |
 | the screen                       | `src/routes/app/MyNumbers.tsx`                                    |
-| the suite                        | `scripts/check-performance.mjs`, `pnpm verify:performance`        |
+| the suite                        | `scripts/verify/creator/check-performance.mjs`, `pnpm verify:performance`        |
 
 **The approval gate, added 2026-08-19, is the first thing to know.** Every
 function and the row policy filter on `content_submissions.status = 'approved'`.
@@ -2164,8 +2164,8 @@ wrong. Charts end at yesterday and the screen says so.
 ### The Penetrex seed (2026-08-18)
 
 Rashid's real roster, in dev so the numbers can be looked at:
-`scripts/seed-penetrex.mjs` (and `--clean`). Four creators, two offers, 46 real
-video links. `scripts/backfill-tiktok.mjs <days>` drives the sync in
+`scripts/seed/seed-penetrex.mjs` (and `--clean`). Four creators, two offers, 46 real
+video links. `scripts/ops/backfill-tiktok.mjs <days>` drives the sync in
 call-budgeted rounds for a deep history.
 
 Sign in as any of them with `WurxPenetrex2026!`:
@@ -3069,7 +3069,7 @@ map to the vendored app; `BrandFace` uses it **only when Euka has no photo, or
 when Euka's own image fails to load**, so no existing brand face changes.
 `data-wx-photo` says which source won, which is what the check reads.
 
-Put a picture there with `node scripts/brand-photo.mjs "<brand>" --tiktok
+Put a picture there with `node scripts/ops/brand-photo.mjs "<brand>" --tiktok
 <handle> | --file <path> | --url <address>`. It refuses a brand no Paid Collabs
 row carries, anything that is not PNG/JPEG/WebP, and anything over the bucket's
 2MB. Irwin's came from their own site: **unavatar has a daily anonymous limit
@@ -3819,7 +3819,7 @@ no creator route reaches it.
 | the seam            | `src/routes/admin/PaidCollabs.tsx`          |
 | our corrections     | `src/routes/admin/wurxbase-overrides.css`   |
 | the header, ours    | `src/routes/admin/wurxbase-chrome.css`      |
-| shooting it         | `scripts/shots-collabs.mjs`                 |
+| shooting it         | `scripts/shots/shots-collabs.mjs`                 |
 | the fence           | `wurxbase-fence` in `src/styles/global.css` |
 
 **`src/vendor/wurxbase/` is a verbatim copy and stays one.** Rashid's
@@ -3890,7 +3890,7 @@ changes.
 | detection              | `src/lib/auth/AuthProvider.tsx`              |
 | the banner             | `src/components/auth/IdentitySwapBanner.tsx` |
 | mounted for both sides | `src/components/layout/AppShell.tsx`         |
-| proof                  | `scripts/check-session.mjs` section 9        |
+| proof                  | `scripts/verify/auth/check-session.mjs` section 9        |
 
 **One session per browser per origin, and that cannot be changed.** Supabase
 keeps it in localStorage, which belongs to the origin and not to the tab, so
@@ -3918,8 +3918,8 @@ showed through it.
 ## Brand Hub, the creator side of a brand (2026-08-24, reshaped 2026-10-09)
 
 **Files:** `src/routes/app/BrandHub.tsx` (`AccentScope`, `HubNav`) ·
-`src/components/brand/BrandWorldHero.tsx` (`BrandWorldHero`, `BrandChip`) ·
-`src/lib/brand-theme.ts` · `scripts/check-brand-theme.mjs` · `scripts/shots-hub.mjs`
+`src/components/brand/BrandWorldHero.tsx` (removed 2026-10-30) (`BrandWorldHero`, `BrandChip`) ·
+`src/lib/brand-theme.ts` · `scripts/build/check-brand-theme.mjs` · `scripts/shots/shots-hub.mjs`
 · migration `20260824170709_brand_world_look.sql`
 
 **REVERSED 2026-10-09. This was a "brand world", and it is not any more.** It
@@ -3988,7 +3988,7 @@ applies as written, it says so.
 ## Multi-colour brand themes (2026-08-25)
 
 **Files:** `src/lib/brand-theme.ts` (the whole thing) ·
-`src/components/admin/BrandLookField.tsx` · `scripts/check-brand-theme.mjs` ·
+`src/components/admin/BrandLookField.tsx` · `scripts/build/check-brand-theme.mjs` ·
 `src/lib/schemas/brand.ts` · `supabase/functions/manage-brand/index.ts` ·
 migration `20260825174347_brand_theme_areas.sql`
 
@@ -4080,7 +4080,7 @@ to the numbers cannot land in one and miss the other.
 
 **Files:** migration `20260824152633_brand_scoped_creator_numbers.sql` ·
 `src/lib/creator/usePerformance.ts` · `useLeaderboard.ts` · `useCreatorContests.ts`
-· `scripts/check-brand-numbers.mjs`
+· `scripts/verify/brands/check-brand-numbers.mjs`
 
 **The rule, and it is Rashid's:** a video belongs to a brand through the offer or
 contest it was filed against. The MONEY belongs to the brand whose ad account
@@ -4102,7 +4102,7 @@ brand's money rows on them.
 ## The two legal pages (2026-08-26)
 
 **Files:** `src/routes/legal/LegalPage.tsx` (the shell) · `Terms.tsx` ·
-`Privacy.tsx` · `legal-contact.ts` · `scripts/check-legal.mjs` ·
+`Privacy.tsx` · `legal-contact.ts` · `scripts/verify/site/check-legal.mjs` ·
 `src/styles/global.css` (the `wx-prose` utility) ·
 `src/components/landing/SiteFooter.tsx`
 
@@ -4150,8 +4150,8 @@ they sat correctly in the source AND the bundle.
 `20260826000638_creator_tiktok_tokens_reachable.sql` ·
 `supabase/functions/_shared/tiktok-display.ts` · `tiktok-creator/` ·
 `tiktok-creator-callback/` · `src/lib/creator/useTikTokAccount.ts` ·
-`src/components/creator/TikTokConnection.tsx` ·
-`src/routes/OAuthTikTokCreatorCallback.tsx` · `scripts/check-creator-tiktok.mjs`
+`src/components/creator/TikTokConnection.tsx` (removed 2026-10-19) ·
+`src/routes/OAuthTikTokCreatorCallback.tsx` · `scripts/verify/tiktok/check-creator-tiktok.mjs`
 
 A creator connects their OWN TikTok account and sees their profile, their
 follower count, and the views, likes, comments and shares on their own videos.
@@ -4286,7 +4286,7 @@ than assumed, and asserts 375 / 768 / 1440 with no sideways scroll.
 `src/routes/admin/collab-ad-math.ts` · `src/routes/admin/collab-ad-figures.tsx` ·
 `src/routes/admin/PaidCollabs.tsx` · `src/routes/admin/wurxbase-overrides.css` ·
 `src/vendor/wurxbase/WurxUI.jsx` (WURX-ADDED blocks) ·
-`scripts/check-collab-ads.mjs` · `scripts/check-collab-ads-ui.mjs`
+`scripts/verify/collabs/check-collab-ads.mjs` · `scripts/verify/collabs/check-collab-ads-ui.mjs`
 
 Two columns on a brand's creator list â€” **Ad spend** and **ROI** â€” and the same
 two figures against each individual video inside an expanded creator.
@@ -4380,12 +4380,12 @@ period switch.
 
 ## Vendoring a WurxBase release (2026-08-27)
 
-**Files:** `scripts/vendor-wurxbase.mjs` · `scripts/wurxbase-patches.mjs` ·
-`scripts/check-collab-contrast.mjs`
+**Files:** `scripts/ops/wurxbase/vendor-wurxbase.mjs` · `scripts/ops/wurxbase/wurxbase-patches.mjs` ·
+`scripts/verify/collabs/check-collab-contrast.mjs`
 
 ```bash
-node scripts/vendor-wurxbase.mjs "<path to their src/>"
-node scripts/wurxbase-patches.mjs          # re-applies OUR Ad spend / ROI blocks
+node scripts/ops/wurxbase/vendor-wurxbase.mjs "<path to their src/>"
+node scripts/ops/wurxbase/wurxbase-patches.mjs          # re-applies OUR Ad spend / ROI blocks
 pnpm build && pnpm preview                 # then, in another shell:
 pnpm verify:collab-contrast                # the one that catches a bad reskin
 pnpm verify:collab-ads && pnpm verify:collab-ads-ui
@@ -4817,7 +4817,7 @@ face. See DECISIONS.
 
 ## Backfilling video thumbnails (2026-10-02)
 
-`scripts/backfill-video-thumbs.mjs` · dry run by default, `--write` to apply.
+`scripts/ops/backfill-video-thumbs.mjs` · dry run by default, `--write` to apply.
 
 Irwin's blanks are fixed inside `reacher-sync` because that function files
 Irwin's videos. Everywhere else videos arrive through the BROWSER and no
@@ -4838,7 +4838,7 @@ First run: 1,397 blanks, 1,100 filled (79%), 188 rows written, across 18 brands.
 
 **Not finished and not on `dev`.** Branch `feature/creative-angle-auto-categorise`.
 The plan, Umar's decisions, the open items and the record of every change are in
-[`CREATIVE_ANGLE_AUTOMATION.md`](CREATIVE_ANGLE_AUTOMATION.md). Read that first.
+[`docs/guides/CREATIVE_ANGLE_AUTOMATION.md`](guides/CREATIVE_ANGLE_AUTOMATION.md). Read that first.
 
 **Files:** `supabase/migrations/20261006090000_collab_brand_briefs.sql` ·
 `supabase/migrations/20261007090000_collab_angle_queue.sql` ·
@@ -4847,7 +4847,7 @@ The plan, Umar's decisions, the open items and the record of every change are in
 `supabase/functions/_shared/angle-store.ts` ·
 `src/routes/admin/collab-angle-categorise.tsx` ·
 `src/routes/admin/wurxbase-overrides.css` (the `wx-cat-` block) ·
-`scripts/wurxbase-patches.mjs` · `scripts/check-angles-categorise.mjs`
+`scripts/ops/wurxbase/wurxbase-patches.mjs` · `scripts/verify/angles/check-angles-categorise.mjs`
 (`pnpm verify:angles-categorise`)
 
 What exists so far:
@@ -4890,7 +4890,7 @@ Change rules:
   `COLLAB_ANGLES_SYNC_SECRET` function secrets, the two vault entries, and both
   functions deployed. `collab_angles_run_cycle()` returns null rather than
   raising when the vault is empty, so the cron history looks healthy either
-  way. See "Turning the feature on" in `CREATIVE_ANGLE_AUTOMATION.md`.
+  way. See "Turning the feature on" in `docs/guides/CREATIVE_ANGLE_AUTOMATION.md`.
 - **Keep the tab in the URL.** Without `?tab=`, Google exports every tab as one
   text and two products' concepts are judged as one brief.
 - **Do not rename an angle in `angles` casually.** The names are the categories
@@ -4957,7 +4957,7 @@ Verified on dev: 44 rows, **0 blanks without a reason**, 0 console errors, and
 every figure byte-identical to before (Dr Tobias $9,630 / $13,980 / 0.69x,
 Aurelia $6,782 / $26,924 / 0.25x, Swisse $4,551 / $23,724 / 0.19x).
 
-`scripts/check-performance.mjs` was NOT run: it needs `SUPABASE_SERVICE_KEY`,
+`scripts/verify/creator/check-performance.mjs` was NOT run: it needs `SUPABASE_SERVICE_KEY`,
 which the machine this was built on does not have. It is an RLS test that
 creates and deletes rows, so it exercises nothing this change touches.
 
@@ -5055,7 +5055,7 @@ campaign's fortnight.
 - **Hand-built, no dependency.** The stack is locked and every colour must be a
   `--wx-*` token; theming a third-party calendar into that is more work than the
   grid, and it would be the only library of its kind in the repo.
-- **A portal, not an absolute panel.** `RowActions` already learned that a panel
+- **A portal, not an absolute panel.** `RowActions` (removed 2026-10-30) already learned that a panel
   inside `FilterBar` is clipped by any ancestor that scrolls. It measures the
   trigger, flips above when there is no room, and is pulled back inside the
   viewport by the same 8px gutter `check-responsive` measures.
@@ -5102,8 +5102,8 @@ vite builds, no new lint findings.
 creator account the scripts default to (`skinbyamara@wurxmediahub.demo`) does
 not exist on dev, and this machine has no service key to make one, so the
 sign-in returns 400 and the screen was never reached. The geometry of the
-popover at 375px is the untested risk; a browser check is written and ready at
-`scripts/check-numbers-range.mjs` once there is a creator login to run it with.
+popover at 375px is the untested risk; a browser check was written for it
+(`scripts/verify/creator/check-numbers-range.mjs`, removed 2026-10-30), to be run once there is a creator login.
 
 ## The Brand Hub sidebar: one section instead of two (2026-10-07)
 

@@ -14,7 +14,7 @@ import { HOME_FOR_ROLE, readClaims } from '@/lib/auth/auth-context';
  *
  * A separate screen because the team should not be greeted by a page selling
  * them on applying, and there must be no sign up route anywhere near it. Staff
- * accounts are only ever created with `scripts/create-admin.mjs`, holding the
+ * accounts are only ever created with `scripts/ops/create-admin.mjs`, holding the
  * service key.
  *
  * Be clear about what this is: a different DOOR, not a different LOCK. Both

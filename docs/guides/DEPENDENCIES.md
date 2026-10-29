@@ -1,7 +1,7 @@
 # Dependencies
 
 What this project needs, what each thing is for, and what is deliberately not
-here. Written 2026-10-13. Companion to `docs/NEW_MACHINE.md`, which covers
+here. Written 2026-10-13. Companion to `docs/guides/NEW_MACHINE.md`, which covers
 setting a machine up; this file covers what gets installed and why.
 
 **The stack is locked.** Adding, removing or swapping anything in sections 2 or
@@ -53,7 +53,7 @@ already does.
 
 ---
 
-## 2. Runtime dependencies (17)
+## 2. Runtime dependencies (19)
 
 These ship to the browser.
 
@@ -84,6 +84,8 @@ These ship to the browser.
 | `tailwind-merge`           | `^3.6.0`   | resolves conflicting Tailwind classes. Both are wrapped by `cn()` in `src/lib/utils.ts`; call that rather than either directly.                          |
 | `gsap`                     | `^3.15.0`  | added 2026-10-14 on Rashid's ask. **Not used by anything yet**, and it overlaps `motion`. See the DECISIONS entry before reaching for it.                |
 | `lenis`                    | `^1.3.26`  | smooth scroll, added 2026-10-14 on Rashid's ask. **Not used by anything yet.** It is a second scroll authority on top of `useScroll`; read the warning below. |
+| `three`                    | `0.134.0`  | WebGL engine under Vanta. Pinned exactly: Vanta 0.5.24 needs an old three. Loaded lazily with `WavesField`; added after this file was first written. |
+| `vanta`                    | `0.5.24`   | the animated waves field (`src/components/ui/WavesField.tsx`). Must stay behind a dynamic `import()`; `pnpm verify:entry-graph` fails the build otherwise. |
 
 **On `gsap` and `lenis`, because installing them was the easy part.** Both
 arrived on 2026-10-14 at Rashid's request, which is the approval this file's
@@ -114,14 +116,14 @@ reasoning and the conversions any copied-in component needs.
 of why `App-*.js` builds to **1,055 kB raw / 303 kB gzipped** — a bundle every
 creator downloads on a phone to reach a screen none of them can open. Splitting
 the admin side out of the creator path is the biggest outstanding performance
-job on this project. It is listed as open in `docs/NEW_MACHINE.md` section 6.
+job on this project. It is listed as open in `docs/guides/NEW_MACHINE.md` section 6.
 
 Nothing here is wrong with the libraries themselves; the fault is where they are
 loaded.
 
 ---
 
-## 3. Development dependencies (15)
+## 3. Development dependencies (17)
 
 | Package                          | Version    | What it is for                                                                                      |
 | -------------------------------- | ---------- | --------------------------------------------------------------------------------------------------- |
@@ -135,11 +137,13 @@ loaded.
 | `prettier`                       | `^3.9.6`   | formatting                                                                                          |
 | `prettier-plugin-tailwindcss`    | `^0.8.1`   | sorts class names so diffs stay readable                                                            |
 | `playwright`                     | `^1.62.0`  | drives real Chromium for every verification script                                                  |
-| `@tanstack/react-query-devtools` | `^5.101.4` |                                                                                                     |
 | `@types/node`                    | `^24.13.2` |                                                                                                     |
 | `@types/react`                   | `^19.2.17` |                                                                                                     |
 | `@types/react-dom`               | `^19.2.3`  |                                                                                                     |
 | `jsrepo`                         | `^3.8.1`   | fetches one React Bits component's source into the repo. A fetcher, not a library; nothing ships from it. |
+| `@electric-sql/pglite`          | `^0.5.12`  | in-process Postgres used by `scripts/verify/backup/test-backup-sql.mjs` (backup/restore SQL tests) |
+| `postgres`                      | `^3.4.9`   | Postgres client used by `scripts/ops/backup-database.mjs`, `restore-database.mjs` and the backup tests |
+| `tsx`                           | `^4.23.15` | runs TypeScript directly for the offline creative-angle guards (`pnpm verify:angles-backoff`, `verify:angles-worker`) |
 
 ---
 
@@ -169,10 +173,10 @@ appear in `.env`, never in the browser bundle, and never on disk.
 ## 5. Things that are in the repository but are not packages
 
 **`src/vendor/wurxbase/` — 13 vendored files.** The Paid Collabs admin app,
-copied in rather than installed. `scripts/check-isolation.mjs` counts these and
+copied in rather than installed. `scripts/build/check-isolation.mjs` counts these and
 fails the build if the number changes unexpectedly. Our additions to those files
 are fenced `WURX-ADDED ... WURX-END` and re-applied by
-`scripts/wurxbase-patches.mjs` after a new copy is pulled in, so the vendored
+`scripts/ops/wurxbase/wurxbase-patches.mjs` after a new copy is pulled in, so the vendored
 code is always "theirs, plus exactly these blocks".
 
 **Fonts.** Caprasimo and Figtree are self-hosted in `public/fonts/` as `.woff2`,
@@ -194,10 +198,10 @@ decision rather than an oversight.
 | **Next.js**                                   | Explicitly excluded by `CLAUDE.md`. This is a Vite SPA.                                                                                                                                                       |
 | **Any ORM**                                   | Queries go through `supabase-js` against a schema that RLS protects. An ORM would add a second opinion about access.                                                                                          |
 | **Redux / Zustand / Jotai**                   | TanStack Query holds server state; React holds the rest. Adding a state library is how the session ends up duplicated.                                                                                        |
-| **A charting library**                        | Every chart is inline SVG. A dependency for two charts is a poor trade, and this way the marks obey the same `--wx-*` tokens and the same user text-size setting as everything else. See `VelocityChart.tsx`. |
+| **A charting library**                        | Every chart is inline SVG. A dependency for two charts is a poor trade, and this way the marks obey the same `--wx-*` tokens and the same user text-size setting as everything else. See `src/components/charts/` (`TrendLine.tsx`, `chart-kit.ts`); the earlier `VelocityChart.tsx` was removed 2026-10-30. |
 | **An image library** (`sharp`, `jimp`)        | The app icons are rendered by Chromium through Playwright, which is already installed. The source is an SVG, so a real renderer was the right tool anyway.                                                    |
 | **A PWA plugin** (`vite-plugin-pwa`, Workbox) | The manifest is 40 lines and the service worker is deliberately almost inert. A plugin would have precached the 1 MB admin bundle by default, which is the exact opposite of what this app needs.             |
-| **A component library beyond shadcn/ui**      | shadcn is copied in and themed, not installed. React Bits is the same shape: `jsrepo` copies one component's source in and there is no React Bits package in the bundle. Running `shadcn init` here is a separate matter and is ruled out — see `Redesign UI/IMPLEMENTATION_PLAN.md` 1.2. |
+| **A component library beyond shadcn/ui**      | shadcn is copied in and themed, not installed. React Bits is the same shape: `jsrepo` copies one component's source in and there is no React Bits package in the bundle. Running `shadcn init` here is a separate matter and is ruled out — see `design/IMPLEMENTATION_PLAN.md` 1.2. |
 | **A test runner**                             | There is no unit test suite. Verification is done by the 125 scripts in `scripts/`, which drive a real browser and a real database. That is a real gap, not a claim that tests are unnecessary.               |
 
 ---
@@ -206,7 +210,7 @@ decision rather than an oversight.
 
 - `pnpm build` runs the token guards, `tsc` and the Vite build. It must pass
   before any commit.
-- `scripts/check-isolation.mjs` proves there is one Supabase client, one schema
+- `scripts/build/check-isolation.mjs` proves there is one Supabase client, one schema
   and the expected count of vendored files. It runs inside the build.
 - Adding a dependency means updating this file in the same commit, with what it
   is for and whether it reaches the creator bundle. A list that drifts is worse

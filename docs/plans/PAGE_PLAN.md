@@ -65,7 +65,7 @@ brand argument, never two implementations that drift.
 - My numbers reads `?brand=`, `?period=`, `?from=`, `?to=` and `?charts=` from the URL.
 - The hub's `?section=` values: `overview`, `offers`, `contests`, `numbers`, `leaderboards`.
 - `OfferCard` and `bucketFor` are shared by the Offers page and the hub's Offers section.
-- Every string asserted in `scripts/check-*.mjs`. If you move or reword one, update the guard in
+- Every string asserted in `scripts/verify/**/check-*.mjs`. If you move or reword one, update the guard in
   the same change and say so. Known ones: `Enter this contest`, `Update progress`, `Apply for
   this`, `You are in`, `with the team`, `already on this one`, `What they sell`, and
   `input[name="search"]`.
@@ -95,11 +95,11 @@ brand argument, never two implementations that drift.
 | Agent | Owns | Wave |
 |---|---|---|
 | **A** | Home + My numbers: `routes/app/Dashboard.tsx`, `routes/app/MyNumbers.tsx`, `components/creator/home/*`, `lib/creator/useHomeData.ts`, `lib/creator/useCreatorPeriod.ts`, preview `routes/dev/HomePreview.tsx` + `NumbersPreview.tsx` | 1 |
-| **B** | Offers + Contests: `routes/app/Offers.tsx`, `routes/app/Contests.tsx`, `components/creator/earn/*`, `OfferCard.tsx`, `ApplyDialog.tsx`, `Contest*.tsx`, preview `OffersPreview.tsx` + `ContestsPreview.tsx` | 1 |
+| **B** | Offers + Contests: `routes/app/Offers.tsx`, `components/creator/earn/ContestsView.tsx` (was `routes/app/Contests.tsx`, moved 2026-10-30), `components/creator/earn/*`, `OfferCard.tsx`, `ApplyDialog.tsx`, `Contest*.tsx`, preview `OffersPreview.tsx` + `ContestsPreview.tsx` | 1 |
 | **C** | Content: `routes/app/Content.tsx`, `components/creator/content/*`, preview `ContentPagePreview.tsx` | 1 |
 | **G** | Account menu + removing Profile: new account menu in the sidebar user chip, `routes/app/Profile.tsx` (delete), `components/creator/TikTokConnection.tsx`, `routes/OAuthTikTokCreatorCallback.tsx`, preview `AccountPreview.tsx`, and the router/nav edits that removal needs | 1 |
 | **D** | Leaderboards: `routes/app/Leaderboards.tsx`, `components/creator/leaderboard/*`, preview `LeaderboardsPreview.tsx` | 2 |
-| **F** | Brand hubs (marketplace): `routes/app/BrandHub.tsx`, `routes/app/Brands.tsx`, `components/creator/brand/*`, preview `BrandHubPreview.tsx`; may also delete the now-orphaned `routes/app/MyNumbers.tsx` and `routes/dev/NumbersPreview.tsx` | 1 (promoted) |
+| **F** | Brand hubs (marketplace): `routes/app/BrandHub.tsx`, `routes/app/Brands.tsx`, `components/creator/brand/*`, preview `BrandHubPreview.tsx`; may also delete the now-orphaned `routes/app/MyNumbers.tsx` and `routes/dev/NumbersPreview.tsx` (the latter removed 2026-10-30) | 1 (promoted) |
 
 The Brand hub was promoted to wave 1 once Rashid redefined it as a marketplace: it no longer
 embeds My numbers or Leaderboards, so it depends only on B's `OfferCard` and `Contests`, whose
@@ -112,7 +112,7 @@ have happened repeatedly), `components/charts/*` (16 importers), `components/cre
 `components/ui/DataState`, `app/router.tsx` and `lib/nav.ts` **except** as granted to G,
 `components/landing/**`, `routes/site/**`, `components/ui/WavesField.tsx` and `AuroraBackground.tsx`.
 
-Preview routes are **already registered** (`/dev/numbers`, `/dev/offers`, `/dev/contests`,
+Preview routes are **already registered** (`/dev/numbers` since removed 2026-10-30 with its preview file, `/dev/offers`, `/dev/contests`,
 `/dev/leaderboards`, `/dev/content-page`, `/dev/account`, plus the existing `/dev/home` and
 `/dev/brand-hub`). Replace your stub file; never edit `router.tsx` for this.
 
@@ -231,8 +231,8 @@ RPCs, tables or policies): build the marketplace over what she can read, and rep
 the gap is so Rashid can decide whether to open it up.
 
 Contracts: `/app/brands` and `/app/brands/:slug` keep working. Old `?section=` links must still
-land on the brand's page (ignore the parameter). `scripts/check-live.mjs` waits for the text
-"What they sell" and `scripts/shots-hub.mjs` iterates the old `?section=` values — update those in
+land on the brand's page (ignore the parameter). `scripts/verify/creator/check-live.mjs` waits for the text
+"What they sell" and `scripts/shots/shots-hub.mjs` iterates the old `?section=` values — update those in
 the same change. `OfferCard`, `bucketFor` and `Contests({ hubBrandId })` are owned by agent B and
 must be used as they are, not copied.
 

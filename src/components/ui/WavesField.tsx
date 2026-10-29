@@ -78,7 +78,7 @@ import type { VantaEffect } from 'vanta/src/vanta.waves.js';
  * GL context and an 8,000-vertex JS loop per frame, all behind a page that is
  * already juddering. The CSS aurora is the better answer there until somebody
  * profiles this on a real mid-range Android, which no test in this repo can
- * do (`scripts/browser.mjs` runs Chromium with `--disable-gpu`).
+ * do (`scripts/lib/browser.mjs` runs Chromium with `--disable-gpu`).
  *
  * `wx.waves = 'on'` is how that gets tried without a deploy.
  */
@@ -543,7 +543,7 @@ export function WavesField({ intensity = 'full' }: { intensity?: 'full' | 'subtl
      * NOTHING EVER MAY BE. §1.2: either one here makes this element the
      * containing block for every `position: fixed` descendant in the document,
      * which is the fault that put the Paid Collabs modals 3,413px down the
-     * page three times. `scripts/check-backdrop-ancestry.mjs` asserts it.
+     * page three times. `scripts/verify/design/check-backdrop-ancestry.mjs` asserts it.
      * `opacity` is safe and is not on that list — it creates a stacking
      * context, not a containing block — and it is static, never animated, so
      * the blur budget's §4.3 rule is untouched too.

@@ -34,14 +34,14 @@ so the history of backups survives a restore.
 
 ## First backup of the REAL database (read-only, nothing changes in it)
 
-`scripts/backup-real-database.ps1` reads the database with PostgreSQL's own `pg_dump`
+`scripts/ops/backup-real-database.ps1` reads the database with PostgreSQL's own `pg_dump`
 (run in Docker), changes nothing and installs nothing into it, and checks its own work.
 You need Docker Desktop running and the **Session pooler** connection string from the
 Supabase dashboard (Project settings > Database > Connection string) with your database
 password filled in. The string is typed hidden and never written to disk.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\backup-real-database.ps1
+powershell -ExecutionPolicy Bypass -File scripts\ops\backup-real-database.ps1
 ```
 
 Do it once for dev (`npznoiotslruqovorrec`) and once for prod (`isqepjioowzqoyhlusqo`).
@@ -121,7 +121,7 @@ file from the command line, for a scheduled job or an off-site copy.
   and `backup.chunks` have RLS on and no policy and no grants to `anon` or
   `authenticated`; the functions are executable by the owner only. Nobody but the
   Edge Function (as `postgres`) can read a backup. Tested in
-  `scripts/test-backup-function.mjs`.
+  `scripts/verify/backup/test-backup-function.mjs`.
 - **Safety rules the database enforces, whatever the page does:** a restore is
   refused if the signed-in admin would not be an active admin afterwards (no
   lock-out); if the backup is damaged or cut short; if a table not in the backup

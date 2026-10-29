@@ -73,7 +73,7 @@ export function Landing() {
         THIS DIV IS THE RIGHT HOST BECAUSE IT IS PLAIN. No `transform`, no
         `filter`, no `contain`, no clip — nothing between it and the viewport.
         Keep it that way: the same property that would clip this backdrop is the
-        one the fence law in `docs/GLASS_PLAN.md` §1.2 forbids above
+        one the fence law in `docs/guides/GLASS_PLAN.md` §1.2 forbids above
         `.wurxbase-root`, for the same underlying reason.
 
         Note it is OUTSIDE `<main class="overflow-x-clip">` as well. `clip` on

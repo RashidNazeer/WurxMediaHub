@@ -1,5 +1,7 @@
 # Admin UI — one language with the creator app
 
+> **Archived 2026-10-30.** Finished or superseded work, kept for history. It describes the code and decisions as they were when it was written, so file names in it may be gone. For where things stand now read `docs/PROJECT_STATE.md`; the docs index is `docs/README.md`.
+
 Rashid, 2026-10-20: *"the whole app must carry the same UI language as we have been
 working on for a few days. Do not change UX, just fix the UI."*
 

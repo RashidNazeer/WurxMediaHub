@@ -1,7 +1,7 @@
 # PRISM token map — ready to apply in Phase 1
 
 Every ratio below was computed with the exact WCAG formula against the proposed values, and
-against the pairs `scripts/check-contrast.mjs` actually asserts. Three real failures were
+against the pairs `scripts/build/check-contrast.mjs` actually asserts. Three real failures were
 found and corrected before any code was written.
 
 ---
@@ -12,7 +12,7 @@ found and corrected before any code was written.
 
 `check-contrast.mjs` hardcodes token names in ~40 assertions and fails with "token not found"
 if one is missing. Renaming to `--prism-*` would break every one of them. The PRISM kit lives
-in `Redesign UI/prism_brand_kit/tokens/prism.css` as the source of truth; our `--wx-*` names
+in `design/prism_brand_kit/tokens/prism.css` as the source of truth; our `--wx-*` names
 are the *interface* to it.
 
 ## The decision that makes neomorphism possible at all

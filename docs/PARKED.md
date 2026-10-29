@@ -66,7 +66,7 @@ Rashid is testing it.
 **One trap left behind, on purpose rather than by accident.** The picker adds
 new `WURX-ADDED` blocks to `src/vendor/wurxbase/WurxUI.jsx` (the import, the
 `wxRange` state beside `month`, the control itself) plus a `periodKey` prop on
-`BrandDrilldown`. These are NOT registered in `scripts/wurxbase-patches.mjs`, so
+`BrandDrilldown`. These are NOT registered in `scripts/ops/wurxbase/wurxbase-patches.mjs`, so
 the next WurxBase release would drop them when `vendor:wurxbase` re-copies the
 file. Register them before pulling a new upstream version — and update the
 existing "BrandDrilldown month effect" entry too, because its body is the old
@@ -292,12 +292,12 @@ promotion into a written checklist so the real launch is boring.
 **Owner:** Claude to run, Rashid to choose the password
 
 `rashid@wurxmedia.com` exists on **dev only**. Prod needs its own, created the
-same way with `scripts/create-admin.mjs`. Public sign up can never produce a
+same way with `scripts/ops/create-admin.mjs`. Public sign up can never produce a
 staff account, so this is the only route in.
 
 Also: the current dev password was typed into a chat message. Rotate it before
 that account controls anything real. One command:
-`node scripts/create-admin.mjs rashid@wurxmedia.com <new password> admin`.
+`node scripts/ops/create-admin.mjs rashid@wurxmedia.com <new password> admin`.
 
 ## 5. Supabase paid plan for prod
 
@@ -490,7 +490,7 @@ to remove all three: the orphaned ad-money rows this item was about (5,230
 across 76 videos, $332.51 of GMV), the test litter a broken suite cleanup had
 left, and the four empty brands from the 12 August seed.
 
-`scripts/tidy-dev.mjs` does it, dry-run by default, and refuses any brand that
+`scripts/ops/tidy-dev.mjs` does it, dry-run by default, and refuses any brand that
 is not empty because everything referencing `brands` cascades. Dev is now 41
 creators, 41 applications, 41 avatars, one brand, 31 offers, 41 jobs, 85 videos,
 738 money rows, zero contests. `audit_log` and `tiktok_sync_runs` were kept.
@@ -852,7 +852,7 @@ crop rules are all built and the hero is designed to be right without one, but
 the image path has been checked only by eye on a hub that has none. **Raise if
 a hero ever comes back wrong after a save.**
 
-**d. The world has no automated suite of its own.** `scripts/shots-hub.mjs`
+**d. The world has no automated suite of its own.** `scripts/shots/shots-hub.mjs`
 photographs five sections at four widths in both themes and fails on a console
 error, a sideways scroll or a world that never renders, which is real cover.
 (There is no brand rail now; the equivalent is the `HubNav` row.) But nothing asserts the RAIL: that both lists are present, that a locked tab
@@ -1647,7 +1647,7 @@ rest, or land on the row and say plainly that this section is not theirs.
 ## 34. DONE 2026-08-29. WurxBase destroyed saved data on an ordinary click
 
 **All six are fixed** on `fix/wurxbase-write-safety`, and the fix is not the
-one that was designed. Every option in `docs/WURXBASE_WRITE_SAFETY.md` was
+one that was designed. Every option in `docs/guides/WURXBASE_WRITE_SAFETY.md` was
 written under "no DDL access on that project"; we have owned the schema since
 2026-08-28, so the recommended JavaScript compare-and-swap — which admitted it
 could not be made atomic — was replaced by one Postgres can enforce:
@@ -1683,7 +1683,7 @@ given a WurxBase login, or the next time Asad is in a conversation.
 
 Found 2026-08-28 by a 100-agent audit of every write path in
 `src/vendor/wurxbase/`. **Full detail and the fix design:
-`docs/WURXBASE_WRITE_SAFETY.md`.** Rashid has NOT approved any change yet.
+`docs/guides/WURXBASE_WRITE_SAFETY.md`.** Rashid has NOT approved any change yet.
 
 **THE SHAPE, one sentence:** their screens read a `localStorage` mirror rather
 than the database, a save writes whatever is in that mirror and then DELETES the
@@ -1745,7 +1745,7 @@ keeps rendering the old terms, so nobody investigates while recovery is still
 possible.
 
 **2026-08-28: THE GROUND MOVED. RE-READ THE DESIGN BEFORE BUILDING IT.** Every
-option in `docs/WURXBASE_WRITE_SAFETY.md` was written under the constraint
+option in `docs/guides/WURXBASE_WRITE_SAFETY.md` was written under the constraint
 "no DDL access on that project". That constraint is gone — their tables are in
 our `wurxbase` schema now. A unique index on `(action, target)` plus an
 upsert makes the angle-test AND brand-contract overwrite bugs *impossible*
@@ -1770,7 +1770,7 @@ three angle findings, leaves their insert and sweep byte-identical so a
 deliberate delete still deletes, and does not bet on `created_at` having a
 default we cannot read. Two one-line swaps and one anchored insertion.
 
-**`scripts/wurxbase-patches.mjs` can only patch one file today** — `FILE` is
+**`scripts/ops/wurxbase/wurxbase-patches.mjs` can only patch one file today** — `FILE` is
 hardcoded to `WurxUI.jsx` — so it needs a small mechanical generalisation first.
 **And a refused patch currently leaves THEIR unpatched file on disk**, which is
 the dangerous version, so the same change must add a build-time assertion.
@@ -1824,7 +1824,7 @@ page himself, or accept the screenshot Rashid already sent.
 **Raise it when:** the Paid Collabs chrome looks too gold, or before the next
 WurxBase release is vendored in.
 
-`semanticFor` in `scripts/vendor-wurxbase.mjs` decides whether a colour is
+`semanticFor` in `scripts/ops/wurxbase/vendor-wurxbase.mjs` decides whether a colour is
 "saying something" from **HSV saturation**, which is a ratio and therefore
 exaggerates wildly in the dark. Their whole chrome is warm dark brown, and
 `#30271C` reads as 0.42 saturated at hue 33 — indistinguishable, to that
@@ -1853,7 +1853,7 @@ Tried on 2026-08-27: contrast went from 1 failure to 7.
    That covers the inline half, which is where all four regressions were.
 2. For CSS rules, let `pnpm verify:collab-contrast` drive it: it already names
    the element and both colours, so each survivor becomes a `SWAPS` entry in
-   `scripts/wurxbase-patches.mjs`.
+   `scripts/ops/wurxbase/wurxbase-patches.mjs`.
 
 **Do not just flip the gate.** It is a one-line change that looks obviously
 right and breaks four screens.
@@ -1879,7 +1879,7 @@ categorical colours in `src/vendor/wurxbase/CreativeAngles.jsx` used to tell
 angles apart. **The vendoring pipeline cannot reach it:** it themes colours that
 follow a CSS property name, and a bare array of hex strings has no property to
 key on. Two honest fixes — map that array in `vendor-wurxbase.mjs`, or add a
-swap to `scripts/wurxbase-patches.mjs`, which already supports in-place swaps.
+swap to `scripts/ops/wurxbase/wurxbase-patches.mjs`, which already supports in-place swaps.
 **Rashid said on 2026-08-27 that he has two changes he wants here. Ask him
 first; this may be one of them.**
 
@@ -1993,7 +1993,7 @@ orphan. The privacy policy now says we keep things until asked rather than
 inventing a schedule, so this is honest today, but it is not tidy.
 
 **d. DONE 2026-08-27. The Google Fonts import is gone**, dropped by
-`scripts/vendor-wurxbase.mjs` on every vendoring, so it cannot come back with
+`scripts/ops/wurxbase/vendor-wurxbase.mjs` on every vendoring, so it cannot come back with
 their next release. Inter is self-hosted here, so nothing changed on screen.
 Original note: **The vendored Paid Collabs CSS imported Inter from Google Fonts.** The main
 product self-hosts every typeface; `src/vendor/wurxbase/App.css` and

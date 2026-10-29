@@ -340,7 +340,7 @@ function PageSkeleton({ bare = false }: { bare?: boolean }) {
  * THE BRAND, AS AN ACCENT. It sets the accent-family tokens on THIS element, so
  * they reach only this page's subtree and leaving the route undoes them. It
  * must not carry a `backdrop-filter`. `data-brand-world` is what
- * `scripts/shots-hub.mjs` finds the page by.
+ * `scripts/shots/shots-hub.mjs` finds the page by.
  */
 function AccentScope({
   brand,

@@ -110,7 +110,7 @@ export function TrustedBy() {
 
                   Scrolling went heavy again. Measured at 390x844: EIGHT
                   blurred layers painting at once, and THIRTEEN at 1440 — the
-                  budget in GLASS_PLAN.md §4.3 is three, and the guard that
+                  budget in docs/guides/GLASS_PLAN.md §4.3 is three, and the guard that
                   enforces it only ever samples the first viewport, which is
                   why it has been passing. The law the brief states is the same
                   one: a section is ONE blurred panel and the things inside it

@@ -27,7 +27,7 @@ import {
  *
  * THE LABELS ARE THE HOUSE WORDS, NOT THE SPEC'S SHORTHAND. "Enter this
  * contest" is Join and "Update progress" is Upload; both are asserted by
- * accessible name in `scripts/check-contests.mjs`, and renaming them would
+ * accessible name in `scripts/verify/creator/check-contests.mjs`, and renaming them would
  * break the only end-to-end proof this feature has.
  */
 export function ContestTileAction({

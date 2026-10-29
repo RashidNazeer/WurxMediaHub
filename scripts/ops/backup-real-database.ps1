@@ -139,7 +139,7 @@ NOT included (they live elsewhere):
 TO USE THEM (needs an engineer; do not guess):
   1. Make a Supabase project with the right structure:  supabase db push
   2. Restore:  pg_restore --data-only --disable-triggers  into that database
-     (or use Prism's own restore: pnpm restore:database, see docs/BACKUPS.md)
+     (or use Prism's own restore: pnpm restore:database, see docs/guides/BACKUPS.md)
   Practise on a throwaway project first. Never restore over the live database
   without first taking a fresh copy of it.
 "@ | Set-Content (Join-Path $dir 'README.txt') -Encoding utf8

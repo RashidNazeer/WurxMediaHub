@@ -5,7 +5,7 @@ grotesque** for display type, and a **four-colour palette**. Written 2026-10-14.
 
 Status: **plan only. No application code has been written.**
 
-This supersedes the neomorphic direction in `Redesign UI/IMPLEMENTATION_PLAN.md`
+This supersedes the neomorphic direction in `design/IMPLEMENTATION_PLAN.md`
 for everything to do with material and colour. The parts of that file about
 _symmetry_ — one concept, one component, one token — survive unchanged and are
 the reason this plan does not re-litigate them.
@@ -101,7 +101,7 @@ which `dataviz` requires anyway.
 
 ### 1.2 The fence: `backdrop-filter` has broken this app three times
 
-`docs/NEW_MACHINE.md` and `PRISM_PROGRESS.md` both record it: a
+`docs/guides/NEW_MACHINE.md` and `docs/archive/PRISM_PROGRESS.md` both record it: a
 `backdrop-filter` above `.wurxbase-root` changes the containing block for fixed
 overlays and the vendored app's modals landed 3,413px down the page. The current
 top bar is opaque **specifically** to avoid it, and says so in a comment.
@@ -133,7 +133,7 @@ button recipe in §4.4 ships with `filter: contrast(3)` on a **wrapper** — dro
 that wrapper anywhere above the fence, or above any fixed overlay, and the
 3,413px bug returns wearing different clothes.
 
-`scripts/check-backdrop-ancestry.mjs` (§7) asserts this in a real browser, and
+`scripts/verify/design/check-backdrop-ancestry.mjs` (§7) asserts this in a real browser, and
 is the single most important new guard in this project.
 
 ### 1.3 Blur is the most expensive thing to composite, and the tests are blind to it
@@ -463,7 +463,7 @@ Phase 6. And `src/routes/studio/StudioHome.tsx` is a **17-line stub** routed at
 `/studio` that appears in no phase — it is either dead or an undesigned screen.
 
 **One thing the inventory got wrong**, recorded so it is not repeated:
-`scripts/check-backdrop-ancestry.mjs` is not pre-existing. It was written by
+`scripts/verify/design/check-backdrop-ancestry.mjs` is not pre-existing. It was written by
 another engineer on this same session, minutes earlier.
 
 ---
@@ -491,7 +491,7 @@ Phase 1 will leave screens looking half-dressed. That is expected and correct.
 Phase 3 needs a working creator login on dev and Phase 5 needs the admin one;
 issue 11 has been open since the brand pages were written precisely because
 nobody had them. Phase 7 needs a real mid-range Android. Getting those is on the
-critical path, not a detail — see `docs/NEW_MACHINE.md` §1.3 and §7.
+critical path, not a detail — see `docs/guides/NEW_MACHINE.md` §1.3 and §7.
 
 ---
 
@@ -552,7 +552,7 @@ does.** Each item names the trigger that should raise it, the same way
 
 | # | What | Trigger — raise it the moment this is true | Blocks |
 | --- | --- | --- | --- |
-| A | **A working creator login on dev.** Two exist per `NEW_MACHINE.md` §1.3: `babblingbrookej@wurxmedia.com` (nearly empty — tests the states most of the design work is about) and `rudely@wurxmedia.com` (real GMV, orders, eight days of history) | Phase 2's gate passes and Phase 3 is the next step | Phase 3 |
+| A | **A working creator login on dev.** Two exist per `docs/guides/NEW_MACHINE.md` §1.3: `babblingbrookej@wurxmedia.com` (nearly empty — tests the states most of the design work is about) and `rudely@wurxmedia.com` (real GMV, orders, eight days of history) | Phase 2's gate passes and Phase 3 is the next step | Phase 3 |
 | B | **The dev admin login**, `rashid@wurxmedia.com`. Its password was never stored anywhere; if he does not have it, it resets from the Supabase dashboard | Phase 4's gate passes and Phase 5 is the next step | Phase 5, and issues 11 and 12 |
 | C | **A real mid-range Android**, in his hands or anyone's | Phase 6 is done and hardening starts | Phase 7, and the blur budget |
 | D | **The ROI threshold** — below what ad spend is the figure too small to judge, rather than printing `0.00x` | the moment My numbers is opened in Phase 3 | issue 1 only, not the phase |

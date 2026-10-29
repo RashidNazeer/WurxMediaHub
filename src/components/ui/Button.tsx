@@ -4,7 +4,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 /*
- * THE LIQUID-GLASS CONTROL. GLASS_PLAN.md §4.4, with §4.5's lit edge and §4.3's
+ * THE LIQUID-GLASS CONTROL. docs/guides/GLASS_PLAN.md §4.4, with §4.5's lit edge and §4.3's
  * blur budget.
  *
  * WHAT THE MATERIAL IS. Five layers, and none of them is a blur:
@@ -49,7 +49,7 @@ import { cn } from '@/lib/utils';
  * NO `backdrop-filter`, ANYWHERE IN THIS FILE. §4.3: the budget is three blurred
  * layers on a phone — chrome, one surface, one overlay — and a toolbar of eight
  * buttons would spend eight. Buttons take the tint and the optical edge, blur
- * belongs to chrome and overlays, and `scripts/check-blur-budget.mjs` fails the
+ * belongs to chrome and overlays, and `scripts/verify/design/check-blur-budget.mjs` fails the
  * run if that ever stops being true.
  */
 
@@ -123,7 +123,7 @@ const button = cva(
     /*
      * NOT `transition-all`. Tailwind's `all` expands to every animatable
      * property, which silently includes `filter`, `backdrop-filter` and
-     * `box-shadow` — the three things GLASS_PLAN.md §4.3 forbids animating,
+     * `box-shadow` — the three things docs/guides/GLASS_PLAN.md §4.3 forbids animating,
      * because each one re-rasterises the element every frame rather than
      * riding the compositor. On a glass button that is the difference between
      * a hover and a stutter. The list is explicit so adding a shadow or a blur

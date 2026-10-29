@@ -1,5 +1,7 @@
 # Contests, follow up after handback 3
 
+> **Archived 2026-10-30.** Finished or superseded work, kept for history. It describes the code and decisions as they were when it was written, so file names in it may be gone. For where things stand now read `docs/PROJECT_STATE.md`; the docs index is `docs/README.md`.
+
 You have the brief and three earlier notes. This does not repeat them. It says
 what improved, the one thing that stopped us building, a ruling that settles the
 layout in your favour, and a fix list.

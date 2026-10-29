@@ -1,5 +1,7 @@
 # Creator Home — UI/UX generation prompt
 
+> **Archived 2026-10-30.** Finished or superseded work, kept for history. It describes the code and decisions as they were when it was written, so file names in it may be gone. For where things stand now read `docs/PROJECT_STATE.md`; the docs index is `docs/README.md`.
+
 Paste everything below the line into the UI model. Attach the **Prism Design Kit**
 folder (`prism_brand_kit/`) alongside it — the model must read
 `tokens/prism.tokens.json`, `tokens/prism.css` and `README.md` from that kit.

@@ -73,7 +73,7 @@ export function BrandLookField({
 
   /*
    * Belt and braces. The derivation guarantees this is empty for every input,
-   * and `scripts/check-brand-theme.mjs` proves it over 88 base colours plus
+   * and `scripts/build/check-brand-theme.mjs` proves it over 88 base colours plus
    * 1200 random multi-colour themes inside the build. If it is ever NOT empty,
    * an admin should be the second to know rather than the last.
    */

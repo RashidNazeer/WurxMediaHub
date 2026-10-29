@@ -17,7 +17,7 @@
  * WHY THIS FILE HAS NO JSX. The band component lives next door in
  * `collab-angle-product-band.tsx`. Keeping the arrangement pure means Node can
  * import this file directly -- it strips the types and runs it -- so
- * `scripts/check-angle-products.mjs` tests the real function rather than a
+ * `scripts/verify/angles/check-angle-products.mjs` tests the real function rather than a
  * second copy of it written to agree with the first. A rule that is only
  * asserted in a comment is a rule nothing enforces.
  *
@@ -68,7 +68,7 @@ const nameOf = (x: AngleVideo): string =>
  * BRAND-AGNOSTIC BY CONSTRUCTION. There is no brand in this function and no
  * list of known products: it groups on whatever `product` the rows carry, so a
  * brand added tomorrow behaves exactly as the ones here do today.
- * `scripts/check-angle-products.mjs` enforces that by refusing a brand name
+ * `scripts/verify/angles/check-angle-products.mjs` enforces that by refusing a brand name
  * anywhere in this file, comments included.
  *
  * COLLAPSING HIDES ROWS, IT DOES NOT CHANGE THE COUNTS. A band always reports

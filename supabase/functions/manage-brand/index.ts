@@ -162,7 +162,7 @@ const BrandAboutBody = z.object({
    * a property of the hex, it is a property of the palette derived from it, and
    * `src/lib/brand-theme.ts` guarantees that for EVERY six digit colour: the
    * text is chosen by measurement, so there is no such thing as an unreadable
-   * input to reject. `scripts/check-brand-theme.mjs` proves it over a hue
+   * input to reject. `scripts/build/check-brand-theme.mjs` proves it over a hue
    * circle plus white, black and the primaries, inside `pnpm build`.
    */
   brandColor: z

@@ -26,7 +26,7 @@ expose new tables` OFF (grants are explicit per table, in the migration).
 - 2026-07-28: Light mode uses a darkened gold `#8a5f1f` instead of the brand
   `#c8924b`. The brand gold is only 2.58:1 on a light background, it would
   have been unreadable. Dark mode keeps the true brand gold at 7.23:1.
-- 2026-07-28: `scripts/check-contrast.mjs` runs inside `pnpm build` and fails
+- 2026-07-28: `scripts/build/check-contrast.mjs` runs inside `pnpm build` and fails
   the build on (a) a token defined in one theme but not the other, or (b) any
   text/background pair below WCAG AA. Rashid's standing instruction: dark and
   light must never mismatch, so it is enforced mechanically rather than by
@@ -305,7 +305,7 @@ line-height: 1.08 }` with Inter for body. We adopted the same recipe, applied
   collapse control lives in the top bar rather than the rail, because at 72px
   the rail has no room for it and it would disappear exactly when you needed it
   to bring the labels back.
-- 2026-07-30: `scripts/check-responsive.mjs` checks every screen at 375, 768,
+- 2026-07-30: `scripts/verify/design/check-responsive.mjs` checks every screen at 375, 768,
   1024 and 1440px. Rashid's creators are mostly on phones and tablets, so this
   is enforced mechanically rather than by remembering to look.
 - 2026-07-30: Modals scroll inside themselves rather than inside a
@@ -379,7 +379,7 @@ line-height: 1.08 }` with Inter for body. We adopted the same recipe, applied
 - 2026-07-30: No adversarial multi-agent review on this feature. Rashid asked
   that expensive review runs be reserved for where they add something, and the
   project rules it would re-check are already established and followed. The new
-  security surface is covered instead by `scripts/check-brands.mjs`, which
+  security surface is covered instead by `scripts/verify/brands/check-brands.mjs`, which
   attacks both tables, both database functions and the Edge Function as a real
   signed-in creator, and keeps doing so on every run.
 - 2026-07-30: Admin content is left aligned against the sidebar, not centred.
@@ -453,7 +453,7 @@ line-height: 1.08 }` with Inter for body. We adopted the same recipe, applied
   columns and dead screen code on a table payments will hang off. The drop then
   broke `review_offer_application`, silently, because plpgsql resolves field
   names at run time: worth remembering before the next one.
-- 2026-07-31: Every Playwright suite launches through `scripts/browser.mjs`
+- 2026-07-31: Every Playwright suite launches through `scripts/lib/browser.mjs`
   rather than `chromium.launch()`. Not a test-quality decision, a machine one:
   7.4 GB of RAM with VS Code already on most of it meant a default launch was
   getting the editor's extension host killed mid-run, which looked like Claude
@@ -1158,7 +1158,7 @@ line-height: 1.08 }` with Inter for body. We adopted the same recipe, applied
   is there any extra data??" There was, from three different causes, and he
   chose to remove all of it. Dev is now 41 creators, 41 applications, 41
   avatars, ONE brand, 31 offers, 41 jobs, 85 videos, 738 money rows, 0 contests.
-  `scripts/tidy-dev.mjs` is the re-runnable answer and it dry-runs by default.
+  `scripts/ops/tidy-dev.mjs` is the re-runnable answer and it dry-runs by default.
 - 2026-08-19: **The four empty brands went** — Vitauthority, BruMate, Physicians
   Choice, Bentgo, seeded 2026-08-12, each with a budget row and some products
   and zero offers, jobs, videos or contests. They were part of the same dummy
@@ -1767,7 +1767,7 @@ line-height: 1.08 }` with Inter for body. We adopted the same recipe, applied
   leftover URL does not error, it quietly reports on a database nobody
   maintains.
 - 2026-08-29: **The write-safety fix is a database constraint, not JavaScript.**
-  The design in `docs/WURXBASE_WRITE_SAFETY.md` recommended a compare-and-swap
+  The design in `docs/guides/WURXBASE_WRITE_SAFETY.md` recommended a compare-and-swap
   performed by re-reading before writing, and said plainly that it "is not
   atomic and cannot be made atomic here... closing that needs a unique
   constraint or an RPC, and constraint 3 says no DDL". Owning the schema removed
@@ -2670,7 +2670,7 @@ React Bits is **not** a package. It ships as copy-in source through the `jsrepo`
 and shadcn CLIs, so what is installed is the tool that fetches a component, not
 the library. Nothing has been pulled in yet.
 
-**Why `jsrepo` rather than `shadcn`.** `Redesign UI/IMPLEMENTATION_PLAN.md` 1.2
+**Why `jsrepo` rather than `shadcn`.** `design/IMPLEMENTATION_PLAN.md` 1.2
 says do not run `shadcn init` in this repo: it rewrites `global.css` and
 `tokens.css` with its own `--background` / `--primary` variables, which clash
 with the `--wx-*` bridge and the parity guard. `jsrepo` fetches a file and
@@ -2701,7 +2701,7 @@ all WCAG pairs passing, 1200 random brand themes passing, isolation ok.
 
 **Decision:** `src/lib/motion/` is the only legal way into Lenis and GSAP, and
 smooth scroll ships **off**, behind `VITE_SMOOTH_SCROLL`. Full rules in
-`docs/MOTION.md`.
+`docs/guides/MOTION.md`.
 
 **The tension the entry above flagged, resolved rather than deferred.** There is
 **one scroll authority and one animation frame loop**. Lenis is the authority: it

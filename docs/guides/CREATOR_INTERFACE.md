@@ -7,6 +7,12 @@ Everything here was read out of the code on 2026-10-16 (`feature/glass-redesign`
 Where the code and this document disagree, the code is right and this is stale — the file
 paths are given throughout so anything can be checked in a minute.
 
+> **Status note, 2026-10-30.** This is a snapshot of 2026-10-16. The page-by-page simplification of
+> 2026-10-19 (`docs/plans/PAGE_PLAN.md`) removed Support and Profile, merged Offers and Contests
+> into Earn and made the Brands Hub a marketplace, so screen-level detail below is out of date.
+> The current rail is in `src/lib/nav.ts`. Files named below that were later deleted are marked
+> "(removed 2026-10-30)".
+
 One thing to know before reading: **nobody on this machine has a creator login.** Every screen
 below is described from its source, not from using it. That matters most for the parts about
 feel rather than structure.
@@ -84,11 +90,11 @@ source as *"the moment the product exists for"*, and it sits as item two in a fl
 The landing screen after sign-in, and the most conditional screen in the app: it renders
 differently for an applicant mid-application, a newly approved creator, and a working creator.
 It carries the onboarding overlay, the welcome and approval moments
-(`WelcomeMoment`, `ApprovedMoment`, `FirstDay`), the stage tracker for her application, and a
+(`WelcomeMoment`, `ApprovedMoment`, `FirstDay` (removed 2026-10-30)), the stage tracker for her application, and a
 summary of her work in flight.
 
 Reads: `useProfile`, `useApplication`, `useOnboarding`, `useMyWork`, `useMyStageEvents`,
-`useWorkSummary`.
+`useWorkSummary` (removed 2026-10-30).
 
 For a redesign: this screen is doing at least three jobs — onboarding, application status,
 and a work dashboard. Worth asking whether they should be one screen.
@@ -159,7 +165,7 @@ never the **work***. Anyone already entered still sees it, still delivers and st
 so a contest she holds an entry in is never dropped from this list.
 
 Supporting components: `ContestDashboard`, `ContestEntryDialog`, `ContestProgressDialog`,
-`ContestEarnings`, `Confetti`.
+`ContestEarnings` (removed 2026-10-30), `Confetti`.
 
 Reads (the widest surface in the app): `contests`, `contest_entries`, `contest_entry_targets`,
 `contest_entry_terms`, `contest_entry_progress`, `contest_entry_confirmed_totals`,

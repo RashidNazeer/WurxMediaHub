@@ -8,6 +8,13 @@ any database yet.
 work.** The change log is at the bottom; add to it in the same commit as the
 change.
 
+> **Status note, 2026-10-30.** The header above is from 2026-10-06. Since then the work was merged
+> into `dev` and `main` (merge commits `613bf87`, `368b837`), and the queue screen, quota backoff and
+> offline guards (`pnpm verify:angles-*`, `pnpm verify:angle-functions`) were added. On CreatorHub
+> `AUDIT_API_URL` / `AUDIT_API_KEY` are not set and `collab-angles-cycle` is INACTIVE
+> (`docs/OPERATIONS.md`, "The Hub moved to CreatorHub"), so whether it is running in production use is
+> unverified. `audit-backend/` at the repo root is an untracked snapshot of the audit machine; leave it alone.
+
 ## What is being built
 
 Creative angle testing (Paid Collabs → Reporting → Creative angle testing) is
@@ -253,7 +260,7 @@ awake.
 
 1. **The briefs, per brand.** Done on this branch (see the change log).
 1a. **Prerequisite: protect the vendored files.** Generalise
-   `scripts/wurxbase-patches.mjs` so it can patch `CreativeAngles.jsx` as well
+   `scripts/ops/wurxbase/wurxbase-patches.mjs` so it can patch `CreativeAngles.jsx` as well
    as `WurxUI.jsx`, and add a check that fails if `angleStore.js` has lost its
    `revision` handling. Without this, the hook line in step 5 is lost on the
    next re-vendor (the vendor script regenerates `CreativeAngles.jsx` and copies
@@ -276,7 +283,7 @@ awake.
      well as RLS and policies.
    - Regenerate `src/types/database.ts` for any new table the screen reads, or
      the strict TypeScript build fails.
-   - `scripts/check-role-gates.mjs` requires any function that tests for the
+   - `scripts/verify/auth/check-role-gates.mjs` requires any function that tests for the
      `ops` role to name every staff role.
    - The button-facing function re-checks the caller server side: verify the
      JWT, require `profiles.role` to be a staff role and active, then look up
@@ -292,7 +299,7 @@ awake.
    `can(currentUser, 'canEditAngles')`. The component calls `fetchAngles()`
    after each batch is filed. Progress follows rule 13 below.
 6. The automatic run.
-7. A `scripts/check-*.mjs` suite, and the FEATURE_MAP / OPERATIONS entries.
+7. A `scripts/verify/angles/check-*.mjs` suite, and the FEATURE_MAP / OPERATIONS entries.
 
 ## Open items
 
@@ -416,7 +423,7 @@ are requirements for the implementation.
     looks at the video again.
 11. **Protect the vendored files first.** A hook line added to
     `src/vendor/wurxbase/CreativeAngles.jsx` is lost on the next re-vendor:
-    `scripts/wurxbase-patches.mjs` patches only `WurxUI.jsx`, the vendor script
+    `scripts/ops/wurxbase/wurxbase-patches.mjs` patches only `WurxUI.jsx`, the vendor script
     regenerates `CreativeAngles.jsx`, and `angleStore.js` is copied verbatim
     with no fence round our revision logic. Generalising the patch script, and
     adding a check that fails if `angleStore.js` has lost its `revision`
@@ -425,7 +432,7 @@ are requirements for the implementation.
     3: `verify_jwt = false` for the cron-called function in
     `supabase/config.toml`; `grant all privileges ... to service_role` on every
     new table as well as RLS and policies; regenerate `src/types/database.ts`
-    for any new table the screen reads; and `scripts/check-role-gates.mjs`
+    for any new table the screen reads; and `scripts/verify/auth/check-role-gates.mjs`
     needs any function testing for the `ops` role to name every staff role.
 13. **Progress and the estimate.** Use only the fields that mean something
     mid-run (see "What the audit backend returns"). Drive the bar from phase
@@ -564,7 +571,7 @@ indistinguishable once filed and nobody would look again.
 
 **The button** (`src/routes/admin/collab-angle-categorise.tsx`), hooked into
 the vendored screen's header through a `WURX-ADDED` fence, with
-`scripts/wurxbase-patches.mjs` generalised so it can patch more than
+`scripts/ops/wurxbase/wurxbase-patches.mjs` generalised so it can patch more than
 `WurxUI.jsx` and the hook survives a re-vendor. The progress ring is an
 absolutely positioned SVG outline that takes no layout space, so the header
 does not move, drawn with `stroke-dasharray` over `done / total` where done
@@ -600,7 +607,7 @@ Gel", none of it survived. **Data that is rendered and then clipped away looks
 exactly like data that was never there**, which is why this read as a missing
 feature rather than a styling fault.
 
-Three changes, all through `scripts/wurxbase-patches.mjs` so they survive the
+Three changes, all through `scripts/ops/wurxbase/wurxbase-patches.mjs` so they survive the
 next re-vendor:
 
 - **swap `product off the date line`** -- the date line goes back to being just

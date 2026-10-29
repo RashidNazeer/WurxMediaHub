@@ -170,7 +170,7 @@ pnpm verify:brand-theme     # 15 checks, no browser. Proves the WRITE PATH for
                             # because stripping it would look like it worked.
                             # Makes its own admin, creator and brand, removes
                             # all three. Needs SUPABASE_SERVICE_KEY
-node scripts/shots-brand-look.mjs http://localhost:4173
+node scripts/shots/shots-brand-look.mjs http://localhost:4173
                             # the theme editor, both modes, four widths. Makes
                             # its own throwaway admin and deletes it in a
                             # finally, because no admin password is stored
@@ -210,23 +210,23 @@ pnpm shots [url] [path]     # retina screenshots of a PUBLIC page
 pnpm shots:creator [url]    # the creator home WITH a full pipeline in it, both
                             # themes, four widths. Builds a throwaway creator
                             # and removes it again. Needs SUPABASE_SERVICE_KEY
-node scripts/shots-collabs.mjs [url] [path]
+node scripts/shots/shots-collabs.mjs [url] [path]
                             # Paid Collabs (vendored WurxBase) in both themes at
                             # 1440/1024/768/390, plus the header on its own and
                             # the creators tab. Seeds THEIR session as a viewer,
                             # so a run cannot write to their database. Also
                             # reports page overflow and console errors.
                             # Needs ADMIN_EMAIL and ADMIN_PASSWORD
-node scripts/check-admin.mjs <url> <email> <password> [role] [path]
-node scripts/create-admin.mjs <email> <password> [role]
-node scripts/wipe-clean-slate.mjs --yes        # DEV ONLY, IRREVERSIBLE.
+node scripts/verify/auth/check-admin.mjs <url> <email> <password> [role] [path]
+node scripts/ops/create-admin.mjs <email> <password> [role]
+node scripts/ops/wipe-clean-slate.mjs --yes        # DEV ONLY, IRREVERSIBLE.
                             # Every creator and applicant account, every offer,
                             # every contest. Keeps brands, staff, the audit log
                             # and tiktok_video_daily. Writes the handle-to-video
                             # mapping to a file first, because embed_id is the
                             # only link between a person and their TikTok money
                             # and it cascades away. Follow with reconcile-budgets.
-node scripts/seed-creators.mjs [--clean]       # DEV ONLY
+node scripts/seed/seed-creators.mjs [--clean]       # DEV ONLY
                             # Wurx's 41 real handles as approved creators, via
                             # the real review_application() path. Password for
                             # all of them is 1234567890, email is
@@ -234,14 +234,14 @@ node scripts/seed-creators.mjs [--clean]       # DEV ONLY
                             # 41, and only if they are creators or applicants,
                             # so it can never take Rashid's own account on the
                             # same domain.
-node scripts/seed-penetrex-offers.mjs [--clean]
+node scripts/seed/seed-penetrex-offers.mjs [--clean]
                             # DEV ONLY. Penetrex's August 2026 retainer from
                             # Rashid's sheet: 31 offers, 41 approved requests,
                             # $22,250 across 393 videos, each request walked to
                             # the stage the sheet says. Needs seed-creators to
                             # have run. Both paths recompute the brand's
                             # committed budget, which has no cascade of its own.
-node scripts/seed-august-content.mjs [--clean] [--submitted-only]
+node scripts/seed/seed-august-content.mjs [--clean] [--submitted-only]
                             # DEV ONLY. The 79 videos in the AUGUST-labelled
                             # blocks of the 20 per-creator content sheets, with
                             # their ad codes, submitted as the creator and
@@ -249,13 +249,13 @@ node scripts/seed-august-content.mjs [--clean] [--submitted-only]
                             # up. Passes TikTok's item id as embed_id, which is
                             # what attaches real ad money. Needs the offers seed
                             # to have run first.
-node scripts/check-brand-binding.mjs [brand]
+node scripts/verify/brands/check-brand-binding.mjs [brand]
                             # READ ONLY, and safe against prod. Proves one
                             # brand owns its offers, requests, videos, TikTok
                             # store and ad figures, and that nothing leaks to
                             # another brand. Run it whenever a second brand
                             # gets a store mapped.
-node scripts/seed-penetrex-contest.mjs [--clean]
+node scripts/seed/seed-penetrex-contest.mjs [--clean]
                             # DEV ONLY. One Penetrex contest with five entrants
                             # in five deliberate states, so the contest video
                             # queue has something in it. Walks the real
@@ -265,7 +265,7 @@ pnpm verify:leaderboard      # 34 checks, mostly attacks. The board is the only
                             # place one creator sees another`s figures, so most
                             # of that suite is about what it must NOT hand over.
 
-node scripts/tidy-dev.mjs [--yes] [--skip-money] [--brands "A,B"]
+node scripts/ops/tidy-dev.mjs [--yes] [--skip-money] [--brands "A,B"]
                             # DEV ONLY. Removes what is on dev but is not the
                             # product: test accounts (@wurxmediahub.test), test
                             # brands, and ad-money rows for videos nobody owns
@@ -275,21 +275,21 @@ node scripts/tidy-dev.mjs [--yes] [--skip-money] [--brands "A,B"]
                             # because everything referencing brands cascades.
                             # It never touches audit_log or tiktok_sync_runs.
 
-node scripts/sync-avatars.mjs [--refresh]
+node scripts/ops/sync-avatars.mjs [--refresh]
                             # DEV ONLY. Fetches each creator's TikTok profile
                             # picture ONCE into the private creator-avatars
                             # bucket, 25 at a time, and never retries somebody
                             # already tried. --refresh does everybody again.
                             # The ONLY thing that talks to unavatar.io, and it
                             # runs on Supabase's servers, not in a browser.
-node scripts/seed-applications.mjs [--clean]   # demo queue data, DEV ONLY
-node scripts/seed-brands.mjs [--clean]         # demo brands and offers, DEV ONLY
-node scripts/seed-pipeline.mjs [--clean]       # videos against the approved jobs,
+node scripts/seed/seed-applications.mjs [--clean]   # demo queue data, DEV ONLY
+node scripts/seed/seed-brands.mjs [--clean]         # demo brands and offers, DEV ONLY
+node scripts/seed/seed-pipeline.mjs [--clean]       # videos against the approved jobs,
                                                # in five states, so every progress
                                                # bar has something to draw. Approves
                                                # through the REAL review_content.
                                                # DEV ONLY. Needs SUPABASE_SERVICE_KEY
-node scripts/reconcile-budgets.mjs [--dry-run] # put brand budgets back in step
+node scripts/ops/reconcile-budgets.mjs [--dry-run] # put brand budgets back in step
                                                # with their approved requests
 ```
 
@@ -312,7 +312,7 @@ because there is nothing left running to stop. It also strands the test
 accounts, since the cleanup step never gets to run.
 
 ```powershell
-Start-Process -FilePath "node" -ArgumentList "scripts/check-brands.mjs","http://localhost:4173" `
+Start-Process -FilePath "node" -ArgumentList "scripts/verify/brands/check-brands.mjs","http://localhost:4173" `
   -WorkingDirectory "d:\Milestone\WurxMediaHub" `
   -RedirectStandardOutput "<scratchpad>\suite.log" `
   -RedirectStandardError "<scratchpad>\suite.log.err" -WindowStyle Hidden
@@ -336,7 +336,7 @@ mid-suite with no failures in it and no error either, which reads exactly like
 a passing run that stopped early. Redirect the two streams separately and read
 both.
 
-All suites launch Chromium through `scripts/browser.mjs`, which strips the GPU
+All suites launch Chromium through `scripts/lib/browser.mjs`, which strips the GPU
 process, extensions and background networking and caps the renderer heap. Add
 new suites through it, not through `chromium.launch()` directly.
 
@@ -347,7 +347,7 @@ The suites that need `ADMIN_EMAIL` and `ADMIN_PASSWORD` should NOT be pointed at
 Rashid's account. Make a throwaway one for the run, then remove it:
 
 ```powershell
-node scripts/create-admin.mjs suite-runner@wurxmediahub.test "<a password>" admin
+node scripts/ops/create-admin.mjs suite-runner@wurxmediahub.test "<a password>" admin
 # ... run the suite ...
 # then delete the auth user and its audit rows with the service key
 ```
@@ -425,7 +425,7 @@ SVG is deliberately not allowed: it can carry script.
 ## 4a. Backups (added 2026-10-27)
 
 Admin screen **Data > Backup data**; the design and the disaster-recovery steps are in
-`docs/BACKUPS.md`. Deploy order on a project: `supabase db push`, then
+`docs/guides/BACKUPS.md`. Deploy order on a project: `supabase db push`, then
 `supabase functions deploy backup-data --project-ref <ref>`. It needs `pg_cron` (already used
 by the nightly syncs). Do dev first and rehearse on real data before prod.
 
@@ -483,8 +483,8 @@ Invoke-RestMethod -Headers $h -Uri "https://api.vercel.com/v6/deployments?app=wu
 
 | Account                | Role      | Notes                                                                                                                                   |
 | ---------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `rashid@wurxmedia.com` | admin     | Dev only. Created 2026-07-29 via `scripts/create-admin.mjs`. **The password is not stored anywhere, by design.** It is Rashid's to type |
-| `*@wurxmediahub.demo`  | applicant | Seven demo applications on dev, password `demo-password-for-dev-only-1`. Remove with `node scripts/seed-applications.mjs --clean`       |
+| `rashid@wurxmedia.com` | admin     | Dev only. Created 2026-07-29 via `scripts/ops/create-admin.mjs`. **The password is not stored anywhere, by design.** It is Rashid's to type |
+| `*@wurxmediahub.demo`  | applicant | Seven demo applications on dev, password `demo-password-for-dev-only-1`. Remove with `node scripts/seed/seed-applications.mjs --clean`       |
 
 Test suites create `@wurxmediahub.test` accounts and delete them again. If a run
 is interrupted, check for leftovers with that suffix.
@@ -979,7 +979,7 @@ pnpm verify:collab-controls  # every row control receives its own clicks
                             # holds 123,456.78, no sideways page scroll,
                             # at 1500/1280/1024. Needs COLLAB_STAFF_PASSWORD.
 pnpm wurxbase:sync           # DRY RUN by default; --apply to write
-node scripts/check-collab-contrast.mjs   # every label, both themes, per-size AA
+node scripts/verify/collabs/check-collab-contrast.mjs   # every label, both themes, per-size AA
 ```
 
 **The contrast one judges each element against its own floor**, 3.0 only at
@@ -1006,8 +1006,8 @@ you; hand-built `fetch` calls do not. Use `wurxbaseRest()` from the seam.
 #### Moving the data
 
 ```bash
-SUPABASE_SERVICE_KEY=... node scripts/wurxbase-copy-data.mjs           # copy
-SUPABASE_SERVICE_KEY=... node scripts/wurxbase-copy-data.mjs --verify  # counts only
+SUPABASE_SERVICE_KEY=... node scripts/ops/wurxbase/wurxbase-copy-data.mjs           # copy
+SUPABASE_SERVICE_KEY=... node scripts/ops/wurxbase/wurxbase-copy-data.mjs --verify  # counts only
 ```
 
 Safe to run twice: each table is emptied before it is filled, so a half-finished
@@ -1026,7 +1026,7 @@ be invisible until the first save deleted the wrong row.
 
 ```bash
 pnpm build && pnpm preview
-SUPABASE_SERVICE_KEY=... node scripts/check-wurxbase-migration.mjs
+SUPABASE_SERVICE_KEY=... node scripts/verify/wurxbase/check-wurxbase-migration.mjs
 ```
 
 Counting rows proves the copy landed and nothing else. **Every way this
@@ -1155,7 +1155,7 @@ content you actually need.
 `pnpm build && pnpm preview` in another shell, then:
 
 ```bash
-node scripts/shots-hub.mjs      # the creator Brand Hub: 5 sections x 4 widths
+node scripts/shots/shots-hub.mjs      # the creator Brand Hub: 5 sections x 4 widths
                                 # x 2 themes = 40 shots into shots/hub/.
                                 # Signs in as a real creator with real money,
                                 # writes nothing, and FAILS on a console error
@@ -1524,7 +1524,7 @@ same as Ops (see FEATURE_MAP, "Ads Manager became staff"). Subhan
 ```bash
 # create or repair an Ads Manager (dev). Refuses an account holding any role
 # other than ads_manager or a fresh applicant.
-SUPABASE_SERVICE_KEY=... node scripts/create-ads-manager.mjs \
+SUPABASE_SERVICE_KEY=... node scripts/ops/create-ads-manager.mjs \
   someone@wurxmedia.com '<password>' 'Display Name'
 pnpm verify:ads-manager          # 19 checks, needs the service key
 pnpm verify:ads-manager-ui       # browser, needs a preview server and
@@ -1532,7 +1532,7 @@ pnpm verify:ads-manager-ui       # browser, needs a preview server and
 
 # create or repair one (dev). Refuses to touch an account that is not already
 # one of the three, so it cannot silently demote a colleague.
-SUPABASE_SERVICE_KEY=... node scripts/create-collabs-viewer.mjs \
+SUPABASE_SERVICE_KEY=... node scripts/ops/create-collabs-viewer.mjs \
   atl@wurxmedia.com affiliate_team_lead
 
 pnpm verify:collabs-viewer-rls   # attacks the DB as each role. Needs the service key.
@@ -1660,10 +1660,10 @@ group, ops and admin only. Make a link, copy it once, revoke it there.
 browser. With `SUPABASE_SERVICE_KEY` in the environment:
 
 ```bash
-node scripts/share-link.mjs new "Apothecary - Sarah" Apothecary 30
-node scripts/share-link.mjs new "Two brands" "Apothecary,Penetrex" 90 ktcv
-node scripts/share-link.mjs list
-node scripts/share-link.mjs revoke <id>
+node scripts/ops/share-link.mjs new "Apothecary - Sarah" Apothecary 30
+node scripts/ops/share-link.mjs new "Two brands" "Apothecary,Penetrex" 90 ktcv
+node scripts/ops/share-link.mjs list
+node scripts/ops/share-link.mjs revoke <id>
 ```
 
 `sections` is any of k (top numbers), t (top videos), c (creators), v (videos);
@@ -1877,10 +1877,10 @@ Paid Collabs draws every brand face from Euka's store photo. A brand with no
 Euka store — Irwin Naturals — shows a gradient letter until it is given one.
 
 ```bash
-SUPABASE_SERVICE_KEY=... node scripts/brand-photo.mjs "Irwin Naturals" --tiktok irwinnaturalsofficial
-SUPABASE_SERVICE_KEY=... node scripts/brand-photo.mjs "Irwin Naturals" --file C:/path/logo.png
-SUPABASE_SERVICE_KEY=... node scripts/brand-photo.mjs "Irwin Naturals" --url https://…/logo.png
-SUPABASE_SERVICE_KEY=... node scripts/brand-photo.mjs --list
+SUPABASE_SERVICE_KEY=... node scripts/ops/brand-photo.mjs "Irwin Naturals" --tiktok irwinnaturalsofficial
+SUPABASE_SERVICE_KEY=... node scripts/ops/brand-photo.mjs "Irwin Naturals" --file C:/path/logo.png
+SUPABASE_SERVICE_KEY=... node scripts/ops/brand-photo.mjs "Irwin Naturals" --url https://…/logo.png
+SUPABASE_SERVICE_KEY=... node scripts/ops/brand-photo.mjs --list
 ```
 
 It stores the file in the public `brand-assets` bucket under
@@ -2054,8 +2054,8 @@ failed fetch is dropped from it so the next mount asks again.
 ### A demo creator with a full history
 
 ```bash
-SUPABASE_SERVICE_KEY=... node scripts/seed-demo-creator.mjs          # make her
-SUPABASE_SERVICE_KEY=... node scripts/seed-demo-creator.mjs --clean  # remove it all
+SUPABASE_SERVICE_KEY=... node scripts/seed/seed-demo-creator.mjs          # make her
+SUPABASE_SERVICE_KEY=... node scripts/seed/seed-demo-creator.mjs --clean  # remove it all
 ```
 
 `rudely@wurxmedia.com` / `1234567890`, a Rising creator with three jobs across
@@ -2122,8 +2122,8 @@ store, not their service.
 
 ```bash
 pnpm verify:contract-pdf        # 32 checks, needs pnpm preview on :4173
-node scripts/backfill-video-thumbs.mjs          # dry run, every brand
-node scripts/backfill-video-thumbs.mjs --write  # apply. Needs SUPABASE_SERVICE_KEY
+node scripts/ops/backfill-video-thumbs.mjs          # dry run, every brand
+node scripts/ops/backfill-video-thumbs.mjs --write  # apply. Needs SUPABASE_SERVICE_KEY
 ```
 
 The design is in `src/routes/admin/contract-paper.js`, which is OURS; the
@@ -2132,7 +2132,7 @@ inline base64 (`wurx-mark.js`) so the renderer stays synchronous — a fetched
 logo would give a blank header on a bad network and nothing would look wrong.
 
 **ALL TIME, NOT THE CURRENT MONTH, in any suite that opens a brand.** Use
-`ensureAllTime(page)` from `scripts/browser.mjs`. Three suites failed on 1
+`ensureAllTime(page)` from `scripts/lib/browser.mjs`. Three suites failed on 1
 October for no reason other than the date: a brand with no creators this month
 is not on the Brands screen at all, and a brand whose creators are all in one
 payment status correctly draws no status dividers. **It is a toggle** — clicking

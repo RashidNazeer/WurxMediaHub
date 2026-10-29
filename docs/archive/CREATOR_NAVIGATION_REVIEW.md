@@ -1,5 +1,7 @@
 # What a creator sees, and what she should see
 
+> **Archived 2026-10-30.** Finished or superseded work, kept for history. It describes the code and decisions as they were when it was written, so file names in it may be gone. For where things stand now read `docs/PROJECT_STATE.md`; the docs index is `docs/README.md`.
+
 > **DECISION, 2026-10-19 (Rashid): the Brand hub stays, and it stays as its own floor.**
 > Every recommendation below that treats a brand as a *filter*, or proposes removing the
 > five-section hub, is **superseded** and is left in place only as the reasoning that was

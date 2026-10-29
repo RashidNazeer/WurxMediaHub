@@ -8,7 +8,7 @@ import { CollabAngleQueue } from './collab-angle-queue';
  * THIS FILE IS THE SEAM, AND IT IS OURS. Like `collab-ad-figures.tsx`, it is the
  * only place that touches our backend on behalf of the vendored WurxBase
  * screen. `CreativeAngles.jsx` imports THIS component (through a fenced block
- * that `scripts/wurxbase-patches.mjs` applies) and never a Supabase client, so
+ * that `scripts/ops/wurxbase/wurxbase-patches.mjs` applies) and never a Supabase client, so
  * `pnpm verify:isolation` still holds.
  *
  * WHAT IT DOES. One click asks the `collab-angles` Edge Function to queue every

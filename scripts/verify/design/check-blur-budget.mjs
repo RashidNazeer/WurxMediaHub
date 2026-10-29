@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * THE BLUR BUDGET. `docs/GLASS_PLAN.md` §4.3, listed in §7.
+ * THE BLUR BUDGET. `docs/guides/GLASS_PLAN.md` §4.3, listed in §7.
  *
  * WHY A BUDGET EXISTS AT ALL. Blur is the most expensive thing a browser
  * composites, and this product's creators are mostly on phones. §1.3 puts it
@@ -54,7 +54,7 @@ const BASE = process.argv[2] ?? process.env.BASE_URL ?? 'http://localhost:4173';
 
 /*
  * THE DEFAULT IS THE THREE PAGES THAT NEED NO LOGIN, and that is deliberate.
- * `GLASS_PLAN.md` §10: phases 1, 1b, 2 and 4 — the token layer, the type, every
+ * `docs/guides/GLASS_PLAN.md` §10: phases 1, 1b, 2 and 4 — the token layer, the type, every
  * glass primitive and the whole public site — need no login at all, and that is
  * roughly half the visible surface. A guard that cannot run until somebody
  * finds a password is a guard that does not run.
@@ -273,7 +273,7 @@ const SURVEY = ({ cap }) => {
  * RUN
  * ===================================================================== */
 
-console.log(`\nThe blur budget against ${BASE}  (GLASS_PLAN.md §4.3)`);
+console.log(`\nThe blur budget against ${BASE}  (docs/guides/GLASS_PLAN.md §4.3)`);
 console.log('='.repeat(72));
 
 const browser = await launchBrowser();
@@ -463,7 +463,7 @@ console.log(`\n${'='.repeat(72)}`);
 console.log('Counted, not measured: --disable-gpu means no frame cost is judged here.');
 console.log('The frame cost itself is Phase 7, on a real mid-range Android.');
 if (failures > 0) {
-  console.error(`\n${failures} blur budget check(s) FAILED — see docs/GLASS_PLAN.md §4.3.\n`);
+  console.error(`\n${failures} blur budget check(s) FAILED — see docs/guides/GLASS_PLAN.md §4.3.\n`);
   process.exit(1);
 }
 console.log('\nEvery page is inside the blur budget.\n');

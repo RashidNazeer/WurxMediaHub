@@ -4,7 +4,7 @@
  * `global.css`, because exactly one element in the product needs it and
  * `global.css` belongs to another engineer this week.
  *
- * NO `filter` AND NO `backdrop-filter`, ANYWHERE IN HERE. `GLASS_PLAN.md` §1.2:
+ * NO `filter` AND NO `backdrop-filter`, ANYWHERE IN HERE. `docs/guides/GLASS_PLAN.md` §1.2:
  * either one makes the element the containing block for every `position: fixed`
  * descendant, and `check-backdrop-ancestry.mjs` is in the build to keep that
  * from coming back. The painted MP4's soft edge is therefore a `mask-image`,

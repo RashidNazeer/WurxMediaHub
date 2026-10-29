@@ -5,7 +5,7 @@
    references a var(--wx-*) token defined below. That is the only way dark and
    light mode stay in lockstep, if a value exists in one mode it MUST exist in
    the other, and every text/background pair below is contrast-checked by
-   `pnpm check:contrast` (scripts/check-contrast.mjs), which runs in the build.
+   `pnpm check:contrast` (scripts/build/check-contrast.mjs), which runs in the build.
 
    Palette source: the PRISM brand kit. Ink #14141C, white and mist grounds,
    violet as the single interactive accent, and the spectrum as accents only.
@@ -301,7 +301,7 @@
    * to 3.86:1 against a required 4.5. Tinting toward surface-1 at 72% instead
    * composites to about #232431 and holds muted at 5.7:1. The glass reads as
    * glass because of the rim lights and the blur, not because of a white wash.
-   * This is the floor in GLASS_PLAN.md §4.1, applied.
+   * This is the floor in docs/guides/GLASS_PLAN.md §4.1, applied.
    */
   /*
    * THE FLOOR, RECOMPUTED FROM RENDERED PIXELS, 2026-10-15.
@@ -637,7 +637,7 @@
    * Glass is translucent, so these four ARE the worst-case backdrop behind
    * every panel, and bounding them is what makes the glass floor computable
    * instead of a hope. Widen the band and text on glass stops being provably
-   * legible. See docs/GLASS_PLAN.md section 4.1.
+   * legible. See docs/guides/GLASS_PLAN.md section 4.1.
    */
   /*
    * THE GRAIN. Glass only reads as glass when there is something behind it with

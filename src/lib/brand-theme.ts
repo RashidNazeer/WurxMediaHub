@@ -32,7 +32,7 @@
  * uniform, so one ramp works for every hue, which is the whole point when the
  * hue is somebody else's decision.
  *
- * WHY IT IS ALL ONE FILE. `scripts/check-brand-theme.mjs` transpiles this
+ * WHY IT IS ALL ONE FILE. `scripts/build/check-brand-theme.mjs` transpiles this
  * module with raw `tsc` and imports the result from plain Node. The moment it
  * imports a sibling, the emitted specifier has no `.js` on it and Node refuses
  * to resolve it, and the guard that protects every brand's readability stops

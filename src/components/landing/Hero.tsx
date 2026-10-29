@@ -64,7 +64,7 @@ export function Hero() {
         `--wx-bg` below. Rashid: "you see this layer creating difference? It must
         not exist."
 
-        It is the same family as the fence law in `docs/GLASS_PLAN.md` §1.2 — a
+        It is the same family as the fence law in `docs/guides/GLASS_PLAN.md` §1.2 — a
         `transform`, a `filter` or a `backdrop-filter` all do this — and the fix
         is the same shape: put the full-bleed layer somewhere with nothing above
         it, not inside the section it happens to start in.

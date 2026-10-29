@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
  * light source and a surface, so depth is a continuation of the material rather
  * than a new idea bolted onto it — but it is also the easiest thing on the list
  * to make look cheap, so most of what follows is constraint rather than
- * technique. See docs/UI_NEXT.md §3.
+ * technique. See docs/archive/UI_NEXT.md §3.
  *
  * ── THE THREE LAYERS ─────────────────────────────────────────────────────────
  *

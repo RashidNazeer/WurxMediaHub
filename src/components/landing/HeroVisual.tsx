@@ -15,7 +15,7 @@ import './hero-visual.css';
  *
  * Media lives in `public/hero/` and is therefore served as-is: Vite never
  * bundles it, never hashes it and never inlines it, which is what you want for
- * a file this size. `public/hero/CREDITS.md` records the stock footage licence.
+ * a file this size. (The stock footage licence note, `public/hero/CREDITS.md`, was removed 2026-10-30.)
  *
  * ── WHAT A VISITOR ACTUALLY DOWNLOADS ──────────────────────────────────────
  *

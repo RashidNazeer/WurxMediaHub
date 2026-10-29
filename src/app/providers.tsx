@@ -30,7 +30,7 @@ import { ScrollProvider } from '@/lib/motion';
  * ScrollProvider is Lenis, and it is INERT UNTIL SOMEBODY TURNS IT ON. With the
  * flag off it renders a context full of no-ops, imports nothing, and changes no
  * behaviour whatsoever — `lenis` is not even in the bundle. See
- * `src/lib/motion/flags.ts` for the switch and `docs/MOTION.md` for the rules.
+ * `src/lib/motion/flags.ts` for the switch and `docs/guides/MOTION.md` for the rules.
  *
  * It sits INSIDE `LazyMotion` because it drives Lenis from Motion's animation
  * frame loop, so there is one `requestAnimationFrame` for the page rather than

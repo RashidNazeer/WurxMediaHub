@@ -32,7 +32,9 @@ or the terminal). Claude runs the entire toolchain via CLI.
 5. `docs/DECISIONS.md`, only when a decision is in question.
 
 Chunked memory, not everything at once. If reality and the docs disagree, fix
-the docs in the same commit.
+the docs in the same commit. The full index, with one line per document, is
+`docs/README.md`; reference guides are in `docs/guides/`, live plans in
+`docs/plans/`, finished briefs and old logs in `docs/archive/`.
 
 ## Stack (locked, change only with Rashid's approval)
 
@@ -47,7 +49,7 @@ No Next.js. No ORM. No state library beyond TanStack Query.
 
 ```bash
 pnpm dev              # local dev server
-pnpm build            # token guard + tsc + vite build  (must pass before commit)
+pnpm build            # entry-graph, contrast, brand-theme and isolation guards + tsc + vite build  (must pass before commit)
 pnpm typecheck        # tsc -b
 pnpm lint             # oxlint
 pnpm format           # prettier --write
@@ -56,7 +58,15 @@ pnpm verify:browser   # real Chromium: console errors, both themes, responsive
 pnpm verify:rls       # attacks the database as a real user, proves RLS holds
 pnpm verify:session   # section 11: refresh, two tabs, reopen, form survival
 pnpm shots            # retina screenshots for design review
+pnpm verify:all       # every verify suite in sequence (needs a server and the service key)
+pnpm verify:angle-functions   # type-checks the shared Edge Functions (offline)
+pnpm verify:angles-categorise # Categorise automation guards: also -queue, -backoff, -worker (offline)
+pnpm verify:euka-date-keys    # Euka product list date-key guard
+pnpm test:backup      # Backup data SQL tests (no setup); test:backup:live/:function need supabase start
 ```
+
+Every script lives under `scripts/` in a folder named for its job (see Layout);
+the pnpm command names are the stable interface, so use them rather than paths.
 
 `verify:rls` and `verify:session` need `SUPABASE_SERVICE_KEY` in the
 environment. Fetch it from the CLI at run time; never write it to a file.
@@ -78,13 +88,25 @@ supabase gen types typescript --linked > src/types/database.ts
 ```
 src/
   app/        providers.tsx, router.tsx      # mounted once, never keyed on session
-  components/ brand/ layout/ theme/ ui/
-  lib/        supabase.ts env.ts query-client.ts utils.ts
-  routes/     one file per screen, lazy-loaded
+  components/ admin/ auth/ brand/ charts/ content/ creator/ landing/ layout/
+              site/ theme/ ui/ work/
+  lib/        supabase.ts env.ts query-client.ts utils.ts, and admin/ creator/
+              backup/ motion/ schemas/ ...
+  routes/     one file per screen, lazy-loaded (app/ admin/ auth/ legal/ site/
+              studio/ dev/)
   styles/     tokens.css (all colour lives here) global.css
-scripts/      check-contrast.mjs             # runs inside pnpm build
+  vendor/     wurxbase/                      # the Paid Collabs app, vendored in
+scripts/      build/    the guards that run inside pnpm build
+              verify/   the check suites, one folder per area (angles auth
+                        backup brands collabs creator design euka site tiktok
+                        wurxbase), plus verify-all.mjs
+              ops/      one-off and operational scripts (wurxbase/ inside)
+              seed/ perf/ shots/ lib/
 supabase/     migrations/                    # every schema change, committed
-docs/         PROJECT_STATE.md FEATURE_MAP.md DECISIONS.md
+              functions/                     # Edge Functions + _shared/
+docs/         PROJECT_STATE.md PARKED.md OPERATIONS.md FEATURE_MAP.md DECISIONS.md
+              README.md (index) guides/ plans/ archive/
+design/       prism_brand_kit/ (palette source) references/ token map, plan
 ```
 
 ## Step protocol
@@ -138,7 +160,7 @@ asking. On prod, ask twice.
 - Dark and light are equal citizens. A token added to one mode MUST be added to
   the other, `pnpm check:contrast` enforces parity and WCAG AA in both and
   fails the build otherwise.
-- Palette is PRISM's, from `Redesign UI/prism_brand_kit`. Ink `#14141C`, White,
+- Palette is PRISM's, from `design/prism_brand_kit`. Ink `#14141C`, White,
   Mist `#F7F7FB`, Line `#ECECF3`, Body `#4A4A5A`, Muted `#6B6B7B`. The four
   spectrum colours are **accents only** — magenta `#FF2E8C`, violet `#9B5CFF`
   (the interactive one), blue `#2E8BFF`, cyan `#17E0D4` (growth/positive) —

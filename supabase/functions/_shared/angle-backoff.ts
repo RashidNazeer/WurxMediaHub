@@ -3,7 +3,7 @@
  *
  * No imports and no I/O, on purpose: the worker cannot be run without Deno and
  * a database, and these rules are the ones that decide whether a free Gemini
- * quota costs a queue its retries. `scripts/check-angles-backoff.mjs` runs
+ * quota costs a queue its retries. `scripts/verify/angles/check-angles-backoff.mjs` runs
  * them directly.
  *
  * THE PROBLEM. The audit machine reports a video it could not judge as

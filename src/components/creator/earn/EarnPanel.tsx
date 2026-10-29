@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
  * THE BUDGET IS THREE BLURRED LAYERS PAINTING AT ONCE, and `wx-neo-raised`
  * carries a `backdrop-filter` at every width now. A list of fifteen contest
  * cards each wearing it is fifteen full-size blurs recomputed on every scroll
- * frame — the exact scroll lag `scripts/check-blur-budget.mjs` exists to catch.
+ * frame — the exact scroll lag `scripts/verify/design/check-blur-budget.mjs` exists to catch.
  *
  * So the layering on these two screens is:
  *

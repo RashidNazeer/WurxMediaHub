@@ -113,7 +113,7 @@ export const callBackup: Call = async (body) => {
       // safety check rejects the request before it is sent, so this is what that looks like.
       message =
         'Prism could not reach the backup service. If backups have not been set up on this project yet, ' +
-        'the database update and the "backup-data" function still have to be deployed (see docs/BACKUPS.md). ' +
+        'the database update and the "backup-data" function still have to be deployed (see docs/guides/BACKUPS.md). ' +
         'Otherwise check your connection and try again. Nothing was changed.';
     } else if (status === 404) {
       message = 'The backup tools are not set up on this server yet. Ask whoever manages Prism to deploy them.';

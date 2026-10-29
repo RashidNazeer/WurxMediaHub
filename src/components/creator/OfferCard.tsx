@@ -437,7 +437,7 @@ function YourRequest({ request }: { request: MyOfferApplication }) {
  * disclosure (`AgreedProgress`), where they are one tap away.
  *
  * "You are in" and "Paid out" are fixed points for
- * `scripts/check-offer-requests.mjs`, so they stay as the first words.
+ * `scripts/verify/creator/check-offer-requests.mjs`, so they stay as the first words.
  */
 function AgreedBody({
   request,
@@ -495,7 +495,7 @@ function AgreedProgress({
  * ONE BUTTON: Apply, Waiting, or Start. §8.2.
  *
  * THE LABELS ARE THE HOUSE WORDS WHERE A GUARD DEPENDS ON THEM.
- * `scripts/check-offer-requests.mjs` clicks "Apply for this" by accessible name
+ * `scripts/verify/creator/check-offer-requests.mjs` clicks "Apply for this" by accessible name
  * and waits on "with the team", "You are in" and "already on this one" by text,
  * so those four phrases are fixed points. "Start" is the new one, and it is a
  * link rather than a button because it goes somewhere: Content, filtered to

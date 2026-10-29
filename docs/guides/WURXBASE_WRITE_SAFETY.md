@@ -19,7 +19,7 @@ our own copy is the angle-test path, designed below.
 
 # FIX DESIGN — the angle-test overwrite path (`saveAngles` sweep)
 
-Everything below was read, not inferred: `scripts/wurxbase-patches.mjs` (all 163 lines), `scripts/vendor-wurxbase.mjs` (file lists at :727-728), `src/vendor/wurxbase/angleStore.js` (all 222 lines), `src/vendor/wurxbase/CreativeAngles.jsx` (:1-300), `src/vendor/wurxbase/supabaseClient.js`, `scripts/check-isolation.mjs`, `package.json`, plus the App.jsx call sites (`:11` import, `:3419` angleMonth, `:3915` mount, `:13017` boot fetch, `:13058` logActivity, `:12070-12117` activity feed).
+Everything below was read, not inferred: `scripts/ops/wurxbase/wurxbase-patches.mjs` (all 163 lines), `scripts/ops/wurxbase/vendor-wurxbase.mjs` (file lists at :727-728), `src/vendor/wurxbase/angleStore.js` (all 222 lines), `src/vendor/wurxbase/CreativeAngles.jsx` (:1-300), `src/vendor/wurxbase/supabaseClient.js`, `scripts/build/check-isolation.mjs`, `package.json`, plus the App.jsx call sites (`:11` import, `:3419` angleMonth, `:3915` mount, `:13017` boot fetch, `:13058` logActivity, `:12070-12117` activity feed).
 
 ---
 
@@ -27,7 +27,7 @@ Everything below was read, not inferred: `scripts/wurxbase-patches.mjs` (all 163
 
 **(a) `saveAngles` has exactly one caller.** `grep` over all of `src/` for `saveAngles` returns two hits: its definition (`angleStore.js:66`) and `CreativeAngles.jsx:133`. So a fix placed inside `saveAngles` covers all seven user actions (`patch`/`addAngle`/`remove`/`undoDelete`/`detach`/`attach`/`setCell`/`onRename`) with no per-call-site work. Any design that needs component cooperation is paying for something it can get for free.
 
-**(b) `scripts/wurxbase-patches.mjs` can only patch ONE file today.** Line 20:
+**(b) `scripts/ops/wurxbase/wurxbase-patches.mjs` can only patch ONE file today.** Line 20:
 
 ```js
 const FILE = 'src/vendor/wurxbase/WurxUI.jsx';
@@ -127,7 +127,7 @@ Three cases, exhaustively:
 
 Minimal, mechanical, preserves every existing semantic (idempotency, ambiguity refusal, marker balance, all-or-nothing).
 
-**4a. Replace lines 20-24 of `scripts/wurxbase-patches.mjs`:**
+**4a. Replace lines 20-24 of `scripts/ops/wurxbase/wurxbase-patches.mjs`:**
 
 ```js
 const FILE = 'src/vendor/wurxbase/WurxUI.jsx';
@@ -417,7 +417,7 @@ Their insert and their sweep are untouched. That is the point: constraint 2 hold
 
 ## 7. A BUILD-TIME ASSERTION, BECAUSE A REFUSED PATCH LEAVES THE DANGEROUS FILE ON DISK
 
-`pnpm build` runs `check-contrast`, `check-brand-theme` and `check-isolation`, but **not** `wurxbase-patches.mjs` — correctly, since patches belong to the vendoring step. The consequence is that a re-vendor where an anchor moved leaves *their* unguarded `angleStore.js` in the tree and `pnpm build` is perfectly happy with it. Add to `scripts/check-isolation.mjs`, before the `if (problems.length > 0)` block:
+`pnpm build` runs `check-contrast`, `check-brand-theme` and `check-isolation`, but **not** `wurxbase-patches.mjs` — correctly, since patches belong to the vendoring step. The consequence is that a re-vendor where an anchor moved leaves *their* unguarded `angleStore.js` in the tree and `pnpm build` is perfectly happy with it. Add to `scripts/build/check-isolation.mjs`, before the `if (problems.length > 0)` block:
 
 ```js
 /* ---- 3. the angle-save guard must still be in their file --------------- */
@@ -434,7 +434,7 @@ if (angleSrc === null) {
         '\n        saveAngles deletes every stored row for a brand+month after writing.' +
         '\n        Without the guard, one click on New angle from a browser whose boot' +
         "\n        fetch failed destroys the team's whole test for that month." +
-        '\n        Re-run: node scripts/wurxbase-patches.mjs'
+        '\n        Re-run: node scripts/ops/wurxbase/wurxbase-patches.mjs'
     );
   }
   if (!angleSrc.includes('rowId: row.id') || !angleSrc.includes('rowId: keepId')) {
@@ -466,7 +466,7 @@ This asserts **presence**, and handles the file being absent as a failure rather
 
 ## 9. HOW TO PROVE IT, CLICK BY CLICK
 
-1. `node scripts/wurxbase-patches.mjs` → expect `ok` on all four new entries plus `skip` on the eight existing ones; `pnpm build` passes including the new isolation assertion.
+1. `node scripts/ops/wurxbase/wurxbase-patches.mjs` → expect `ok` on all four new entries plus `skip` on the eight existing ones; `pnpm build` passes including the new isolation assertion.
 2. **The reference bug.** Open `/admin/collabs` in a private window (no mirror), Reports → Angles, pick a brand+month that already has a saved test on the server, wait for "Nothing saved yet", click **New angle**. Expected: the note reads "Someone else changed this test · reloaded", the screen fills with the real saved angles, and the server row count for that `target` is unchanged. Click New angle again: it works, and now adds to the real test.
 3. **Two tabs.** Tab A and tab B both on the same brand+month. Type an ad-spend figure in A. In B (not refreshed), rename an angle. Expected: B refuses once and snaps to A's state; B's second attempt succeeds and A's figure is still there.
 4. **The deliberate delete still deletes.** One angle, delete it, confirm. Expected: gone, "Nothing saved yet", and gone again after a reload. This is the constraint-2 regression test and it must be run every time.

@@ -1,5 +1,7 @@
 # Creator redesign — where things stand
 
+> **Archived 2026-10-30.** Finished or superseded work, kept for history. It describes the code and decisions as they were when it was written, so file names in it may be gone. For where things stand now read `docs/PROJECT_STATE.md`; the docs index is `docs/README.md`.
+
 Written 2026-10-16, at the end of a long session, so the next one can pick up without
 re-deriving any of it. **Everything below is LOCAL. Nothing has been pushed.**
 
@@ -30,7 +32,7 @@ Steps 1–11 of the redesign brief, plus the two reviewer reports' items that we
   contrast vs the real composited card). Light rim 1.03 → **1.65:1**. Dark muted text on glass
   3.69 → **4.57:1**. Measured on rendered pixels, not read off the stylesheet.
 - **Charts** — `src/components/charts/`: `SparkArea`, `SparkBars`, `RingProgress`, `Donut`,
-  `BrandBars`, `TrendLine`, `StackedBar`, `DeltaChip`, `ChartTip`, plus `chart-kit.ts`.
+  `BrandBars` (removed 2026-10-30), `TrendLine`, `StackedBar`, `DeltaChip`, `ChartTip`, plus `chart-kit.ts`.
   Hand-rolled SVG, no chart library (see §5).
 - **Navigation** — all eight tabs kept and regrouped by weight; Support added as a ninth by the
   notifications agent.
@@ -52,8 +54,8 @@ Nobody on this machine has a creator login, so these exist to make the signed-in
 export PATH="/c/Program Files/nodejs:/c/Users/Umar Wurx/AppData/Roaming/npm:$PATH"
 pnpm typecheck
 pnpm build                       # runs check-contrast, check-brand-theme, check-isolation
-node scripts/check-backdrop-ancestry.mjs
-node scripts/check-blur-budget.mjs
+node scripts/verify/design/check-backdrop-ancestry.mjs
+node scripts/verify/design/check-blur-budget.mjs
 ```
 
 Scratchpad tools written this session (in the session scratchpad, not the repo):
@@ -116,7 +118,7 @@ at scroll 0), `fontaudit.mjs` (counts font families actually rendered), `shoot.m
   bell have never been seen rendered with real data. The dev preview routes cover the components,
   not the pages.
 - Largest text size and reduced-motion passes.
-- `scripts/check-apply.mjs` was patched for the new confirm-password field; other E2E suites that
+- `scripts/verify/auth/check-apply.mjs` was patched for the new confirm-password field; other E2E suites that
   drive the signup form may need the same one-line addition.
 
 
@@ -161,15 +163,15 @@ that clearly helped (57 → 107 frames rendered, 96% → 24% dropped). Stopping 
 removing its blur did **not** help — it is the layer's geometry: `width: 200%`,
 `inset: -30% -100%`, `filter: blur(34px)` over the whole oversized layer, plus a mask and two
 tiled backgrounds. **Caveat the agent was careful about: that machine was running six agents and
-run-to-run variance was 5–10×. Re-run `node scripts/perf-attribute.mjs` with `PERF_GPU=1` on an
-idle machine before acting.** Also: `scripts/browser.mjs` forces `--disable-gpu`, which
+run-to-run variance was 5–10×. Re-run `node scripts/perf/perf-attribute.mjs` with `PERF_GPU=1` on an
+idle machine before acting.** Also: `scripts/lib/browser.mjs` forces `--disable-gpu`, which
 software-rasterises blur — any blur conclusion drawn without `PERF_GPU=1` is an artefact.
 
 ### Measurement harness left in `scripts/`
 `entry-graph.mjs` (names the bare packages a leaf import put on the critical path — **worth
 adding to `pnpm build`**, it is the only thing that makes the win above regression-visible),
 `perf-probe.mjs`, `perf-jank.mjs`, `perf-attribute.mjs`. Delete them if unwanted; nothing else
-references them.
+references them. (perf-probe, perf-jank and perf-profile were removed 2026-10-30; perf-attribute remains in `scripts/perf/`.)
 
 ### Build state at the end of the session
 `pnpm build` was **failing on the landing agent's in-flight edit** — it was changing a
@@ -229,7 +231,7 @@ follow-up to put one helper in `src/lib/` once that file is free.
 
 ### The disappearing text — found, and it was not what anyone assumed
 Not `.text-brand-blend` and not `LoadWords`; both were already correct. The cause: the landing
-reveals were scroll-**linked**, not scroll-**triggered**. `ScrollDepth`/`ScrollWords` in
+reveals were scroll-**linked**, not scroll-**triggered**. `ScrollDepth`/`ScrollWords` (ScrollWords removed 2026-10-30) in
 `Section.tsx` compute opacity as a pure function of scroll progress, so scrolling back UP
 un-assembles a heading to **opacity 0 while it is still on screen**. Measured: three H2s at
 exactly 0.000 on the upward pass.
@@ -266,7 +268,7 @@ proportion or the frame is exposed mid-loop. Verified by screenshot — no bare 
 edge, the field still reads the same, because the source is a repeating linear gradient that was
 already low-frequency.
 
-**Not yet measured** on an idle machine. Re-run `node scripts/perf-attribute.mjs` with
+**Not yet measured** on an idle machine. Re-run `node scripts/perf/perf-attribute.mjs` with
 `PERF_GPU=1` to confirm the gain; this machine was running six agents.
 
 ### Left for whoever picks this up
@@ -275,7 +277,7 @@ already low-frequency.
   `CountUp`), not the reveals.
 - `CountUp` calls `toLocaleString` on every rAF frame for three counters (~182ms). A hoisted
   `Intl.NumberFormat` makes it near-free.
-- `src/lib/focus-apply.ts` now has no importers; left in place because `ApplyForm.tsx` may want it.
+- `src/lib/focus-apply.ts` (removed 2026-10-30) now has no importers; left in place because `ApplyForm.tsx` may want it.
 - `src/components/layout/MobileNav.tsx:122` calls `useEffect` conditionally — a rules-of-hooks
   **correctness** bug, pre-existing, flagged by oxlint.
 

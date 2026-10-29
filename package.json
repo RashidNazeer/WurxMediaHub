@@ -79,6 +79,7 @@
     "verify:collabs-viewer-rls": "node scripts/verify/collabs/check-collabs-viewer-rls.mjs",
     "verify:angles": "node scripts/verify/angles/check-angles-visible.mjs",
     "verify:euka-errors": "node scripts/verify/euka/check-euka-errors.mjs",
+    "verify:euka-date-keys": "node scripts/verify/euka/check-euka-date-keys.mjs",
     "verify:collab-chrome": "node scripts/verify/collabs/check-collab-chrome.mjs",
     "verify:angles-import": "node scripts/verify/angles/check-angles-import.mjs",
     "verify:role-gates": "node scripts/verify/auth/check-role-gates.mjs",

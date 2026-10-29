@@ -266,7 +266,7 @@ Wired in at `src/app/providers.tsx` (the provider),
 ## 7. Still owed
 
 - ~~No automated guard asserts the fence law in a browser.~~ **It does now.**
-  `scripts/check-backdrop-ancestry.mjs` was written on this same session, in
+  `scripts/verify/design/check-backdrop-ancestry.mjs` was written on this same session, in
   parallel with this work, which is why the note above said otherwise. It runs
   as `pnpm verify:backdrop-ancestry` and reports exit 0 against this motion
   layer. The dev-time check in `gsap.ts` is still worth having — it is the only

@@ -37,9 +37,9 @@ It is gitignored on purpose and must stay that way. Never commit it.
 
 ### 1.2 Anything under `Downloads\` the docs refer to
 
-`docs/PROJECT_STATE.md` mentions `Downloads\Creator Home - current\`. Check for
+`docs/archive/PROJECT_STATE_to_2026-10-13.md` mentions `Downloads\Creator Home - current\`. Check for
 design exports, brand kits and briefs that only exist locally. The PRISM brand
-kit itself lives at `Redesign UI\prism_brand_kit\` inside the project folder, so
+kit itself lives at `design\prism_brand_kit\` inside the project folder, so
 that one travels with the repo copy if you copy the whole folder rather than
 re-cloning.
 
@@ -82,7 +82,7 @@ every verification script fails with a confusing launch error:
 pnpm exec playwright install chromium
 ```
 
-**`docs/DEPENDENCIES.md` is the companion to this file**: every package, what
+**`docs/guides/DEPENDENCIES.md` is the companion to this file**: every package, what
 each one is for, which of them reach the creator's phone, and what is
 deliberately absent and why.
 
@@ -156,9 +156,10 @@ and seeing their real GMV.
 Read these in the repository, in this order, every session:
 
 1. `CLAUDE.md` — the working rules. It wins over everything, including this file.
-2. `docs/PROJECT_STATE.md` — where things are. **Currently stale**: its NEXT
-   ACTION still says "Nothing is queued" and is dated 2026-09-29, before the
-   entire PRISM rebrand. Section 6 below is the accurate picture.
+2. `docs/PROJECT_STATE.md` — where things are. Rewritten 2026-10-30; the old
+   file (stale from 2026-10-13, its NEXT ACTION dated 2026-09-29) is kept at
+   `docs/archive/PROJECT_STATE_to_2026-10-13.md`. Section 6 below is the
+   picture as of 2026-10-13.
 3. `docs/PARKED.md` — work deliberately deferred, each with the trigger that
    should bring it back.
 4. `docs/OPERATIONS.md` — project ids, commands, deploy flow and the Windows
@@ -278,7 +279,7 @@ redirect. See the traps in section 8.
 
 ## 6. Where things actually stand
 
-`PROJECT_STATE.md` is stale. This is the real picture as of 2026-10-13.
+`PROJECT_STATE.md` was stale when this was written (it has since been rewritten, 2026-10-30). This is the real picture as of 2026-10-13.
 
 ### Shipped and merged
 
@@ -320,7 +321,7 @@ all passing.
    browser and returns, and in standalone mode the return can land in a
    different context. This product is explicitly engineered against random
    logouts, so it deserves a real phone before anyone is told it is safe.
-3. **`scripts/check-brands.mjs`** was edited to follow the brand hub's new tab
+3. **`scripts/verify/brands/check-brands.mjs`** was edited to follow the brand hub's new tab
    order but could not be run — it needs a service key the old machine did not
    have. The edits are reasoned from the markup, not proven.
 
@@ -331,7 +332,7 @@ all passing.
   Collabs admin code, shipped to every creator who can never open it. This is
   the biggest remaining performance problem and it has been outstanding a while.
 - "Fix the file structure of the codes", asked for and not done.
-- `docs/PROJECT_STATE.md` needs rewriting to match reality.
+- `docs/PROJECT_STATE.md` needs rewriting to match reality (done 2026-10-30).
 
 ---
 

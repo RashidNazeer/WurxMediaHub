@@ -1,7 +1,7 @@
 /**
  * The motion layer.
  *
- * `docs/MOTION.md` is the short version of what belongs where: Motion by
+ * `docs/guides/MOTION.md` is the short version of what belongs where: Motion by
  * default, GSAP only for sequenced timelines, CSS for anything that is really a
  * state change. Read it before adding an animation anywhere in this app.
  *

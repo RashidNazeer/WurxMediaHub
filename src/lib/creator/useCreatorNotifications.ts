@@ -240,7 +240,7 @@ function useNotificationFeed() {
    * THE SAME CHANNEL NAMES AND THE SAME BINDINGS the two owning hooks already
    * use, deliberately. `joinChannel` reference-counts by name and refuses two
    * DIFFERENT binding sets under one name, so matching them exactly means the
-   * bell shares whatever socket `useMyContent` or `ContestEarnings` has
+   * bell shares whatever socket `useMyContent` or the (since removed) `ContestEarnings` card has
    * already opened rather than adding a second subscription to the same rows.
    */
   /*

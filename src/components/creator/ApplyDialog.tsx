@@ -152,7 +152,7 @@ export function ApplyDialog({
             EXACTLY WHAT THEY ARE AGREEING TO, RESTATED.
 
             The two sentences in here are fixed points:
-            `scripts/check-offer-requests.mjs` waits on "5 videos for $300" and
+            `scripts/verify/creator/check-offer-requests.mjs` waits on "5 videos for $300" and
             on "confirm what this one involves". Changing either means changing
             that guard in the same commit.
           */}

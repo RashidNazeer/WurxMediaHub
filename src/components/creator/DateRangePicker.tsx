@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils';
  * stylesheet into that is more work than the grid below, and it would be the
  * only library of its kind in the repo.
  *
- * A PORTAL, NOT AN ABSOLUTE PANEL. `RowActions` already learned this: the
+ * A PORTAL, NOT AN ABSOLUTE PANEL. the former `RowActions` (removed 2026-10-30) already learned this: the
  * trigger lives inside `FilterBar`, and a panel positioned inside it is clipped
  * by any ancestor that scrolls or hides overflow. So it renders to `body`,
  * measures the trigger, and flips above when there is no room below.
@@ -104,7 +104,7 @@ export function DateRangePicker({
   }, [open]);
 
   /* Escape, outside click, and closing on scroll or resize rather than trying
-     to follow the trigger — the house pattern from RowActions. */
+     to follow the trigger — the pattern the removed RowActions used. */
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e: KeyboardEvent) => {

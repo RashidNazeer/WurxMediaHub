@@ -537,7 +537,7 @@ html.wx-waves-live {
  * NO `filter` AND NO `backdrop-filter` HERE. `<body>` is on the ancestor chain
  * of `.wurxbase-root`, and either property on it would make it the containing
  * block for every fixed overlay in the vendored admin app — the exact fault
- * that put its modals 3,413px down the page. `scripts/check-backdrop-ancestry.mjs`
+ * that put its modals 3,413px down the page. `scripts/verify/design/check-backdrop-ancestry.mjs`
  * asserts this; the texture is painted, never filtered.
  */
 body::after {
@@ -776,7 +776,7 @@ body::after {
  * nothing visually: the aurora behind these is a LOW-FREQUENCY gradient, and
  * blurring a soft gradient is close to an identity operation. Blur is spent
  * where it reads — chrome and overlays — and the translucent fill is what makes
- * a surface glass here. `scripts/check-blur-budget.mjs` holds this line.
+ * a surface glass here. `scripts/verify/design/check-blur-budget.mjs` holds this line.
  */
 /*
  * THE FACE IS A THIRD BACKGROUND LAYER, 2026-10-15.
@@ -1021,7 +1021,7 @@ body::after {
  * CHROME. The only surfaces that spend a blur layer at EVERY width: the rail,
  * the top bar and overlays. They are SIBLINGS of the content column, never ancestors of
  * `.wurxbase-root`, so a backdrop-filter here is legal — see §1.2 and
- * `scripts/check-backdrop-ancestry.mjs`, which asserts exactly that.
+ * `scripts/verify/design/check-backdrop-ancestry.mjs`, which asserts exactly that.
  */
 @utility wx-glass-chrome {
   background-color: var(--wx-glass-panel);
@@ -2365,7 +2365,7 @@ body::after {
  *      continuous, nothing to smear — so the blur buys literally nothing. Both
  *      the landing agent and the performance agent independently measured THIS
  *      ELEMENT as the dominant frame cost behind Rashid's "takes really long
- *      to load and gitters" (`docs/REDESIGN_HANDOFF.md`), and the blur was the
+ *      to load and gitters" (`docs/archive/REDESIGN_HANDOFF.md`), and the blur was the
  *      expensive half of it. A full-screen blurred layer is the single most
  *      expensive thing a browser composites; a plain gradient is close to free.
  *   2. THE DRIFT. `animation: wx-aurora-drift 60s` slid the layer sideways so

@@ -29,8 +29,8 @@ import { WavesField } from '@/components/ui/WavesField';
  *    `<main>` that also holds the filtered layer. Here the filtered layer must
  *    never be an ANCESTOR of page content: `filter` creates a containing block
  *    for every `position: fixed` descendant, which is what put the Paid
- *    Collabs modals 3,413px down the page three times. `GLASS_PLAN.md` §1.2,
- *    asserted by `scripts/check-backdrop-ancestry.mjs`. So this renders a
+ *    Collabs modals 3,413px down the page three times. `docs/guides/GLASS_PLAN.md` §1.2,
+ *    asserted by `scripts/verify/design/check-backdrop-ancestry.mjs`. So this renders a
  *    sibling layer and takes no children at all, exactly as `HaloBackdrop`
  *    did.
  *

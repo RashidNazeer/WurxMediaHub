@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * THE FENCE GUARD. `docs/GLASS_PLAN.md` §1.2 and §7 call this the single most
+ * THE FENCE GUARD. `docs/guides/GLASS_PLAN.md` §1.2 and §7 call this the single most
  * important new guard in the glass redesign, and this is why.
  *
  * THE LAW
@@ -13,7 +13,7 @@
  * `position: fixed` descendant. The vendored Paid Collabs app is full of
  * `inset: 0` centred modal overlays, so the moment something above the fence
  * takes a filter, "fixed" stops meaning the screen and starts meaning that box.
- * It has happened three times — `docs/NEW_MACHINE.md`, `PRISM_PROGRESS.md` and
+ * It has happened three times — `docs/guides/NEW_MACHINE.md`, `docs/archive/PRISM_PROGRESS.md` and
  * the comment block on `wurxbase-fence` in `global.css` all record it — and the
  * symptom is always the same: the screen dims and the dialog is 3,413px down
  * the page, where nobody looks. The current top bar is opaque *specifically* to
@@ -42,7 +42,7 @@
  * THREE MODES, BECAUSE THERE IS NO STAFF LOGIN ON THIS MACHINE
  *
  * `.wurxbase-root` only exists on `/admin/collabs/*`, which is behind a staff
- * login this session does not have (`GLASS_PLAN.md` §10 item B — the password
+ * login this session does not have (`docs/guides/GLASS_PLAN.md` §10 item B — the password
  * was never stored). So the script does what it can prove today and says
  * loudly what it cannot:
  *
@@ -318,7 +318,7 @@ function openingTagAround(src, anchorIndex) {
 }
 
 /*
- * THE CHAIN, AS `GLASS_PLAN.md` §1.2 DRAWS IT.
+ * THE CHAIN, AS `docs/guides/GLASS_PLAN.md` §1.2 DRAWS IT.
  *
  *   <div class="wx-app …">                ← ancestor · MUST stay plain
  *     <aside> rail card </aside>          ← sibling  · MAY be glass
@@ -769,7 +769,7 @@ if (!BASE) {
       if (!rows) {
         /*
          * A SKIP, NOT A PASS AND NOT A FAILURE. `.wurxbase-root` only exists
-         * behind the staff login (`GLASS_PLAN.md` §10 item B). Failing here
+         * behind the staff login (`docs/guides/GLASS_PLAN.md` §10 item B). Failing here
          * would make the guard red on every machine that lacks the password,
          * and people switch red guards off. Passing here would be a lie.
          */
@@ -819,7 +819,7 @@ console.log(`\n${'='.repeat(72)}`);
 if (failures > 0) {
   console.error(
     `${failures} fence check(s) FAILED. A filter above .wurxbase-root puts the\n` +
-      `vendored app's modals off-screen — see docs/GLASS_PLAN.md §1.2.\n`
+      `vendored app's modals off-screen — see docs/guides/GLASS_PLAN.md §1.2.\n`
   );
   process.exit(1);
 }

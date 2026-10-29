@@ -12,7 +12,7 @@ import type { AppRole } from '@/lib/auth/auth-context';
 /**
  * The product's navigation.
  *
- * REBUILT 2026-08-15 against the design Rashid supplied in `MY UI/All Contest`,
+ * REBUILT 2026-08-15 against the design Rashid supplied in `design/references/all-contest`,
  * because the old one was, in his words, very boring. What came across from that
  * design: the 280px rail, the brand block with a subtitle under the wordmark,
  * the gradient call to action at the top, roomier rows with the icon and label

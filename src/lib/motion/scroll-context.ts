@@ -18,7 +18,7 @@ export type ScrollApi = {
    *
    * Reading this is for imperative work (`lenis.scrollTo`, `lenis.on`). Do NOT
    * read scroll POSITION from it to drive animation — use Motion's `useScroll`,
-   * which reads the same document scroll Lenis writes. See `docs/MOTION.md`.
+   * which reads the same document scroll Lenis writes. See `docs/guides/MOTION.md`.
    */
   lenis: Lenis | null;
 

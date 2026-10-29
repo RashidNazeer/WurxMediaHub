@@ -1,5 +1,7 @@
 # The Monday cutover: what is done, and what needs a person
 
+> **Archived 2026-10-30.** Finished or superseded work, kept for history. It describes the code and decisions as they were when it was written, so file names in it may be gone. For where things stand now read `docs/PROJECT_STATE.md`; the docs index is `docs/README.md`.
+
 **Updated 2026-08-29 ~04:00, at the end of the unattended run.** Everything
 below is on the branch `fix/wurxbase-write-safety`, dev only. Nothing has been
 merged to `dev`, nothing deployed, production untouched.
@@ -114,10 +116,10 @@ still points at their old project, so it works the old way today. The cutover:
 2. apply all four migrations to prod;
 3. expose the `wurxbase` schema in the prod project's API settings — NOT in
    git, see OPERATIONS;
-4. `SUPABASE_SERVICE_KEY=... node scripts/wurxbase-copy-data.mjs --i-mean-prod`;
+4. `SUPABASE_SERVICE_KEY=... node scripts/ops/wurxbase/wurxbase-copy-data.mjs --i-mean-prod`;
 5. move the three identity sequences the script prints;
 6. `pnpm verify:wurxbase` against prod;
-7. `SUPABASE_SERVICE_KEY=... node scripts/link-wurxbase-team.mjs --i-mean-prod`;
+7. `SUPABASE_SERVICE_KEY=... node scripts/ops/wurxbase/link-wurxbase-team.mjs --i-mean-prod`;
 8. create the eight hub accounts there too — they do not travel with a
    migration — then `ROSTER_PASSWORD=... pnpm verify:wurxbase-roster`;
 9. **the Euka function and its secret**, which also do not travel:

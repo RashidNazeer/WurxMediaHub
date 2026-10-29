@@ -1,8 +1,8 @@
 /*
  * JANK ATTRIBUTION (temporary, performance agent).
  *
- * `perf-jank.mjs` says the landing page drops almost every frame while
- * scrolling. This says WHY, by re-running the same scroll with one suspect
+ * The landing page dropped almost every frame while scrolling. This says WHY, by
+ * re-running the same scroll with one suspect
  * neutralised at a time and comparing. Nothing here edits the app: each
  * variant is a stylesheet or an emulation applied to the loaded page, so the
  * numbers point at an owner without changing anybody's file.

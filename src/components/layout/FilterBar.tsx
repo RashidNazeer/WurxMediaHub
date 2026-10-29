@@ -155,7 +155,7 @@ export function FilterTab({
           className={cn(
             'wx-numeric text-[0.6875rem] font-semibold',
             // `text-muted`, never `text-faint`: faint on surface-2 is 4.31:1 in
-            // light mode, under AA. Registered in scripts/check-contrast.mjs.
+            // light mode, under AA. Registered in scripts/build/check-contrast.mjs.
             //
             // THE ACTIVE COUNT IS THE EASY ONE TO MISS. It used to be
             // `text-on-accent/80` — white at 80% — which was right over the old

@@ -1,5 +1,7 @@
 # UI design brief: Contests for WurxMediaHub
 
+> **Archived 2026-10-30.** Finished or superseded work, kept for history. It describes the code and decisions as they were when it was written, so file names in it may be gone. For where things stand now read `docs/PROJECT_STATE.md`; the docs index is `docs/README.md`.
+
 Everything below is the brief. It is written to be pasted whole into a design
 agent or handed to a designer as it stands.
 
