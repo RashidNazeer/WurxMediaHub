@@ -1,6 +1,7 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import { PrismMark } from '@/components/brand/PrismMark';
+import { useTheme } from '@/components/theme/theme-context';
 import '@/vendor/wurxbase/paidcollabs.css';
 import '@/routes/admin/wurxbase-overrides.css';
 
@@ -9,15 +10,15 @@ import '@/routes/admin/wurxbase-overrides.css';
  *
  * Rashid's boss, 2026-09-17: "we need to show them exact same view as we have
  * they will just not be able to see ad spend and roi at any cost". So this is
- * the Paid Collabs BRANDS view â€” the same five cards, the same top-videos
- * strip, the same table â€” wearing the same stylesheet, and nothing else of the
+ * the Paid Collabs BRANDS view — the same five cards, the same top-videos
+ * strip, the same table — wearing the same stylesheet, and nothing else of the
  * product. "No other section no other data please."
  *
  * WHAT IS NOT HERE, and could not be even if this file wanted it: ad spend,
  * ROI, payment details, phone numbers, emails, internal comments. The
  * `collab-share` function builds the payload field by field and those fields
  * are never read into it. This page can only draw what it is given, which is
- * the point â€” hiding a column in CSS would leave it one "view source" away.
+ * the point — hiding a column in CSS would leave it one "view source" away.
  *
  * ALSO NOT HERE, because a client must not change anything: the status
  * dropdown is a plain pill, and there is no contract download, no row actions,
@@ -108,15 +109,15 @@ const monthLabel = (key: string) => {
   return `${MONTHS[Number(m) - 1] ?? '?'} ${y}`;
 };
 const dayLabel = (iso: string | null) => {
-  if (!iso) return 'â€“';
+  if (!iso) return '–';
   const d = new Date(`${iso}T00:00:00Z`);
   return Number.isNaN(d.getTime())
-    ? 'â€“'
+    ? '–'
     : `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
 };
 const money = (n: number | null | undefined) =>
   n === null || n === undefined || !Number.isFinite(n)
-    ? 'â€“'
+    ? '–'
     : new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD',
@@ -156,15 +157,100 @@ const HIRED_BY: Record<string, { i: string; fg: string; bg: string }> = {
   khushi: { i: 'K', fg: '#0E7A3A', bg: '#E4F5EB' },
 };
 
+/*
+ * WHICH SUPABASE REGION THE FUNCTION RUNS IN. By default the platform starts a
+ * function in the region nearest the VISITOR, and every database call it then
+ * makes travels back to the database. For a client opening this link from the US
+ * or Europe that is a trip across an ocean for each call. Pinning it next to the
+ * database makes the visitor pay for one trip. Set VITE_SHARE_REGION to the
+ * project's own region (Singapore today), or to an empty string to switch it off.
+ */
+const SHARE_REGION =
+  (import.meta.env.VITE_SHARE_REGION as string | undefined) ?? 'ap-southeast-1';
+
+/** A failed request, with whether the link itself is the problem. */
+class ShareFail extends Error {
+  gone: boolean;
+  constructor(message: string, gone: boolean) {
+    super(message);
+    this.gone = gone;
+  }
+}
+
+async function fetchMonth(token: string, askedMonth: string | null): Promise<Payload> {
+  let res: Response;
+  try {
+    res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/collab-share`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(SHARE_REGION ? { 'x-region': SHARE_REGION } : {}),
+      },
+      body: JSON.stringify(askedMonth ? { token, month: askedMonth } : { token }),
+    });
+  } catch {
+    throw new ShareFail(
+      'We could not reach the server. Check your connection and try again.',
+      false
+    );
+  }
+  const body = await res.json().catch(() => null);
+  if (res.status === 404) {
+    throw new ShareFail(body?.error ?? 'This link is not active any more.', true);
+  }
+  if (!res.ok || !body?.data) {
+    throw new ShareFail(body?.error ?? 'Something went wrong loading this page.', false);
+  }
+  return body as Payload;
+}
+
 export function ShareCollab() {
   const { token = '' } = useParams();
-  const [month, setMonth] = useState<string | null>(null);
+  const { resolved: theme } = useTheme();
   const [brandIdx, setBrandIdx] = useState(0);
   const [payload, setPayload] = useState<Payload | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'gone' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  /* The month the visitor has just clicked, while its answer is on the way. The
+     button lights up at once; the table stays as it was until the answer lands. */
+  const [pending, setPending] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState('');
+
+  /*
+   * EVERY MONTH, KEPT. The first answer lists the months this link may show, and
+   * the page then fetches the rest quietly, one at a time, so by the time anybody
+   * clicks one it is already here and the switch costs nothing. A month that is
+   * still on its way is awaited rather than asked for twice, and only the latest
+   * click is allowed to change the screen (a slow answer for an earlier click
+   * must not land on top of a later one).
+   */
+  const cache = useRef(new Map<string, Payload>());
+  const inflight = useRef(new Map<string, Promise<Payload>>());
+  const latestClick = useRef(0);
+
+  const getMonth = useCallback(
+    (askedMonth: string | null): Promise<Payload> => {
+      const key = askedMonth ?? '';
+      const have = cache.current.get(key);
+      if (have) return Promise.resolve(have);
+      const running = inflight.current.get(key);
+      if (running) return running;
+      const p = fetchMonth(token, askedMonth)
+        .then((answer) => {
+          cache.current.set(key, answer);
+          /* The function may answer a different month than was asked (one outside
+             the link's list is replaced by one inside it), so file it under both. */
+          cache.current.set(answer.month, answer);
+          return answer;
+        })
+        .finally(() => inflight.current.delete(key));
+      inflight.current.set(key, p);
+      return p;
+    },
+    [token]
+  );
 
   useEffect(() => {
     const meta = document.createElement('meta');
@@ -174,43 +260,72 @@ export function ShareCollab() {
     return () => meta.remove();
   }, []);
 
-  const load = useCallback(
-    async (askedMonth: string | null) => {
-      setState((s) => (s === 'ready' ? 'ready' : 'loading'));
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/collab-share`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(askedMonth ? { token, month: askedMonth } : { token }),
-          }
-        );
-        const body = await res.json().catch(() => null);
-        if (res.status === 404) {
-          setMessage(body?.error ?? 'This link is not active any more.');
-          setState('gone');
-          return;
-        }
-        if (!res.ok || !body?.data) {
-          setMessage(body?.error ?? 'Something went wrong loading this page.');
-          setState('error');
-          return;
-        }
-        setPayload(body as Payload);
-        setMonth((body as Payload).month);
+  const loadFirst = useCallback(() => {
+    let cancelled = false;
+    setState('loading');
+    getMonth(null)
+      .then(async (first) => {
+        if (cancelled) return;
+        setPayload(first);
         setState('ready');
-      } catch {
-        setMessage('We could not reach the server. Check your connection and try again.');
-        setState('error');
+        /* The other months, in the background, one at a time. Failures are
+           ignored here: a month that did not arrive is simply asked for again
+           when somebody clicks it. */
+        const rest = [
+          ...first.months.slice(0, 12),
+          ...(first.months.length > 1 ? ['all'] : []),
+        ].filter((m) => !cache.current.has(m));
+        for (const m of rest) {
+          if (cancelled) return;
+          await getMonth(m).catch(() => undefined);
+        }
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        const fail =
+          e instanceof ShareFail
+            ? e
+            : new ShareFail('Something went wrong loading this page.', false);
+        setMessage(fail.message);
+        setState(fail.gone ? 'gone' : 'error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [getMonth]);
+
+  useEffect(() => loadFirst(), [loadFirst]);
+
+  const pickMonth = useCallback(
+    (m: string) => {
+      setSwitchError('');
+      const click = ++latestClick.current;
+      const have = cache.current.get(m);
+      if (have) {
+        setPayload(have);
+        setPending(null);
+        return;
       }
+      setPending(m);
+      getMonth(m)
+        .then((answer) => {
+          if (click !== latestClick.current) return;
+          setPayload(answer);
+          setPending(null);
+        })
+        .catch((e: unknown) => {
+          if (click !== latestClick.current) return;
+          setPending(null);
+          setSwitchError(
+            e instanceof ShareFail && !e.gone
+              ? e.message
+              : 'That month did not load. Try it again.'
+          );
+        });
     },
-    [token]
+    [getMonth]
   );
 
-  useEffect(() => {
-    void load(null);
-  }, [load]);
   useEffect(() => {
     document.title = payload
       ? `${payload.data.map((b) => b.brand).join(', ')} · Wurx Media`
@@ -258,7 +373,7 @@ export function ShareCollab() {
           {state === 'error' && (
             <button
               type="button"
-              onClick={() => void load(month)}
+              onClick={() => loadFirst()}
               className="wx-neo-raised-sm wx-neo-press mt-6 rounded-md px-4 py-2 text-sm font-semibold"
             >
               Try again
@@ -271,6 +386,8 @@ export function ShareCollab() {
 
   if (!payload || !brand) return null;
   const k = brand.kpis;
+  /* The button lit is the month just clicked, not the one still on screen. */
+  const shownMonth = pending ?? payload.month;
 
   return (
     <Shell>
@@ -312,13 +429,10 @@ export function ShareCollab() {
             <button
               key={m}
               type="button"
-              onClick={() => {
-                setMonth(m);
-                void load(m);
-              }}
-              aria-pressed={m === payload.month}
+              onClick={() => pickMonth(m)}
+              aria-pressed={m === shownMonth}
               className={`rounded-md px-3 py-1.5 text-sm font-semibold ${
-                m === payload.month
+                m === shownMonth
                   ? '[background-color:var(--wx-accent-fill)] [color:var(--wx-on-accent-fill)]'
                   : 'wx-neo-raised-sm wx-neo-press'
               }`}
@@ -329,8 +443,18 @@ export function ShareCollab() {
         )}
       </div>
 
-      {/* Everything below wears Paid Collabs' own stylesheet. */}
-      <div className="wurxbase-root mt-6">
+      <p className="text-muted mt-3 min-h-5 text-sm" role="status" aria-live="polite">
+        {pending ? `Loading ${monthLabel(pending)}…` : switchError}
+      </p>
+
+      {/* Everything below wears Paid Collabs' own stylesheet, which switches on
+          data-theme: without it the cards and table stayed dark on a light page. */}
+      <div
+        className="wurxbase-root mt-2 transition-opacity"
+        data-theme={theme}
+        aria-busy={pending !== null}
+        style={pending ? { opacity: 0.55 } : undefined}
+      >
         {k && (
           <div
             className="pc-kpis pc-kpis-5"
@@ -357,9 +481,7 @@ export function ShareCollab() {
               color="#0E7A3A"
               value={money(k.paid)}
               sub={
-                k.allocated > 0
-                  ? `${Math.round((k.paid / k.allocated) * 100)}% paid out`
-                  : 'â€”'
+                k.allocated > 0 ? `${Math.round((k.paid / k.allocated) * 100)}% paid out` : '—'
               }
             />
             <Kpi
@@ -369,7 +491,7 @@ export function ShareCollab() {
               sub={
                 k.committed > 0
                   ? `${Math.round((k.delivered / k.committed) * 100)}% completed`
-                  : 'â€”'
+                  : '—'
               }
             />
             <Kpi
@@ -403,7 +525,7 @@ export function ShareCollab() {
                         <img className="pc-topvid-thumb" src={v.thumb} alt="" loading="lazy" />
                       ) : (
                         <span className="pc-topvid-thumb pc-topvid-ph" aria-hidden>
-                          â–¶
+                          ▶
                         </span>
                       )}
                       <span className="pc-topvid-rank">#{i + 1}</span>
@@ -600,7 +722,7 @@ export function ShareCollab() {
                         {c.l30 ? (
                           <span className="pc-l30-cell">{money(Math.round(c.l30))}</span>
                         ) : (
-                          <span className="pc-l30-cell muted">â€“</span>
+                          <span className="pc-l30-cell muted">–</span>
                         )}
                       </div>
                       <div className="pc-cell pc-num" data-label="Items sold">
@@ -619,7 +741,7 @@ export function ShareCollab() {
                             <a href={v.url} target="_blank" rel="noreferrer noopener">
                               Video {vi + 1}
                             </a>
-                            <span>{v.date ? dayLabel(v.date) : 'â€“'}</span>
+                            <span>{v.date ? dayLabel(v.date) : '–'}</span>
                             <span>{kNum(v.views)} views</span>
                             <span className="wx-share-gmv">{money(v.gmv)}</span>
                             {v.items > 0 && <span>{v.items} sold</span>}

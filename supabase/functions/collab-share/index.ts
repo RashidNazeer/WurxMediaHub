@@ -92,9 +92,95 @@ async function paged(build: (from: number, to: number) => any): Promise<Row[]> {
   }
 }
 
+/*
+ * THE THREE READS A CLIENT PAGE NEEDS, AND HOW LONG THEY ARE KEPT.
+ *
+ * Rashid, 2026-11-02: opening a client link took "really long", and switching
+ * month took longer still. Measured, the database was never the slow part (the
+ * biggest brand reads in 2 ms); the time was the function making six HTTPS
+ * calls to it one after another, from wherever the visitor happened to be, and
+ * doing the whole job again for every month clicked.
+ *
+ * So the three reads that do not depend on each other now run together, and
+ * their answer is kept for a minute. A month switch, and the page quietly
+ * fetching the other months after it opens, then cost no database reads at all.
+ *
+ * WHAT IS NOT CACHED, ON PURPOSE: the link itself. Whether a link is live,
+ * expired or revoked is read from the database on EVERY request, so revoking one
+ * still takes effect at once. Only the brand's rows, which are the same for
+ * whoever holds a link to that brand, are reused, and for at most a minute: the
+ * page's own footer already says figures "update through the day".
+ *
+ * Kept per isolate, in memory, so a cold isolate simply reads again.
+ */
+const ROWS_TTL_MS = 60_000;
+const ROWS_MAX = 24;
+type Shared = { creators: Row[]; budgets: Row[] };
+const rowsCache = new Map<string, { at: number; p: Promise<Shared> }>();
+let tiersCache: { at: number; p: Promise<TierMap> } | null = null;
+
+function loadShared(db: any, brands: string[]): Promise<Shared> {
+  const key = JSON.stringify([...brands].sort());
+  const hit = rowsCache.get(key);
+  if (hit && Date.now() - hit.at < ROWS_TTL_MS) return hit.p;
+  const p = (async (): Promise<Shared> => {
+    /* An explicit column list, not select('*'): the staff screen reads every
+       column including phone numbers and payment details, and a projection
+       that starts from everything is one forgotten delete from a leak. */
+    const [creators, budgets] = await Promise.all([
+      paged((from, to) =>
+        db.schema('wurxbase').from('creators')
+          .select('name, brand, hiring_date, deal, videos, video_codes, tiktok_account, tiktok_account_2, category, product, hired_by, payment_status, monthly')
+          .in('brand', brands)
+          .not('name', 'is', null).neq('name', '')
+          .or('status.eq.approved,status.is.null')
+          .order('hiring_date', { ascending: false })
+          .range(from, to)),
+      paged((from, to) =>
+        db.schema('wurxbase').from('brand_monthly_budgets')
+          .select('brand, month, budget, content_guide_url, focus_product_url')
+          .in('brand', brands).range(from, to)),
+    ]);
+    return { creators, budgets };
+  })();
+  /* A failed read must not be remembered for a minute. */
+  p.catch(() => { if (rowsCache.get(key)?.p === p) rowsCache.delete(key); });
+  rowsCache.set(key, { at: Date.now(), p });
+  while (rowsCache.size > ROWS_MAX) rowsCache.delete(rowsCache.keys().next().value as string);
+  return p;
+}
+
+/* Euka's tier and L30 GMV are READ from our own table here and refreshed
+   elsewhere: see _shared/euka-tiers.ts for why a client page must never make
+   that call itself. Every store is merged, because one creator's last-30-day
+   GMV is their whole GMV across every shop they post for. The merged map is the
+   same for every link, so it is shared by all of them. */
+function loadTiers(db: any): Promise<TierMap> {
+  if (tiersCache && Date.now() - tiersCache.at < ROWS_TTL_MS) return tiersCache.p;
+  const p = (async (): Promise<TierMap> => {
+    let tiers: TierMap = {};
+    try {
+      const { data: cacheRows } = await db.from('collab_share_euka_cache').select('handles');
+      for (const row of cacheRows ?? []) tiers = mergeTiers(tiers, (row.handles ?? {}) as TierMap);
+    } catch { /* leave the two columns empty rather than failing the page */ }
+    return tiers;
+  })();
+  tiersCache = { at: Date.now(), p };
+  return p;
+}
+
+/* Run after the answer has gone, never before it. A failure here must not turn
+   a good page into an error, which it used to. */
+function afterResponse(work: Promise<unknown>) {
+  const safe = work.catch((e) => console.error('collab-share view log', String((e as Error)?.message ?? e).slice(0, 200)));
+  const rt = (globalThis as any).EdgeRuntime;
+  if (rt && typeof rt.waitUntil === 'function') rt.waitUntil(safe);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders(req) });
   if (req.method !== 'POST') return json({ error: 'Bad request' }, 405, req);
+  const t0 = performance.now();
 
   const db = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -125,27 +211,13 @@ Deno.serve(async (req) => {
   try {
     const brands: string[] = (link.brands ?? []).map((b: string) => String(b).trim()).filter(Boolean);
 
-    /* ── the rows for these brands, and nothing else ───────────────────── */
-    /* An explicit column list, not select('*'): the staff screen reads every
-       column including phone numbers and payment details, and a projection
-       that starts from everything is one forgotten delete from a leak. */
-    const creators = await paged((from, to) =>
-      db.schema('wurxbase').from('creators')
-        .select('name, brand, hiring_date, deal, videos, video_codes, tiktok_account, tiktok_account_2, category, product, hired_by, payment_status, monthly')
-        .in('brand', brands)
-        .not('name', 'is', null).neq('name', '')
-        .or('status.eq.approved,status.is.null')
-        .order('hiring_date', { ascending: false })
-        .range(from, to));
-
+    /* ── the rows for these brands, and nothing else, all at once ──────── */
     /* The whole-table read that counted a person's campaigns is gone with the
        circle it fed: a client page should not walk every brand's roster to
        draw a number the client is not allowed to see. */
-
-    const budgets = await paged((from, to) =>
-      db.schema('wurxbase').from('brand_monthly_budgets')
-        .select('brand, month, budget, content_guide_url, focus_product_url')
-        .in('brand', brands).range(from, to));
+    const tLink = performance.now();
+    const [{ creators, budgets }, tiers] = await Promise.all([loadShared(db, brands), loadTiers(db)]);
+    const tData = performance.now();
 
     /* ── which months this link may show, and which one was asked for ──── */
     /*
@@ -166,21 +238,11 @@ Deno.serve(async (req) => {
     const inScope = (c: Row) =>
       month === 'all' ? monthOk(monthOf(c.hiring_date)) : monthOf(c.hiring_date) === month;
 
-    /* ── tier and L30 GMV: a table read, nothing more ──────────────────── */
-    /*
-     * REFRESHED BY euka-ads-sync, NOT HERE. Each refresh is two multi-thousand
-     * row Euka exports; doing that inside this request left the next client
-     * view queued behind it and two in five timed out (2026-09-18). A client
-     * page is now a database read, and the figures are at most half an hour
-     * old. Every store is merged, because one creator's last-30-day GMV is
-     * their whole GMV across every shop they post for — reading only this
-     * brand's store is what put dashes where the staff screen had figures.
-     */
-    let tiers: TierMap = {};
-    try {
-      const { data: cacheRows } = await db.from('collab_share_euka_cache').select('handles');
-      for (const row of cacheRows ?? []) tiers = mergeTiers(tiers, (row.handles ?? {}) as TierMap);
-    } catch { /* leave the two columns empty rather than failing the page */ }
+    /* tier and L30 GMV (`tiers`, above) are REFRESHED BY euka-ads-sync, NOT HERE.
+       Each refresh is two multi-thousand row Euka exports; doing that inside
+       this request left the next client view queued behind it and two in five
+       timed out (2026-09-18). A client page is a database read, and the figures
+       are at most half an hour old. */
 
     /* ── the payload, built field by field ─────────────────────────────── */
     const data = brands.map((brand) => {
@@ -334,18 +396,34 @@ Deno.serve(async (req) => {
     });
 
     /* ── remember that somebody looked ─────────────────────────────────── */
-    /* The address is salted with this link's own fingerprint, so the same
-       visitor is recognisable within one link and nowhere else. */
-    const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0]!.trim();
-    await db.from('collab_share_views').insert({
-      link_id: link.id,
-      ip_hash: ip ? await sha256Hex(`${ip}:${link.token_hash}`) : null,
-      user_agent: (req.headers.get('user-agent') ?? '').slice(0, 200) || null,
-    });
-    await db.from('collab_share_links')
-      .update({ last_viewed_at: new Date().toISOString(), view_count: (link.view_count ?? 0) + 1 })
-      .eq('id', link.id);
+    /*
+     * AFTER THE ANSWER HAS GONE, and only for an OPEN. The page asks for a
+     * month by name when somebody clicks one, and again for each of the other
+     * months it fetches quietly in the background; counting those made one
+     * person opening a link look like thirteen. "A view count climbing far
+     * beyond one client is the only sign a shared secret has spread"
+     * (OPERATIONS), so it has to count visits, not clicks.
+     */
+    if (parsed.data.month === undefined) {
+      /* The address is salted with this link's own fingerprint, so the same
+         visitor is recognisable within one link and nowhere else. */
+      const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0]!.trim();
+      const ua = (req.headers.get('user-agent') ?? '').slice(0, 200) || null;
+      afterResponse((async () => {
+        await Promise.all([
+          (async () => db.from('collab_share_views').insert({
+            link_id: link.id,
+            ip_hash: ip ? await sha256Hex(`${ip}:${link.token_hash}`) : null,
+            user_agent: ua,
+          }))(),
+          db.from('collab_share_links')
+            .update({ last_viewed_at: new Date().toISOString(), view_count: (link.view_count ?? 0) + 1 })
+            .eq('id', link.id),
+        ]);
+      })());
+    }
 
+    const tDone = performance.now();
     return new Response(JSON.stringify({
       label: link.label,
       sections: {
@@ -361,7 +439,14 @@ Deno.serve(async (req) => {
       data,
     }), {
       status: 200,
-      headers: { ...corsHeaders(req), 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+      headers: {
+        ...corsHeaders(req),
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        /* Where the time went, for the browser's Network panel. Numbers only. */
+        'Server-Timing': `link;dur=${Math.round(tLink - t0)}, data;dur=${Math.round(tData - tLink)}, build;dur=${Math.round(tDone - tData)}`,
+        'Access-Control-Expose-Headers': 'Server-Timing',
+      },
     });
   } catch (e) {
     return json({ error: 'Something went wrong. Try again shortly.', detail: String((e as Error).message).slice(0, 200) }, 500, req);
