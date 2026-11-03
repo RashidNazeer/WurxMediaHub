@@ -175,7 +175,9 @@ Payment will be issued under **Net 7** payment terms, meaning payment will be se
 
 By providing TikTok Spark Ad Codes, the Creator grants the Brand permission to promote the published content through TikTok Spark Ads for the agreed campaign period.
 
-Any additional usage rights outside of TikTok Spark Ads must be agreed upon separately in writing.`),
+With the Creator's consent, the Brand and Wurx Media may use the published videos on other platforms, including **Meta (Facebook and Instagram)**, for the Brand's advertising and marketing purposes.
+
+Any additional usage rights beyond those described above must be agreed upon separately in writing.`),
   },
   {
     title: '8. Termination',
