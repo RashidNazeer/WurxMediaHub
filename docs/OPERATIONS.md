@@ -1681,6 +1681,16 @@ copy it again (DECISIONS says why). Links minted before that have no stored
 address; the screen's **Give it a new address** issues one and kills the old
 one, keeping the history. That is also the move when a link has spread.
 
+**Speed (2026-11-02).** The page fetches the link's other months quietly after it opens, so
+switching month is instant; the function reads the three tables it needs together and
+keeps them for a minute per isolate (the link itself is checked on every request, so
+revoking still bites at once); and the page asks Supabase to run the function in the
+database's own region (`VITE_SHARE_REGION`, default `ap-southeast-1`; set it to the
+project's region, or empty to switch the pin off). The response carries a
+`Server-Timing` header (link / data / build, in ms) for the browser's Network panel.
+**A view is now counted only when a link is OPENED**, not on each month click or
+background fetch, so `view_count` means visits.
+
 **Watching a link.** `collab_share_list()` carries `view_count` and
 `last_viewed_at`; `public.collab_share_views` holds one row per open, with the
 visitor address hashed and salted per link. A count climbing far beyond one
