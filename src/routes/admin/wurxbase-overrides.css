@@ -4337,3 +4337,11 @@
   .wurxbase-root .wx-cmp-cols { grid-template-columns: minmax(0, 1fr); }
   .wurxbase-root .wx-cmp-head { flex-wrap: wrap; }
 }
+
+/* Brands list: one more column, GMV, after Cost / Video. The vendored rule has
+   ten tracks; this has eleven. The phone layout sets its own grid with
+   !important, so it is unaffected. */
+.wurxbase-root.wurxbase-root .pc-bt-head,
+.wurxbase-root.wurxbase-root .pc-bt-row {
+  grid-template-columns: 2.4fr 0.95fr 0.95fr 0.95fr 0.95fr 1.15fr 0.6fr 0.8fr 0.95fr 0.95fr 28px;
+}
