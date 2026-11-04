@@ -180,66 +180,54 @@ export function compareMonths(rows, month, budgets, brand, helpers) {
 /* ─── the screen ───────────────────────────────────────────────────────── */
 
 const usd = (n) => `$${Math.round(n).toLocaleString('en-US')}`;
-const num = (n) => Math.round(n).toLocaleString('en-US');
 const pct = (n) => `${Math.round(n)}%`;
+const FIRST = 6;
 
-/** "up 12%", "new", or a dash. `good` says which direction is the happy one. */
-function Delta({ now, before, good = 'up', fmt = (n) => num(n), noPct = false }) {
-  if (before == null || now == null) return <span className="wx-cmp-d none">–</span>;
-  const diff = now - before;
-  if (diff === 0) return <span className="wx-cmp-d flat">no change</span>;
-  const up = diff > 0;
-  const tone = good === 'neutral' ? 'flat' : up === (good === 'up') ? 'good' : 'bad';
-  const rel =
-    before > 0 && !noPct
-      ? ` · ${up ? '+' : '−'}${Math.round(Math.abs(diff / before) * 100)}%`
-      : '';
+/**
+ * One creator: face, name, handle, and the single figure that matters for the
+ * column they are in (videos done, plus GMV when there is any to show).
+ */
+function PersonRow({ p, fig, Face }) {
+  const videos = fig.videos > 0 ? `${fig.delivered}/${fig.videos} videos` : 'No deal size';
   return (
-    <span className={`wx-cmp-d ${tone}`}>
-      {up ? '▲' : '▼'} {up ? '+' : '−'}
-      {fmt(Math.abs(diff))}
-      {rel}
-    </span>
+    <li className="wx-cmp-row">
+      {Face ? (
+        <Face handle={p.handle} name={p.name} size={36} />
+      ) : (
+        <span className="wx-cmp-initial">{(p.name || '?')[0].toUpperCase()}</span>
+      )}
+      <span className="wx-cmp-who">
+        <b>{p.name}</b>
+        {p.handle && <em>@{p.handle}</em>}
+      </span>
+      <span className="wx-cmp-fig">
+        <b>{videos}</b>
+        {fig.gmv > 0 && <em>{usd(fig.gmv)} GMV</em>}
+      </span>
+    </li>
   );
 }
 
-function Metric({ label, now, before, fmt, good, empty, noPct }) {
-  return (
-    <div className="wx-cmp-metric">
-      <span className="wx-cmp-lbl">{label}</span>
-      <span className="wx-cmp-now">{empty ? '–' : fmt(now)}</span>
-      <span className="wx-cmp-was">{empty ? 'no data' : `was ${fmt(before)}`}</span>
-      {!empty && <Delta now={now} before={before} fmt={fmt} good={good} noPct={noPct} />}
-    </div>
-  );
-}
-
-function PeopleList({ title, tone, hint, items, show }) {
+function PeopleList({ title, tone, items, figOf, Face }) {
   const [all, setAll] = useState(false);
-  const shown = all ? items : items.slice(0, 8);
+  const shown = all ? items : items.slice(0, FIRST);
   return (
     <section className={`wx-cmp-people ${tone}`}>
       <header>
+        <span className="wx-cmp-dot" aria-hidden />
         <h4>{title}</h4>
         <span className="wx-cmp-count">{items.length}</span>
       </header>
-      <p className="wx-cmp-hint">{hint}</p>
       {items.length === 0 ? (
         <p className="wx-cmp-none">Nobody.</p>
       ) : (
         <ul>
           {shown.map((p, i) => (
-            <li key={`${p.handle || p.name}-${i}`}>
-              <span className="wx-cmp-who">
-                <b>{p.name}</b>
-                {p.handle && <em>@{p.handle}</em>}
-              </span>
-              <span className="wx-cmp-fig">{show(p)}</span>
-            </li>
+            <PersonRow key={`${p.handle || p.name}-${i}`} p={p} fig={figOf(p)} Face={Face} />
           ))}
         </ul>
       )}
-      {items.length > 8 && (
+      {items.length > FIRST && (
         <button type="button" className="wx-cmp-more" onClick={() => setAll((v) => !v)}>
           {all ? 'Show fewer' : `Show all ${items.length}`}
         </button>
@@ -248,27 +236,18 @@ function PeopleList({ title, tone, hint, items, show }) {
   );
 }
 
-export function BrandMonthCompare({
-  brand,
-  month,
-  allTime,
-  rows,
-  budgets,
-  helpers,
-  monthLabel,
-}) {
+export function BrandMonthCompare({ brand, month, allTime, rows, budgets, helpers, monthLabel }) {
   const [open, setOpen] = useState(true);
   const cmp = useMemo(
-    () =>
-      allTime || !month ? null : compareMonths(rows || [], month, budgets, brand, helpers),
+    () => (allTime || !month ? null : compareMonths(rows || [], month, budgets, brand, helpers)),
     [rows, month, allTime, budgets, brand, helpers]
   );
   /* All Time has no "last month", so there is nothing honest to compare. */
   if (!cmp) return null;
 
-  const { cur, old } = cmp;
-  const noPrev = old.creators === 0;
+  const noPrev = cmp.old.creators === 0;
   const lbl = (k) => (monthLabel ? monthLabel(k) : k);
+  const Face = helpers && helpers.CreatorFace;
 
   return (
     <div className="wx-cmp" data-wx="month-compare">
@@ -278,15 +257,29 @@ export function BrandMonthCompare({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <span className="wx-cmp-title">
-          {lbl(cmp.month)} vs {lbl(cmp.prev)}
-          {cmp.month === new Date().toISOString().slice(0, 7) ? ' · month in progress' : ''}
+        <span className="wx-cmp-titles">
+          <span className="wx-cmp-title">
+            {lbl(cmp.month)} vs {lbl(cmp.prev)}
+            {cmp.month === new Date().toISOString().slice(0, 7) ? ' · month in progress' : ''}
+          </span>
+          <span className="wx-cmp-sub">
+            {noPrev
+              ? `No creators were hired in ${lbl(cmp.prev)}`
+              : `${cmp.stayed.length} of ${cmp.people.before} creators from ${lbl(cmp.prev)} are back`}
+          </span>
         </span>
-        <span className="wx-cmp-sub">
-          {noPrev
-            ? `No creators were hired in ${lbl(cmp.prev)}`
-            : `${cmp.stayed.length} of ${cmp.people.before} creators from ${lbl(cmp.prev)} are back${cmp.retention != null ? ` · ${pct(cmp.retention)} retained` : ''}`}
-        </span>
+        {!noPrev && cmp.retention != null && (
+          <span
+            className="wx-cmp-ret"
+            title={`${pct(cmp.retention)} of ${lbl(cmp.prev)}'s creators were hired again`}
+          >
+            <span className="wx-cmp-retbar">
+              <i style={{ width: `${Math.min(100, Math.max(0, cmp.retention))}%` }} />
+            </span>
+            <b>{pct(cmp.retention)}</b>
+            <em>retained</em>
+          </span>
+        )}
         <span className="wx-cmp-chev" aria-hidden>
           {open ? '▾' : '▸'}
         </span>
@@ -294,113 +287,33 @@ export function BrandMonthCompare({
 
       {open && (
         <>
-          <div className="wx-cmp-grid">
-            <Metric
-              label="Budget"
-              now={cur.budget}
-              before={old.budget}
-              fmt={usd}
-              empty={cur.budget === 0 && old.budget === 0}
-            />
-            <Metric
-              label="Allocated"
-              now={cur.allocated}
-              before={old.allocated}
-              fmt={usd}
-              empty={cur.creators === 0 && noPrev}
-            />
-            <Metric
-              label="Paid"
-              now={cur.paid}
-              before={old.paid}
-              fmt={usd}
-              empty={cur.creators === 0 && noPrev}
-            />
-            <Metric
-              label="Creators"
-              now={cur.creators}
-              before={old.creators}
-              fmt={num}
-              empty={cur.creators === 0 && noPrev}
-            />
-            <Metric
-              label="Videos committed"
-              now={cur.videos}
-              before={old.videos}
-              fmt={num}
-              empty={cur.creators === 0 && noPrev}
-            />
-            <Metric
-              label="Videos delivered"
-              now={cur.delivered}
-              before={old.delivered}
-              fmt={num}
-              empty={cur.creators === 0 && noPrev}
-            />
-            <Metric
-              label="Completion"
-              now={cur.completion}
-              before={old.completion}
-              fmt={pct}
-              noPct
-              empty={cur.videos === 0 && old.videos === 0}
-            />
-            <Metric
-              label="Cost / video"
-              now={cur.costPerVideo}
-              before={old.costPerVideo}
-              fmt={usd}
-              good="down"
-              empty={cur.videos === 0 || old.videos === 0}
-            />
-            <Metric
-              label="Views"
-              now={cur.views}
-              before={old.views}
-              fmt={num}
-              empty={cur.views === 0 && old.views === 0}
-            />
-            <Metric
-              label="GMV"
-              now={cur.gmv}
-              before={old.gmv}
-              fmt={usd}
-              empty={cur.gmv === 0 && old.gmv === 0}
-            />
-          </div>
-
           <div className="wx-cmp-cols">
             <PeopleList
-              title={`Working with us again`}
+              title="Back again"
               tone="stayed"
-              hint={`Hired in ${lbl(cmp.prev)} and in ${lbl(cmp.month)}`}
               items={cmp.stayed}
-              show={(p) =>
-                `${usd(p.before.allocated)} → ${usd(p.now.allocated)} · ${p.now.delivered}/${p.now.videos} videos`
-              }
+              figOf={(p) => p.now}
+              Face={Face}
             />
             <PeopleList
-              title="Not back this month"
+              title="Not back"
               tone="dropped"
-              hint={`Hired in ${lbl(cmp.prev)}, not in ${lbl(cmp.month)}`}
               items={cmp.dropped}
-              show={(p) =>
-                `${usd(p.before.allocated)} · ${p.before.delivered}/${p.before.videos} videos · ${usd(p.before.gmv)} GMV`
-              }
+              figOf={(p) => p.before}
+              Face={Face}
             />
             <PeopleList
-              title="New this month"
+              title="New"
               tone="joined"
-              hint={`Hired in ${lbl(cmp.month)}, not in ${lbl(cmp.prev)}`}
               items={cmp.joined}
-              show={(p) =>
-                `${usd(p.now.allocated)} · ${p.now.delivered}/${p.now.videos} videos`
-              }
+              figOf={(p) => p.now}
+              Face={Face}
             />
           </div>
           <p className="wx-cmp-foot">
-            Months are contract cycles (the month a creator was hired). Views and GMV are the
-            videos of that month's creators. "Back" means the same TikTok handle.
+            Back again: hired in {lbl(cmp.prev)} and {lbl(cmp.month)}. Not back: hired in{' '}
+            {lbl(cmp.prev)} only. New: hired in {lbl(cmp.month)} only. Same TikTok handle means
+            same creator.
           </p>
         </>
       )}
