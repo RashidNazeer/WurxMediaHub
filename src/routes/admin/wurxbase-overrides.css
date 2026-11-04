@@ -4246,3 +4246,94 @@
 .wurxbase-root.wurxbase-root .lb-fill {
   display: none !important;
 }
+
+/* ═══ THIS MONTH VS LAST (collab-month-compare.jsx) ═══════════════════════
+   Colours are the page's own tokens, so it follows light and dark with the rest
+   of the screen. Good/bad is never colour alone: every change carries an arrow
+   and a sign. */
+.wurxbase-root .wx-cmp {
+  margin-top: 14px;
+  border-radius: var(--radius-xl, 16px);
+  background: var(--wx-surface-1);
+  border: 1px solid var(--wx-glass-line);
+  overflow: hidden;
+}
+.wurxbase-root .wx-cmp-head {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 18px;
+  cursor: pointer;
+}
+.wurxbase-root .wx-cmp-head:focus-visible { outline: 2px solid var(--wx-text); outline-offset: -2px; }
+.wurxbase-root .wx-cmp-title { font-size: 15px; font-weight: 800; color: var(--wx-text); }
+.wurxbase-root .wx-cmp-sub { flex: 1; min-width: 0; font-size: 12.5px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-cmp-chev { color: var(--wx-text-muted); }
+.wurxbase-root .wx-cmp-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--wx-glass-line);
+  border-top: 1px solid var(--wx-glass-line);
+  border-bottom: 1px solid var(--wx-glass-line);
+}
+.wurxbase-root .wx-cmp-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px;
+  background: var(--wx-surface-1);
+  min-width: 0;
+}
+.wurxbase-root .wx-cmp-lbl {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--wx-text-muted);
+}
+.wurxbase-root .wx-cmp-now { font-size: 20px; font-weight: 800; color: var(--wx-text); }
+.wurxbase-root .wx-cmp-was { font-size: 12px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-cmp-d { font-size: 12px; font-weight: 700; }
+.wurxbase-root .wx-cmp-d.good { color: var(--wx-success); }
+.wurxbase-root .wx-cmp-d.bad { color: var(--wx-danger); }
+.wurxbase-root .wx-cmp-d.flat,
+.wurxbase-root .wx-cmp-d.none { color: var(--wx-text-muted); }
+.wurxbase-root .wx-cmp-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 16px 18px 6px;
+}
+.wurxbase-root .wx-cmp-people header { display: flex; align-items: center; gap: 8px; }
+.wurxbase-root .wx-cmp-people h4 { margin: 0; font-size: 13.5px; font-weight: 800; color: var(--wx-text); }
+.wurxbase-root .wx-cmp-count {
+  min-width: 22px; padding: 1px 7px; border-radius: 999px; text-align: center;
+  font-size: 11.5px; font-weight: 800; color: var(--wx-text);
+  background: color-mix(in srgb, var(--s) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--s) 45%, transparent);
+}
+.wurxbase-root .wx-cmp-people.stayed { --s: var(--wx-success); }
+.wurxbase-root .wx-cmp-people.dropped { --s: var(--wx-danger); }
+.wurxbase-root .wx-cmp-people.joined { --s: #0ea5e9; }
+.wurxbase-root .wx-cmp-hint { margin: 2px 0 8px; font-size: 11.5px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-cmp-none { margin: 0; font-size: 12.5px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-cmp-people ul { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; }
+.wurxbase-root .wx-cmp-people li {
+  display: flex; flex-direction: column; gap: 1px; padding: 7px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--wx-glass-line) 60%, transparent);
+}
+.wurxbase-root .wx-cmp-who { display: flex; gap: 6px; align-items: baseline; min-width: 0; }
+.wurxbase-root .wx-cmp-who b { font-size: 13px; color: var(--wx-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wurxbase-root .wx-cmp-who em { font-style: normal; font-size: 11.5px; color: var(--wx-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wurxbase-root .wx-cmp-fig { font-size: 11.5px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-cmp-more {
+  all: unset; cursor: pointer; margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--wx-text);
+  text-decoration: underline;
+}
+.wurxbase-root .wx-cmp-foot { margin: 0; padding: 8px 18px 14px; font-size: 11.5px; color: var(--wx-text-muted); }
+@media (max-width: 1100px) {
+  .wurxbase-root .wx-cmp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wurxbase-root .wx-cmp-cols { grid-template-columns: minmax(0, 1fr); }
+  .wurxbase-root .wx-cmp-head { flex-wrap: wrap; }
+}
