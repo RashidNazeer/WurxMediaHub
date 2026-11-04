@@ -31,6 +31,7 @@ import { supabase, selectAll, eukaJson, lastEukaFailure, collabProducts, brandSo
 import { godGet, godMoney, godDateParts, colTemplate, colStyle,
   visibleCols } from './godSettings';
 import { generateContractPdf, defaultContractFields, CONTRACT_SECTIONS, renderContractPdf } from './contractPdf';
+import { BrandMonthCompare } from '@/routes/admin/collab-month-compare'; /* WURX-ADDED */
 import { mergeContract, getBrandContract, saveBrandContract,
   fetchBrandContracts } from './brandContract';
 import './paidcollabs.css';
@@ -3704,6 +3705,14 @@ function BrandDrilldown({ brand, creators, brandCreators, allCreators, budgets, 
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="12" x2="12" y2="12"/><line x1="8" y1="16" x2="14" y2="16"/></svg>
           } />
       </div>
+
+      {/* WURX-ADDED · this month against last, and who came back. Lives in our
+          own file; see collab-month-compare.jsx. WURX-END */}
+      <BrandMonthCompare
+        brand={brand.brand} month={month} allTime={allTime}
+        rows={brandCreators || creators} budgets={budgets} monthLabel={monthLabel}
+        helpers={{ parseDealAmount, parseDealVideos, deliveredVideoCount, wxVideoTotals }}
+      />
 
       {/* ── EUKA-style top videos strip · this brand's best performers ── */}
       {(() => {
