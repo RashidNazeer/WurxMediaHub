@@ -66,11 +66,14 @@ export function godReset() { return godSet({ ...GOD_DEFAULTS }); }
 /* ── the columns of the Creators table ──
    Order and width live here so the header, the rows and the God Mode
    picker can never fall out of step with each other. */
+/* WURX-ADJUSTED · 2026-11-04: with Brand GMV added the table was too narrow for a
+   phone number or a long handle at 1745px ("+1(412) 583-91…"), while Name had
+   room to spare. Name gives up width to Contact and TikTok. WURX-END */
 export const CREATOR_COLS = [
   { id: 'num',       label: '#',         w: '46px'   },
-  { id: 'name',      label: 'Name',      w: '1.34fr' },
-  { id: 'contact',   label: 'Contact',   w: '0.86fr' },
-  { id: 'tiktok',    label: 'TikTok',    w: '0.88fr' },
+  { id: 'name',      label: 'Name',      w: '1.12fr' },
+  { id: 'contact',   label: 'Contact',   w: '1.02fr' },
+  { id: 'tiktok',    label: 'TikTok',    w: '1.06fr' },
   /* WURX-ADDED · Rashid, 2026-09-18: "can we add a new column of followers as
      well i hope we can get followers count for our creators". EUKA already
      carries it per handle — the brand page prints it under the handle — so this
@@ -85,6 +88,10 @@ export const CREATOR_COLS = [
   { id: 'deal',      label: 'Deal',      w: '0.78fr' },
   { id: 'rate',      label: 'Rate/Vid',  w: '0.54fr' },
   { id: 'l30',       label: 'L30 GMV',   w: '0.7fr'  },
+  /* WURX-ADDED · what THIS creator sold for THIS brand inside the chosen dates:
+     their posted videos' GMV, not Euka's last-30-days figure for the account.
+     Rashid, 2026-11-04. WURX-END */
+  { id: 'brandgmv',  label: 'Brand GMV', w: '0.7fr'  },
   { id: 'status',    label: 'Status',    w: '0.96fr' },
   { id: 'hiredby',   label: 'Hired By',  w: '0.68fr' },
 ];
@@ -93,7 +100,7 @@ export const COL_BY_LABEL = {
   '#': 'num', 'Name': 'name', 'Contact': 'contact', 'TikTok': 'tiktok',
   'Followers': 'followers',
   'Category': 'category', 'Brand': 'brand', 'Onboarded': 'onboarded',
-  'Deal': 'deal', 'Rate/Vid': 'rate', 'L30 GMV': 'l30',
+  'Deal': 'deal', 'Rate/Vid': 'rate', 'L30 GMV': 'l30', 'Brand GMV': 'brandgmv',
   'Status': 'status', 'Hired By': 'hiredby',
 };
 
