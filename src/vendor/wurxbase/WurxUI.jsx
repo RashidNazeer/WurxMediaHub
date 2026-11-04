@@ -2211,6 +2211,7 @@ export default function WurxUI({
             allCreators={creators}
             allTime={allTime}
             month={month}
+            periodRange={allTime ? null : wxRangeDates /* WURX-ADDED · for Brand GMV */}
             eukaL30={eukaL30}
             onSetCreatorStatus={onSetCreatorStatus}
             onUpdateCreator={onUpdateCreator}
@@ -7173,7 +7174,7 @@ function useGod() {
   return godGet();
 }
 
-function CreatorsTab({ creators, allCreators, allTime, month, eukaL30, onSetCreatorStatus, onUpdateCreator, onEditCreator }) {
+function CreatorsTab({ creators, allCreators, allTime, month, periodRange, eukaL30, onSetCreatorStatus, onUpdateCreator, onEditCreator }) {
   const [search, setSearch] = useState('');
   const [sel, setSel] = useState(() => new Set());
   const [videosCreatorId, setVideosCreatorId] = useState(null);
@@ -7412,7 +7413,7 @@ function CreatorsTab({ creators, allCreators, allTime, month, eukaL30, onSetCrea
        exports and the screen renders, so the three can never disagree. It is
        EUKA's last-30-days figure for that creator, not a month total and not
        the sheet's typed GMV — see the note in docs about the three sources. */
-    const headers = ['Name', 'TikTok', 'Brand', 'Category', 'Deal', 'Amount', 'Videos', 'L30 GMV', 'Payment Status', 'Hired By', 'Hired Date', 'Email', 'WhatsApp', 'PayPal', 'Zelle'];
+    const headers = ['Name', 'TikTok', 'Brand', 'Category', 'Deal', 'Amount', 'Videos', 'L30 GMV', 'Brand GMV', 'Payment Status', 'Hired By', 'Hired Date', 'Email', 'WhatsApp', 'PayPal', 'Zelle'];
     const esc = (v) => {
       const s = String(v ?? '');
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -7423,6 +7424,7 @@ function CreatorsTab({ creators, allCreators, allTime, month, eukaL30, onSetCrea
         c.name || '', c.tiktok_account || '', c.brand || '', c.category || '',
         c.deal || '', parseDealAmount(c.deal) || '', parseDealVideos(c.deal) || '',
         Math.round(creatorL30(c, eukaL30) || 0) || '',
+        (() => { const t = wxVideoTotals(wxClipToRange([c], periodRange)); return t.all.length ? Math.round(t.gmv) : ''; })(),
         c.payment_status || '', c.hired_by || '', c.hiring_date || '',
         c.email || '', fmtPhone(c.whatsapp_number), c.paypal || '', c.zelle || '',
       ].map(esc).join(','));
@@ -7849,6 +7851,7 @@ function CreatorsTab({ creators, allCreators, allTime, month, eukaL30, onSetCrea
                           euka={eukaL30}
                           deals={wxDealsNow.get(wxPersonKey(c)) || 0}
                           dealsMonth={wxDealsMonth}
+                          periodRange={periodRange}
                           onToggle={() => toggle(c.id)}
                           onOpen={() => setVideosCreatorId(c.id)}
                           onSetStatus={setStatus}
@@ -9419,7 +9422,7 @@ function KpiPill({ label, value, onClick, title }) {
 const cellCenter = { display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 0 };
 const cellEllipsis = { maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
-function CreatorsTabRow({ c, idx, selected, euka, deals, dealsMonth, onToggle, onOpen, onSetStatus }) {
+function CreatorsTabRow({ c, idx, selected, euka, deals, dealsMonth, periodRange, onToggle, onOpen, onSetStatus }) {
   const god = useGod();
   const amount = parseDealAmount(c.deal);
   const videoCount = parseDealVideos(c.deal);
@@ -9483,6 +9486,19 @@ function CreatorsTabRow({ c, idx, selected, euka, deals, dealsMonth, onToggle, o
       <div className="pc-cell" data-label="L30 GMV" style={{ ...cellCenter, ...colStyle("L30 GMV", god) }}>
         <EukaL30Cell euka={euka} c={c} handles={[c.tiktok_account, c.tiktok_account_2]} />
       </div>
+      {/* WURX-ADDED · this creator's GMV for this brand over the chosen dates.
+          The same sum the brand page shows (each video once), over this row's
+          videos clipped to the range. A dash when no video has synced: that is
+          "not reported", never $0. WURX-END */}
+      {(() => {
+        const t = wxVideoTotals(wxClipToRange([c], periodRange));
+        return (
+          <div className="pc-cell" data-label="Brand GMV" data-wx="brand-gmv" style={{ ...cellCenter, ...colStyle("Brand GMV", god) }}
+            title={t.all.length ? `${t.all.length} video${t.all.length === 1 ? '' : 's'} for ${c.brand || 'this brand'} in the chosen dates` : 'No synced videos in the chosen dates'}>
+            {t.all.length ? <span className="pc-metric pc-metric-gmv">{fmt$Exact(Math.round(t.gmv))}</span> : <span className="pc-handle">-</span>}
+          </div>
+        );
+      })()}
       <div className="pc-cell" data-label="Status" style={{ ...cellCenter, ...colStyle("Status", god) }} onClick={e => e.stopPropagation()}>
         <WurxStatusDropdown c={c} onChange={(patch) => onSetStatus(c.id, patch)} />
       </div>
