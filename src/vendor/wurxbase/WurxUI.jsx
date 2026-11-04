@@ -3723,7 +3723,7 @@ function BrandDrilldown({ brand, creators, brandCreators, allCreators, budgets, 
       <BrandMonthCompare
         brand={brand.brand} month={month} allTime={allTime}
         rows={brandCreators || creators} budgets={budgets} monthLabel={monthLabel}
-        helpers={{ parseDealAmount, parseDealVideos, deliveredVideoCount, wxVideoTotals }}
+        helpers={{ parseDealAmount, parseDealVideos, deliveredVideoCount, wxVideoTotals, CreatorFace }}
       />
 
       {/* ── EUKA-style top videos strip · this brand's best performers ── */}
