@@ -2373,9 +2373,16 @@ function BrandsTab({ creators, allCreators, budgets, refetchBudgets, month, allT
       row.usage = row.budget > 0 ? (row.allocated / row.budget) * 100 : 0;
       // Cost / video = allocated / committed videos (Afflix semantics · not delivered)
       row.costPerVideo = row.videos > 0 ? row.allocated / row.videos : 0;
+      /* WURX-ADDED · the brand page's own GMV card, so the two always agree:
+         the same function, over the same period-clipped rows the drilldown is
+         handed. `gmvKnown` is false when no video has synced, and that shows as
+         a dash, not $0. WURX-END */
+      const wxT = wxVideoTotals(wxClipToRange(row.list, periodRange));
+      row.gmv = wxT.gmv;
+      row.gmvKnown = wxT.all.length > 0;
     });
     return Object.values(map).sort((a, b) => b.allocated - a.allocated);
-  }, [creators, budgets, month, allTime]);
+  }, [creators, budgets, month, allTime, periodRange]);
 
   /* WURX-ADDED · BRANDS THAT EXIST, BUT NOT IN THE MONTH ON SCREEN.
      The list above is built from this month's creators and this month's budget
@@ -2627,11 +2634,12 @@ function BrandsTab({ creators, allCreators, budgets, refetchBudgets, month, allT
           onClick={() => {
             const esc = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
             const rows = [
-              ['Brand', 'Budget', 'Allocated', 'Paid', 'Remaining', 'Usage %', 'Videos done', 'Videos total', 'Creators', 'Cost per video'],
+              ['Brand', 'Budget', 'Allocated', 'Paid', 'Remaining', 'Usage %', 'Videos done', 'Videos total', 'Creators', 'Cost per video', 'GMV'],
               ...filteredBrands.map(r => [
                 r.brand, r.budget || 0, r.allocated, r.paid, r.remaining,
                 r.budget > 0 ? Math.round(r.usage) : '', r.videosDone, r.videos, r.creators,
                 r.costPerVideo > 0 ? Math.round(r.costPerVideo) : '',
+                r.gmvKnown ? Math.round(r.gmv) : '',
               ]),
             ];
             const csv = rows.map(row => row.map(esc).join(',')).join('\r\n');
@@ -2720,6 +2728,7 @@ function BrandsTab({ creators, allCreators, budgets, refetchBudgets, month, allT
               ['brand', 'Brand'], ['budget', 'Budget'], ['allocated', 'Allocated'],
               ['paid', 'Paid'], ['remaining', 'Remaining'], ['usage', 'Usage'],
               ['videosDone', 'Videos'], ['creators', 'Creators'], ['costPerVideo', 'Cost / Video'],
+              ['gmv', 'GMV'],
             ].map(([key, label]) => (
               <div
                 key={key}
@@ -2791,6 +2800,8 @@ function BrandsTab({ creators, allCreators, budgets, refetchBudgets, month, allT
               </div>
               <div className="pc-num" data-label="Creators">{r.creators}</div>
               <div className="pc-num pc-money" data-label="Cost / Vid">{r.costPerVideo > 0 ? fmt$Exact(Math.round(r.costPerVideo)) : <span className="pc-money muted">-</span>}</div>
+              {/* WURX-ADDED · GMV, as the brand page shows it */}
+              <div className="pc-num pc-money pc-green" data-label="GMV" data-wx="brand-gmv">{r.gmvKnown ? fmt$Exact(Math.round(r.gmv)) : <span className="pc-money muted">-</span>}</div>
               <div style={{ color: 'var(--pc-text-3)', textAlign: 'center', fontSize: 18 }}>›</div>
             </div>
             );
