@@ -4364,9 +4364,3 @@
   top: 4.75rem !important;
 }
 
-/* The padlock beside a Brand GMV figure that was frozen when its month ended. */
-.wurxbase-root.wurxbase-root [data-wx="brand-gmv"] .wx-frozen {
-  margin-left: 0.3rem;
-  opacity: 0.55;
-  flex: none;
-}

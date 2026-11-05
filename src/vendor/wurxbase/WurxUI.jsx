@@ -23,8 +23,9 @@ import { DateRangePicker as WxDateRangePicker } from '@/components/creator/DateR
 import { presetToRange as wxPresetToRange } from '@/lib/creator/date-range';
 import { clipCreatorsToRange as wxClipToRange, rangeHeading as wxRangeHeading } from '@/lib/admin/collab-period';
 import { brandLogo } from '@/lib/brand-logos';
-/* The Creators table's Brand GMV: one creator's total for one brand across ALL her
-   rows, frozen at month end. src/routes/admin/collab-month-gmv.ts. */
+/* The Creators and Brands tables' Brand GMV: what the videos one creator posted for one
+   brand in the chosen dates have made up to now, across ALL her rows. It is live and
+   never locked: those videos keep selling. src/routes/admin/collab-month-gmv.ts. */
 import { useMonthGmv as wxUseMonthGmv, describeGmv as wxDescribeGmv } from '@/routes/admin/collab-month-gmv';
 /* WURX-END */
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
@@ -3196,9 +3197,9 @@ function BrandFace({ brand }) {
 }
 
 function BrandDrilldown({ brand, creators, brandCreators, allCreators, budgets, refetchBudgets, month, allTime, periodKey, periodRange, eukaL30, currentUser, onBack, onSelectCreator, canEdit, canAdd, canDeleteBrand, onAddCreator, onEditCreator, onDeleteBrand, onSetCreatorStatus, onUpdateCreator, onDeleteCreator }) {
-  /* WURX-ADDED · Brand GMV beside L30 GMV: each creator's total for THIS brand over the
-     chosen dates, across all her rows, each video once, and the figure frozen at month
-     end when the dates are a closed calendar month. Same hook as the Creators table. WURX-END */
+  /* WURX-ADDED · Brand GMV beside L30 GMV: what the videos each creator posted for THIS
+     brand in the chosen dates have made so far, across all her rows, each video once.
+     Live, never locked. Same hook as the Creators table. WURX-END */
   const wxMonthGmv = wxUseMonthGmv(allCreators || brandCreators || creators, periodRange);
   /* WURX-ADDED · tell our ad figures which month is on screen.
 
@@ -4899,19 +4900,14 @@ function DrilldownCreatorRow({ c, idx, euka, deals, dealsMonth, monthGmv, open, 
       <div className="pc-cell pc-num" data-label="L30 GMV">
         <EukaL30Cell euka={euka} c={c} handles={[c.tiktok_account, c.tiktok_account_2]} />
       </div>
-      {/* WURX-ADDED · this creator's GMV for this brand over the chosen dates: all her rows,
-          each video once; for a whole closed month, the figure frozen when it ended (padlock).
-          A dash is no video in the period, never $0. WURX-END */}
+      {/* WURX-ADDED · what the videos this creator posted for this brand in the chosen dates
+          have made up to now: all her rows, each video once, live. A dash is no video in
+          the period, never $0. WURX-END */}
       {(() => {
         const g = monthGmv ? monthGmv.forRow(c) : null;
         return (
-          <div className="pc-cell pc-num" data-label="Brand GMV" data-wx="brand-gmv" data-frozen={g && g.frozen ? 'true' : undefined} title={wxDescribeGmv(g, c.brand)}>
+          <div className="pc-cell pc-num" data-label="Brand GMV" data-wx="brand-gmv" title={wxDescribeGmv(g, c.brand)}>
             {g && g.videos ? <span className="pc-metric pc-metric-gmv">{fmt$Exact(Math.round(g.gmv))}</span> : <span className="pc-handle">-</span>}
-            {g && g.frozen ? (
-              <svg className="wx-frozen" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Frozen at the end of the month">
-                <rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
-              </svg>
-            ) : null}
           </div>
         );
       })()}
@@ -7200,10 +7196,10 @@ function useGod() {
 }
 
 function CreatorsTab({ creators, allCreators, allTime, month, periodRange, eukaL30, onSetCreatorStatus, onUpdateCreator, onEditCreator }) {
-  /* WURX-ADDED · Brand GMV for every row: the creator's total for the brand over the
-     chosen dates, across all her rows (a September deal can carry an October video),
-     each video once, and the frozen month-end figure when the dates are a closed
-     calendar month. `allCreators` is every row, not just this month's. WURX-END */
+  /* WURX-ADDED · Brand GMV for every row: what the videos the creator posted for the
+     brand in the chosen dates have made up to now, across all her rows (a September
+     deal can carry an October video), each video once. Live, never locked.
+     `allCreators` is every row, not just this month's. WURX-END */
   const wxMonthGmv = wxUseMonthGmv(allCreators, periodRange);
   const [search, setSearch] = useState('');
   const [sel, setSel] = useState(() => new Set());
@@ -9516,24 +9512,18 @@ function CreatorsTabRow({ c, idx, selected, euka, deals, dealsMonth, monthGmv, o
       <div className="pc-cell" data-label="L30 GMV" style={{ ...cellCenter, ...colStyle("L30 GMV", god) }}>
         <EukaL30Cell euka={euka} c={c} handles={[c.tiktok_account, c.tiktok_account_2]} />
       </div>
-      {/* WURX-ADDED · this creator's GMV for this brand over the chosen dates: ALL her
-          rows for the brand, each video once, so a deal signed in September that
-          carries an October video counts in October. For a whole closed month it is
-          the figure FROZEN when the month ended (a padlock marks it), because a
-          video's GMV keeps rising after the month does. A dash means no video in
-          the period, never $0; the hover says how many videos, and how many sold
-          nothing or have not synced. WURX-END */}
+      {/* WURX-ADDED · what the videos this creator posted for this brand in the chosen
+          dates have made up to now: ALL her rows for the brand, each video once, so a
+          deal signed in September that carries an October video counts in October.
+          Live, because those videos keep selling. A dash means no video in the
+          period, never $0; the hover says how many videos, and how many sold nothing
+          or have not synced. WURX-END */}
       {(() => {
         const g = monthGmv.forRow(c);
         return (
-          <div className="pc-cell" data-label="Brand GMV" data-wx="brand-gmv" data-frozen={g && g.frozen ? 'true' : undefined} style={{ ...cellCenter, ...colStyle("Brand GMV", god) }}
+          <div className="pc-cell" data-label="Brand GMV" data-wx="brand-gmv" style={{ ...cellCenter, ...colStyle("Brand GMV", god) }}
             title={wxDescribeGmv(g, c.brand)}>
             {g && g.videos ? <span className="pc-metric pc-metric-gmv">{fmt$Exact(Math.round(g.gmv))}</span> : <span className="pc-handle">-</span>}
-            {g && g.frozen ? (
-              <svg className="wx-frozen" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Frozen at the end of the month">
-                <rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
-              </svg>
-            ) : null}
           </div>
         );
       })()}

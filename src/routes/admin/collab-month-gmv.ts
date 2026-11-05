@@ -1,57 +1,36 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getSupabase } from '@/lib/supabase';
-import {
-  creatorBrandGmv,
-  gmvKey,
-  monthHasEnded,
-  wholeMonthOf,
-  type CreatorBrandGmv,
-  type CreatorRow,
-  type DayRange,
-} from '@/lib/admin/month-gmv';
+import { creatorBrandGmv, gmvKey, type CreatorRow, type DayRange } from '@/lib/admin/month-gmv';
 
 /**
- * A CREATOR'S GMV FOR A BRAND SO FAR, for the Brand GMV column of the Creators
- * and Brands tables.
+ * WHAT THE VIDEOS A CREATOR POSTED FOR A BRAND IN THE CHOSEN DATES HAVE MADE, up to
+ * now. The Brand GMV column of the Creators and Brands tables.
  *
- * Rashid, 2026-11-05, corrected 2026-11-06: the total GMV a creator has made for
- * a brand through ALL her videos for that brand so far, "at the end of the month".
- * At the end of October that is everything her videos for the brand had made by
- * then, including a video she posted three months ago.
+ * Rashid, 2026-11-06: pick October and see the GMV the videos posted in October have
+ * made in total on today's date. It is LIVE and is never locked: those videos keep
+ * selling, so the figure rises until they stop. (A frozen month-end figure was built
+ * first and dropped: it answered a different question.)
  *
- * THIS FILE IS THE SEAM, AND IT IS OURS, like `collab-ad-figures.tsx`. The
- * vendored app never imports our Supabase client; it calls this hook with the
- * creators it already holds and reads figures back.
+ * THIS FILE IS THE SEAM, AND IT IS OURS, like `collab-ad-figures.tsx`. The vendored
+ * app never imports our Supabase client; it calls this hook with the creators it
+ * already holds and reads figures back. Nothing is fetched: each video's `revenue` is
+ * its lifetime GMV as the Euka and Reacher syncs last reported it.
  *
- * TWO SOURCES, and which one answers depends on what the calendar is showing:
- *
- *   FROZEN   when the picked range is exactly one WHOLE calendar month that has
- *            ended and has been frozen, the figure is the one written when the
- *            month closed (collab_gmv_snapshots). A video's GMV is a running total
- *            that every sync raises, so October's live figure keeps climbing
- *            after October ends; only the frozen one is the month-end number.
- *   LIVE     for anything else (the month still running, a week, a custom range,
- *            All Time) the figure is worked out here from the rows the screen
- *            holds, by the same calculation the database froze it with.
- *
- * A FROZEN MONTH WITH NO ROW FOR A CREATOR IS A FACT, NOT A GAP: she had no
- * dated video in that month when it closed, so the cell is a dash, even if a video
- * has since been dated into it. Her live figure is kept alongside, for the hover.
- *
- * IF THE FROZEN FIGURES CANNOT BE READ (the tables are not there yet, the network
- * dropped) the table falls back to the live figure rather than breaking.
+ * A video belongs to the month it was POSTED in, whichever of her rows holds it, so a
+ * September deal that carries an October video counts in October.
  */
 
-export interface MonthGmvCell extends CreatorBrandGmv {
-  /** True when `gmv` is the figure written when the month closed. */
-  frozen: boolean;
-  /** When it was written, for a frozen figure. */
-  frozenAt: string | null;
-  /** How it was written: on schedule, or late for a month that had already ended. */
-  source: string | null;
-  /** What the same videos add up to now, for a frozen figure. */
-  liveGmv: number | null;
+export interface MonthGmvCell {
+  brand: string;
+  /** Videos posted in the chosen dates (each once, across all her rows for the brand). */
+  videos: number;
+  /** Of them: with sales, synced at $0, and not synced at all. */
+  withSales: number;
+  zero: number;
+  unsynced: number;
+  /** Their GMV so far, unrounded. */
+  gmv: number;
+  /** What ALL her videos for the brand have made, however old, for the hover. */
+  allTimeGmv: number;
 }
 
 export interface MonthGmv {
@@ -59,142 +38,54 @@ export interface MonthGmv {
   forRow: (c: CreatorRow) => MonthGmvCell | null;
 }
 
-interface Frozen {
-  frozenAt: string;
-  source: string;
-  rows: Map<string, CreatorBrandGmv>;
-}
-
-const PAGE = 1000;
-
-async function readFrozen(month: string): Promise<Frozen | null> {
-  const db = getSupabase();
-  const { data: f, error } = await db
-    .from('collab_gmv_freezes')
-    .select('month, frozen_at, source')
-    .eq('month', month)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!f) return null;
-
-  const rows = new Map<string, CreatorBrandGmv>();
-  /* PostgREST answers at most 1000 rows, and a short answer would look like a creator
-     with no frozen row, so read every page. */
-  for (let from = 0; ; from += PAGE) {
-    const { data, error: e } = await db
-      .from('collab_gmv_snapshots')
-      .select('brand, creator_key, creator_name, videos, videos_with_sales, videos_zero, videos_unsynced, gmv, month_videos, month_gmv')
-      .eq('month', month)
-      .order('brand')
-      .order('creator_key')
-      .range(from, from + PAGE - 1);
-    if (e) throw new Error(e.message);
-    for (const r of data ?? []) {
-      rows.set(gmvKey(r.brand, r.creator_key), {
-        brand: r.brand,
-        creatorKey: r.creator_key,
-        creatorName: r.creator_name,
-        videos: r.videos,
-        withSales: r.videos_with_sales,
-        zero: r.videos_zero,
-        unsynced: r.videos_unsynced,
-        gmv: Number(r.gmv),
-        periodVideos: r.month_videos,
-        periodGmv: Number(r.month_gmv),
-      });
-    }
-    if (!data || data.length < PAGE) break;
-  }
-  return { frozenAt: String(f.frozen_at), source: String(f.source), rows };
-}
-
 export function useMonthGmv(allCreators: CreatorRow[], range: DayRange): MonthGmv {
   const from = range?.from ?? null;
   const to = range?.to ?? null;
-  const month = wholeMonthOf(from && to ? { from, to } : null);
-  const closed = month !== null && monthHasEnded(month);
 
-  const live = useMemo(
+  const inPeriod = useMemo(
     () => creatorBrandGmv(allCreators, from && to ? { from, to } : null),
     [allCreators, from, to],
   );
+  /* what all her videos for the brand have made, for the hover */
+  const everything = useMemo(() => creatorBrandGmv(allCreators, null), [allCreators]);
 
-  const frozen = useQuery({
-    queryKey: ['collab-gmv-frozen', month],
-    queryFn: () => readFrozen(month as string),
-    enabled: closed,
-    /* A frozen month never changes, so there is nothing to refresh. */
-    staleTime: 10 * 60_000,
-    retry: 1,
-  });
-
-  return useMemo<MonthGmv>(() => {
-    const snap = closed ? frozen.data ?? null : null;
-    return {
+  return useMemo<MonthGmv>(
+    () => ({
       forRow: (c) => {
         const key = gmvKey(c?.brand, c?.name);
-        const now = live.get(key) ?? null;
-        if (snap) {
-          const s = snap.rows.get(key);
-          return {
-            brand: s?.brand ?? now?.brand ?? String(c?.brand ?? '').trim(),
-            creatorKey: s?.creatorKey ?? now?.creatorKey ?? '',
-            creatorName: s?.creatorName ?? now?.creatorName ?? String(c?.name ?? '').trim(),
-            videos: s?.videos ?? 0,
-            withSales: s?.withSales ?? 0,
-            zero: s?.zero ?? 0,
-            unsynced: s?.unsynced ?? 0,
-            gmv: s?.gmv ?? 0,
-            periodVideos: s?.periodVideos ?? 0,
-            periodGmv: s?.periodGmv ?? 0,
-            frozen: true,
-            frozenAt: snap.frozenAt,
-            source: snap.source,
-            liveGmv: now?.gmv ?? 0,
-          };
-        }
-        return now
-          ? { ...now, frozen: false, frozenAt: null, source: null, liveGmv: null }
-          : null;
+        const g = inPeriod.get(key);
+        if (!g) return null;
+        return {
+          brand: g.brand,
+          videos: g.videos,
+          withSales: g.withSales,
+          zero: g.zero,
+          unsynced: g.unsynced,
+          gmv: g.gmv,
+          allTimeGmv: everything.get(key)?.gmv ?? g.gmv,
+        };
       },
-    };
-  }, [closed, frozen.data, live]);
+    }),
+    [inPeriod, everything],
+  );
 }
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
-const dayOf = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
 /**
  * The hover text for a Brand GMV cell: how many videos it is made of, in the three
- * kinds, and whether it is frozen or live. Plain words, because the figure is only
- * as useful as what a person can tell about where it came from.
+ * kinds, and that it is live. Plain words, because the figure is only as useful as
+ * what a person can tell about where it came from.
  */
 export function describeGmv(g: MonthGmvCell | null, brand: string): string {
   const name = brand || 'this brand';
-  if (!g || !g.videos) {
-    return g?.frozen
-      ? `No video for ${name} had been posted by the end of this month (frozen ${dayOf(g.frozenAt ?? '')}).`
-      : `No video for ${name} posted by the end of the chosen dates.`;
-  }
-  const parts = [`${g.videos} video${g.videos === 1 ? '' : 's'} for ${name}, all posted so far`];
+  if (!g || !g.videos) return `No video for ${name} posted in the chosen dates.`;
+  const parts = [`${g.videos} video${g.videos === 1 ? '' : 's'} for ${name} posted in the chosen dates`];
   const kinds: string[] = [];
   if (g.withSales) kinds.push(`${g.withSales} with sales`);
   if (g.zero) kinds.push(`${g.zero} at $0`);
   if (g.unsynced) kinds.push(`${g.unsynced} not synced`);
   if (kinds.length) parts.push(kinds.join(', '));
-  parts.push(
-    g.periodVideos
-      ? `${money(g.periodGmv)} from the ${g.periodVideos} posted in this period`
-      : 'none of it from videos posted in this period',
-  );
-  if (g.frozen && g.frozenAt) {
-    const late = g.source === 'backfill' ? ', frozen after the month had ended' : '';
-    const drift =
-      g.liveGmv !== null && Math.round(g.liveGmv) !== Math.round(g.gmv)
-        ? `. Now the same videos add up to ${money(g.liveGmv)}`
-        : '';
-    return `${parts.join(' · ')}. Month-end total, frozen ${dayOf(g.frozenAt)}${late}${drift}.`;
-  }
-  return `${parts.join(' · ')}. Live: it changes as videos sync.`;
+  parts.push(`${money(g.allTimeGmv)} from all her videos for ${name} so far`);
+  return `${parts.join(' · ')}. Live: it keeps rising as these videos sell.`;
 }

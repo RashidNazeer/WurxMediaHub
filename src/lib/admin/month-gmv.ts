@@ -1,49 +1,39 @@
 /**
- * WHAT A CREATOR HAS SOLD FOR A BRAND, SO FAR, as of the end of a month or range.
+ * WHAT THE VIDEOS A CREATOR POSTED FOR A BRAND HAVE MADE, over a month or any range of days.
  *
- * Rashid, 2026-11-05, corrected 2026-11-06: the total GMV a creator has made for
- * a brand through her videos for that brand, shown in the Creators and Brands
- * tables. At the end of October it is the sum of ALL the GMV her videos for the
- * brand have made so far: a sale can come from a video she posted three months ago.
+ * Rashid, 2026-11-06: pick October and see the GMV the videos posted in October have
+ * made in total, on today's date. It is live and never locked: those videos keep
+ * selling. Shown in the Brand GMV column of the Creators and Brands tables.
  *
- * THE FIGURE: every video she has posted for that brand on or before the END of
- * the range (whenever it was posted), each counted ONCE, at its GMV, across ALL of
- * her rows for the brand. The part of that posted INSIDE the range is kept
- * alongside (periodVideos, periodGmv), for the hover.
+ * THE FIGURE: every video she posted for that brand inside the range, each counted
+ * ONCE, at its GMV so far, across ALL of her rows for the brand. With no range (All
+ * Time) it is every video she has ever posted for the brand.
  *
- * WHERE THE GMV COMES FROM: each video's `revenue` is its lifetime GMV as the Euka
- * and Reacher syncs last reported it, so older videos are in the data and keep
- * growing. Nothing else is fetched.
+ * WHERE THE GMV COMES FROM: each video's `revenue` is its lifetime GMV as the Euka and
+ * Reacher syncs last reported it, so a video from three months ago is in the data and
+ * keeps growing. Nothing else is fetched.
  *
- * WHY ACROSS ALL HER ROWS, AND NOT THE ROW ON SCREEN. The Creators table has one
- * row per DEAL, and a deal belongs to the month it was signed. A creator hired in
- * September who posts in October has her October videos on a September row, which
- * is not in October's list at all; and a video that sits on two of her rows is
- * counted twice by any per-row sum. Both were measured on the live data (the
- * per-row column over-counted October by $22).
+ * WHY ACROSS ALL HER ROWS, AND NOT THE ROW ON SCREEN. The Creators table has one row
+ * per DEAL, and a deal belongs to the month it was signed. A creator hired in
+ * September who posts in October has her October videos on a September row, which is
+ * not in October's list at all; and a video that sits on two of her rows is counted
+ * twice by any per-row sum. Both were measured on the live data.
  *
  * THE RULES, each one the app's own so this cannot disagree with the brand cards:
  *   - a person is the trimmed, lower-cased name (the key the Creators tab already
  *     uses); a brand is the trimmed name, compared as written;
  *   - a video is its TikTok id (`/video/<digits>`), or its link when it has none;
- *   - where rows disagree about one video the LARGER figure wins, because a
- *     video's GMV only grows, so the larger is the newer sync;
- *   - GMV is the video's `revenue`, never negative, and not rounded here: round
- *     once, where it is shown.
+ *   - where rows disagree about one video the LARGER figure wins, because a video's
+ *     GMV only grows, so the larger is the newer sync;
+ *   - GMV is the video's `revenue`, never negative, and not rounded here: round once,
+ *     where it is shown.
  *
- * AND ONE RULE THE OLD PER-ROW COLUMN DID NOT HAVE. A video with NO posted date is
- * left out when there is a range, because it cannot be placed before its end. (The older
- * clip kept undated videos so a typed-in ad code would not vanish; they carry no
- * GMV today, so the totals agree, but "this month's GMV" must not include a video
- * nobody can date.) With no range at all (All Time) every video counts.
+ * A video with NO posted date is left out when there is a range, because it cannot be
+ * placed in one. With no range every video counts.
  *
  * THREE KINDS OF VIDEO ARE KEPT APART, because a zero is not a gap: WITH SALES
- * (revenue above 0), ZERO (synced and sold nothing) and UNSYNCED (no revenue
- * figure at all, which is "not reported" and must never be read as $0).
- *
- * THIS IS THE SAME CALCULATION AS `public.collab_month_gmv` IN THE DATABASE, which
- * is what freezes a month. `scripts/verify/collabs/check-month-gmv.mjs` runs both
- * over one set of rows and fails if they differ.
+ * (revenue above 0), ZERO (synced and sold nothing) and UNSYNCED (no revenue figure
+ * at all, which is "not reported" and must never be read as $0).
  */
 
 export type VideoEntry = { video?: unknown; date?: unknown; revenue?: unknown };
@@ -54,7 +44,7 @@ export interface CreatorBrandGmv {
   brand: string;
   creatorKey: string;
   creatorName: string;
-  /** Distinct videos posted on or before the end of the range. */
+  /** Distinct videos posted in the range. */
   videos: number;
   /** Of those, how many have sales (revenue above 0). */
   withSales: number;
@@ -62,12 +52,8 @@ export interface CreatorBrandGmv {
   zero: number;
   /** No revenue figure at all: not reported. */
   unsynced: number;
-  /** Total GMV of those videos so far, unrounded. */
+  /** Their GMV so far, unrounded. */
   gmv: number;
-  /** Of them, the videos posted inside the range itself. */
-  periodVideos: number;
-  /** And their GMV. */
-  periodGmv: number;
 }
 
 export const personKey = (name: unknown): string => String(name ?? '').trim().toLowerCase();
@@ -103,8 +89,8 @@ interface Seen {
 }
 
 /**
- * Every creator-at-a-brand over `range` (or all time when it is null), with the
- * month's GMV worked out across all of her rows.
+ * Every creator-at-a-brand over `range` (or all time when it is null), with the GMV of
+ * the videos posted in it worked out across all of her rows.
  */
 export function creatorBrandGmv(rows: CreatorRow[], range: DayRange): Map<string, CreatorBrandGmv> {
   /* group the entries by person and brand first, then dedupe within the group */
@@ -126,8 +112,7 @@ export function creatorBrandGmv(rows: CreatorRow[], range: DayRange): Map<string
       g = { brand, creatorKey, creatorName: String(c?.name ?? '').trim(), videos: new Map() };
       groups.set(k, g);
     } else {
-      /* the same name can be spelled with different case or spacing across rows; keep the
-         smallest, which is what the database's min() picks, so the two agree */
+      /* the same name can be spelled with different case or spacing across rows; keep the smallest */
       const n = String(c?.name ?? '').trim();
       if (n && n < g.creatorName) g.creatorName = n;
     }
@@ -136,7 +121,7 @@ export function creatorBrandGmv(rows: CreatorRow[], range: DayRange): Map<string
       const url = String((entry as VideoEntry)?.video ?? '').trim();
       if (!url) continue;
       const day = postedDay(entry);
-      if (range && !day) continue; // cannot be placed before a month end
+      if (range && !day) continue; // cannot be placed in a range
       const key = videoId(url) || url;
       const revenue = revenueOf(entry);
       const cur = g.videos.get(key);
@@ -151,30 +136,22 @@ export function creatorBrandGmv(rows: CreatorRow[], range: DayRange): Map<string
   }
 
   const out = new Map<string, CreatorBrandGmv>();
-  for (const [k, g] of groups) {
+  for (const g of groups.values()) {
     let videos = 0;
     let withSales = 0;
     let zero = 0;
     let unsynced = 0;
     let gmv = 0;
-    let periodVideos = 0;
-    let periodGmv = 0;
     for (const v of g.videos.values()) {
-      /* so far: everything posted up to the end of the range, however long ago */
-      if (range && !(v.day <= range.to)) continue;
+      if (range && !(v.day >= range.from && v.day <= range.to)) continue;
       videos += 1;
       if (v.revenue === null) unsynced += 1;
       else if (v.revenue > 0) withSales += 1;
       else zero += 1;
-      const amount = Math.max(v.revenue ?? 0, 0);
-      gmv += amount;
-      if (!range || v.day >= range.from) {
-        periodVideos += 1;
-        periodGmv += amount;
-      }
+      gmv += Math.max(v.revenue ?? 0, 0);
     }
     if (!videos) continue;
-    out.set(k, {
+    out.set(gmvKey(g.brand, g.creatorKey), {
       brand: g.brand,
       creatorKey: g.creatorKey,
       creatorName: g.creatorName,
@@ -183,31 +160,7 @@ export function creatorBrandGmv(rows: CreatorRow[], range: DayRange): Map<string
       zero,
       unsynced,
       gmv,
-      periodVideos,
-      periodGmv,
     });
   }
   return out;
-}
-
-/** The last day of a `YYYY-MM` month, as `YYYY-MM-DD`. */
-function lastDayOf(month: string): string {
-  const [y, m] = month.split('-').map(Number) as [number, number];
-  return `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`;
-}
-
-/**
- * `YYYY-MM` when the range is exactly one whole calendar month (the first day to
- * the last), otherwise null. Only a whole month can have a frozen figure.
- */
-export function wholeMonthOf(range: DayRange): string | null {
-  if (!range) return null;
-  const m = /^(\d{4}-\d{2})-01$/.exec(range.from);
-  if (!m) return null;
-  return range.to === lastDayOf(m[1]!) ? m[1]! : null;
-}
-
-/** Has this month ended? Months are UTC, the same as the job that freezes them. */
-export function monthHasEnded(month: string, now: Date = new Date()): boolean {
-  return month < now.toISOString().slice(0, 7);
 }
