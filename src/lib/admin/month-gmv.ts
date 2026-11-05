@@ -1,11 +1,19 @@
 /**
- * WHAT A CREATOR SOLD FOR A BRAND, over a month or any range of days.
+ * WHAT A CREATOR HAS SOLD FOR A BRAND, SO FAR, as of the end of a month or range.
  *
- * Rashid, 2026-11-05: the total GMV a creator has made for a certain brand
- * through her videos for that brand, shown in the Creators table.
+ * Rashid, 2026-11-05, corrected 2026-11-06: the total GMV a creator has made for
+ * a brand through her videos for that brand, shown in the Creators and Brands
+ * tables. At the end of October it is the sum of ALL the GMV her videos for the
+ * brand have made so far: a sale can come from a video she posted three months ago.
  *
- * THE FIGURE: every video she posted for that brand inside the range, each
- * counted ONCE, at its GMV, across ALL of her rows for the brand.
+ * THE FIGURE: every video she has posted for that brand on or before the END of
+ * the range (whenever it was posted), each counted ONCE, at its GMV, across ALL of
+ * her rows for the brand. The part of that posted INSIDE the range is kept
+ * alongside (periodVideos, periodGmv), for the hover.
+ *
+ * WHERE THE GMV COMES FROM: each video's `revenue` is its lifetime GMV as the Euka
+ * and Reacher syncs last reported it, so older videos are in the data and keep
+ * growing. Nothing else is fetched.
  *
  * WHY ACROSS ALL HER ROWS, AND NOT THE ROW ON SCREEN. The Creators table has one
  * row per DEAL, and a deal belongs to the month it was signed. A creator hired in
@@ -24,7 +32,7 @@
  *     once, where it is shown.
  *
  * AND ONE RULE THE OLD PER-ROW COLUMN DID NOT HAVE. A video with NO posted date is
- * left out of a month or a range, because it cannot be placed in one. (The older
+ * left out when there is a range, because it cannot be placed before its end. (The older
  * clip kept undated videos so a typed-in ad code would not vanish; they carry no
  * GMV today, so the totals agree, but "this month's GMV" must not include a video
  * nobody can date.) With no range at all (All Time) every video counts.
@@ -46,7 +54,7 @@ export interface CreatorBrandGmv {
   brand: string;
   creatorKey: string;
   creatorName: string;
-  /** Distinct videos posted in the range. */
+  /** Distinct videos posted on or before the end of the range. */
   videos: number;
   /** Of those, how many have sales (revenue above 0). */
   withSales: number;
@@ -54,8 +62,12 @@ export interface CreatorBrandGmv {
   zero: number;
   /** No revenue figure at all: not reported. */
   unsynced: number;
-  /** Total GMV, unrounded. */
+  /** Total GMV of those videos so far, unrounded. */
   gmv: number;
+  /** Of them, the videos posted inside the range itself. */
+  periodVideos: number;
+  /** And their GMV. */
+  periodGmv: number;
 }
 
 export const personKey = (name: unknown): string => String(name ?? '').trim().toLowerCase();
@@ -124,7 +136,7 @@ export function creatorBrandGmv(rows: CreatorRow[], range: DayRange): Map<string
       const url = String((entry as VideoEntry)?.video ?? '').trim();
       if (!url) continue;
       const day = postedDay(entry);
-      if (range && !day) continue; // cannot be placed in a month or a range
+      if (range && !day) continue; // cannot be placed before a month end
       const key = videoId(url) || url;
       const revenue = revenueOf(entry);
       const cur = g.videos.get(key);
@@ -145,13 +157,21 @@ export function creatorBrandGmv(rows: CreatorRow[], range: DayRange): Map<string
     let zero = 0;
     let unsynced = 0;
     let gmv = 0;
+    let periodVideos = 0;
+    let periodGmv = 0;
     for (const v of g.videos.values()) {
-      if (range && !(v.day >= range.from && v.day <= range.to)) continue;
+      /* so far: everything posted up to the end of the range, however long ago */
+      if (range && !(v.day <= range.to)) continue;
       videos += 1;
       if (v.revenue === null) unsynced += 1;
       else if (v.revenue > 0) withSales += 1;
       else zero += 1;
-      gmv += Math.max(v.revenue ?? 0, 0);
+      const amount = Math.max(v.revenue ?? 0, 0);
+      gmv += amount;
+      if (!range || v.day >= range.from) {
+        periodVideos += 1;
+        periodGmv += amount;
+      }
     }
     if (!videos) continue;
     out.set(k, {
@@ -163,6 +183,8 @@ export function creatorBrandGmv(rows: CreatorRow[], range: DayRange): Map<string
       zero,
       unsynced,
       gmv,
+      periodVideos,
+      periodGmv,
     });
   }
   return out;

@@ -29,10 +29,11 @@ import {
   wholeMonthOf,
 } from '../../../src/lib/admin/month-gmv.ts';
 
-const MIGRATION = fs.readFileSync(
-  new URL('../../../supabase/migrations/20261105085000_collab_month_gmv_snapshots.sql', import.meta.url),
-  'utf8',
-);
+/* the month figure was first built as "posted in the month", then corrected to "so far":
+   the second migration replaces the calculation, so a database gets both, in order */
+const MIGRATION = ['20261105085000_collab_month_gmv_snapshots.sql', '20261106000000_collab_gmv_cumulative.sql']
+  .map((f) => fs.readFileSync(new URL('../../../supabase/migrations/' + f, import.meta.url), 'utf8'))
+  .join('\n;\n');
 
 let failed = 0;
 let passed = 0;
@@ -86,6 +87,7 @@ const sqlMonth = async (db, month) => {
       brand: x.brand, creatorKey: x.creator_key, creatorName: x.creator_name,
       videos: x.videos, withSales: x.videos_with_sales, zero: x.videos_zero,
       unsynced: x.videos_unsynced, gmv: Number(x.gmv),
+      periodVideos: x.month_videos, periodGmv: Number(x.month_gmv),
     });
   }
   return m;
@@ -115,9 +117,11 @@ section('1. THE RULES, one at a time (browser code)');
   ];
   const m = jsMonth(rows, '2026-10');
   const ann = one(m, 'Aqua', 'Ann Lee');
-  ok(ann && Math.abs(ann.gmv - 215.5) < 1e-9, 'a creator\'s total adds her distinct videos once each, across all her rows', JSON.stringify(ann));
-  ok(ann && ann.videos === 3, 'the same video on two rows is one video, the larger figure (140, not 100 and not 240)', JSON.stringify(ann));
-  ok(ann && ann.gmv === 140 + 50.5 + 25, 'a September row\'s October video counts in October; a September-posted video does not');
+  ok(ann && Math.abs(ann.gmv - 1214.5) < 1e-9, 'her total adds ALL her distinct videos so far, once each, across all her rows (September\'s 999 included)', JSON.stringify(ann));
+  ok(ann && ann.videos === 4, 'the same video on two rows is one video, the larger figure (140, not 100 and not 240)', JSON.stringify(ann));
+  ok(ann && ann.periodVideos === 3 && ann.periodGmv === 140 + 50.5 + 25, 'of that, what was posted IN October is kept apart: a September row\'s October video counts, the September one does not');
+  ok(one(jsMonth(rows, '2026-09'), 'Aqua', 'Ann Lee')?.gmv === 999, 'at the end of September she had made 999: later videos are not in it');
+  ok(!one(jsMonth(rows, '2026-08'), 'Aqua', 'Ann Lee'), 'before her first video there is no entry');
   ok(one(m, 'Zest', 'Ann Lee')?.gmv === 10, 'another brand is its own total');
   ok(personKey(' ANN  lee ') !== personKey('ann lee'), 'only case and the ends of the name are normalised (inner spacing is a different person, as in the app)');
   const bo = one(m, 'Aqua', 'Bo Chan');
@@ -127,8 +131,11 @@ section('1. THE RULES, one at a time (browser code)');
   ok(one(m, 'Aqua', 'Di Fox')?.videos === 1 && one(m, 'Aqua', 'Di Fox')?.gmv === 30, 'a link with no id is its own key, so a repeat is one video');
   const all = creatorBrandGmv(rows, null);
   ok(one(all, 'Aqua', 'Bo Chan')?.videos === 4, 'with NO range (All Time) every video counts, dated or not');
-  ok(!creatorBrandGmv([{ brand: 'A', name: 'N', video_codes: [v(9, '2026-08-01', 5)] }], { from: '2026-10-01', to: '2026-10-31' }).size,
-    'a creator with nothing in the month has no entry at all (the table shows a dash, not $0)');
+  const old = creatorBrandGmv([{ brand: 'A', name: 'N', video_codes: [v(9, '2026-08-01', 5)] }], { from: '2026-10-01', to: '2026-10-31' }).get(gmvKey('A', 'N'));
+  ok(old && old.gmv === 5 && old.videos === 1 && old.periodVideos === 0 && old.periodGmv === 0,
+    'a creator who posted nothing in October still has her August video\'s GMV in October\'s total (it keeps earning)', JSON.stringify(old));
+  ok(!creatorBrandGmv([{ brand: 'A', name: 'N', video_codes: [v(9, '2026-11-02', 5)] }], { from: '2026-10-01', to: '2026-10-31' }).size,
+    'a creator whose first video is in November has no entry for October (the table shows a dash, not $0)');
   ok(!creatorBrandGmv([{ brand: '', name: 'N', video_codes: [v(9, '2026-10-01', 5)] }, { brand: 'A', name: '  ', video_codes: [v(9, '2026-10-01', 5)] }], null).size,
     'a row with no brand or no name belongs to nobody and is skipped');
 }
@@ -140,8 +147,8 @@ const same = (a, b) => {
   for (const [k, x] of a) {
     const y = b.get(k);
     if (!y) return `missing ${JSON.stringify(k)}`;
-    for (const f of ['videos', 'withSales', 'zero', 'unsynced', 'creatorName']) if (x[f] !== y[f]) return `${JSON.stringify(k)} ${f}: ${x[f]} vs ${y[f]}`;
-    if (Math.abs(x.gmv - y.gmv) > 0.005) return `${JSON.stringify(k)} gmv: ${x.gmv} vs ${y.gmv}`;
+    for (const f of ['videos', 'withSales', 'zero', 'unsynced', 'creatorName', 'periodVideos']) if (x[f] !== y[f]) return `${JSON.stringify(k)} ${f}: ${x[f]} vs ${y[f]}`;
+    for (const f of ['gmv', 'periodGmv']) if (Math.abs(x[f] - y[f]) > 0.005) return `${JSON.stringify(k)} ${f}: ${x[f]} vs ${y[f]}`;
   }
   return '';
 };
@@ -245,9 +252,16 @@ section('3. FREEZING');
     'THE FROZEN FIGURE DID NOT MOVE: still 150, the live one is 5050');
 
   /* the nightly job */
-  ok((await q('select public.collab_gmv_freeze_previous_month() n'))[0].n === 0, 'the nightly job finds last month already frozen and does nothing');
+  /* THE FREEZE WAITS A DAY: a sale made on the last day may not have synced by midnight.
+     "2nd of this month, 01:00 UTC" is when last month's turn comes; "1st, 23:59" is not. */
+  const second = "((date_trunc('month', now() at time zone 'UTC') at time zone 'UTC') + interval '1 day 1 hour')";
+  const firstLate = "((date_trunc('month', now() at time zone 'UTC') at time zone 'UTC') + interval '23 hours 59 minutes')";
+  ok((await q(`select public.collab_gmv_freeze_previous_month(${second}) n`))[0].n === 0, 'the nightly job finds last month already frozen and does nothing');
   await db.exec('delete from public.collab_gmv_snapshots; delete from public.collab_gmv_freezes;');
-  const again = (await q('select public.collab_gmv_freeze_previous_month() n'))[0].n;
+  const tooSoon = (await q(`select public.collab_gmv_freeze_previous_month(${firstLate}) n`))[0].n;
+  ok(tooSoon === 0 && (await q('select count(*)::int n from public.collab_gmv_freezes where month = $1', [prev]))[0].n === 0,
+    'on the 1st, even at 23:59, last month is NOT frozen yet (its last day has not had a day to sync)', `${tooSoon}`);
+  const again = (await q(`select public.collab_gmv_freeze_previous_month(${second}) n`))[0].n;
   ok(again === 3, 'after a missed night the next run freezes last month (repairing the gap)', `${again}`);
   ok((await q('select source from public.collab_gmv_freezes where month = $1', [prev]))[0].source === 'scheduled', 'and records it as scheduled');
 
@@ -259,8 +273,37 @@ section('3. FREEZING');
   /* the job is scheduled */
   const job = (await q("select * from cron.job where jobname = 'collab-gmv-freeze'"));
   ok(job.length === 1 && job[0].schedule === '20 0 * * *' && /collab_gmv_freeze_previous_month/.test(job[0].command), 'the nightly job is scheduled at 00:20 UTC');
-  await db.exec(MIGRATION);
-  ok((await q("select count(*)::int n from cron.job where jobname = 'collab-gmv-freeze'"))[0].n === 1, 'running the migration twice still leaves ONE job');
+  const before = (await q('select count(*)::int n from public.collab_gmv_snapshots'))[0].n;
+  await db.exec(fs.readFileSync(new URL('../../../supabase/migrations/20261106000000_collab_gmv_cumulative.sql', import.meta.url), 'utf8'));
+  ok((await q("select count(*)::int n from cron.job where jobname = 'collab-gmv-freeze'"))[0].n === 1, 'running the correction twice still leaves ONE job');
+  ok((await q('select count(*)::int n from public.collab_gmv_snapshots'))[0].n === before, 'and a second run does not clear or re-freeze anything');
+
+  /* THE UPGRADE: a month frozen under the first meaning (posted in the month) is frozen
+     again as "so far" by the correction, once, and flagged as late */
+  {
+    const old = new PGlite();
+    await old.exec(`
+      create role anon; create role authenticated; create role service_role;
+      create schema wurxbase;
+      create table wurxbase.creators (id bigint generated by default as identity primary key, brand text, name text, video_codes jsonb);
+      create function public.is_collabs_viewer() returns boolean language sql as 'select true';
+      create schema cron;
+      create table cron.job (jobid serial primary key, jobname text, schedule text, command text);
+      create function cron.schedule(n text, s text, c text) returns bigint language sql as 'insert into cron.job (jobname, schedule, command) values (n, s, c) returning jobid::bigint';
+      create function cron.unschedule(n text) returns boolean language sql as 'delete from cron.job where jobname = n returning true';
+    `);
+    await old.exec(fs.readFileSync(new URL('../../../supabase/migrations/20261105085000_collab_month_gmv_snapshots.sql', import.meta.url), 'utf8'));
+    const old2 = [{ brand: 'Aqua', name: 'Ann Lee', video_codes: [v(1, d(older, 5), 300), v(2, d(prev, 9), 50)] }];
+    for (const r of old2) await old.query('insert into wurxbase.creators (brand, name, video_codes) values ($1, $2, $3::jsonb)', [r.brand, r.name, JSON.stringify(r.video_codes)]);
+    await old.query('select public.collab_gmv_freeze($1, $2)', [prev, 'backfill']);
+    ok(Number((await old.query('select gmv from public.collab_gmv_snapshots')).rows[0].gmv) === 50, 'before the correction, last month was frozen as what was posted in it (50)');
+    await old.exec(fs.readFileSync(new URL('../../../supabase/migrations/20261106000000_collab_gmv_cumulative.sql', import.meta.url), 'utf8'));
+    const after = (await old.query('select * from public.collab_gmv_snapshots')).rows;
+    ok(after.length === 1 && Number(after[0].gmv) === 350 && after[0].videos === 2 && Number(after[0].month_gmv) === 50 && after[0].month_videos === 1,
+      'after it, the same month is frozen again as everything so far (300 from an older video + 50), with the in-month part kept (50)', JSON.stringify(after));
+    ok((await old.query('select source from public.collab_gmv_freezes')).rows[0].source === 'backfill', 'and it is flagged as frozen late');
+    await old.close();
+  }
 
   /* nothing here can be written to from a browser */
   const pol = await q("select polcmd from pg_policy where polrelid in ('public.collab_gmv_freezes'::regclass, 'public.collab_gmv_snapshots'::regclass)");

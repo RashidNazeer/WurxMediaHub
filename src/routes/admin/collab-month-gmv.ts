@@ -12,11 +12,13 @@ import {
 } from '@/lib/admin/month-gmv';
 
 /**
- * A CREATOR'S GMV FOR A BRAND, for the Brand GMV column of the Creators table.
+ * A CREATOR'S GMV FOR A BRAND SO FAR, for the Brand GMV column of the Creators
+ * and Brands tables.
  *
- * Rashid, 2026-11-05: the total GMV a creator has made for a certain brand
- * through her videos for that brand, "at the end of the month", shown in that
- * table.
+ * Rashid, 2026-11-05, corrected 2026-11-06: the total GMV a creator has made for
+ * a brand through ALL her videos for that brand so far, "at the end of the month".
+ * At the end of October that is everything her videos for the brand had made by
+ * then, including a video she posted three months ago.
  *
  * THIS FILE IS THE SEAM, AND IT IS OURS, like `collab-ad-figures.tsx`. The
  * vendored app never imports our Supabase client; it calls this hook with the
@@ -81,7 +83,7 @@ async function readFrozen(month: string): Promise<Frozen | null> {
   for (let from = 0; ; from += PAGE) {
     const { data, error: e } = await db
       .from('collab_gmv_snapshots')
-      .select('brand, creator_key, creator_name, videos, videos_with_sales, videos_zero, videos_unsynced, gmv')
+      .select('brand, creator_key, creator_name, videos, videos_with_sales, videos_zero, videos_unsynced, gmv, month_videos, month_gmv')
       .eq('month', month)
       .order('brand')
       .order('creator_key')
@@ -97,6 +99,8 @@ async function readFrozen(month: string): Promise<Frozen | null> {
         zero: r.videos_zero,
         unsynced: r.videos_unsynced,
         gmv: Number(r.gmv),
+        periodVideos: r.month_videos,
+        periodGmv: Number(r.month_gmv),
       });
     }
     if (!data || data.length < PAGE) break;
@@ -141,6 +145,8 @@ export function useMonthGmv(allCreators: CreatorRow[], range: DayRange): MonthGm
             zero: s?.zero ?? 0,
             unsynced: s?.unsynced ?? 0,
             gmv: s?.gmv ?? 0,
+            periodVideos: s?.periodVideos ?? 0,
+            periodGmv: s?.periodGmv ?? 0,
             frozen: true,
             frozenAt: snap.frozenAt,
             source: snap.source,
@@ -168,22 +174,27 @@ export function describeGmv(g: MonthGmvCell | null, brand: string): string {
   const name = brand || 'this brand';
   if (!g || !g.videos) {
     return g?.frozen
-      ? `No video posted for ${name} in this month when it was frozen (${dayOf(g.frozenAt ?? '')}).`
-      : 'No video posted for this brand in the chosen dates.';
+      ? `No video for ${name} had been posted by the end of this month (frozen ${dayOf(g.frozenAt ?? '')}).`
+      : `No video for ${name} posted by the end of the chosen dates.`;
   }
-  const parts = [`${g.videos} video${g.videos === 1 ? '' : 's'} for ${name}`];
+  const parts = [`${g.videos} video${g.videos === 1 ? '' : 's'} for ${name}, all posted so far`];
   const kinds: string[] = [];
   if (g.withSales) kinds.push(`${g.withSales} with sales`);
   if (g.zero) kinds.push(`${g.zero} at $0`);
   if (g.unsynced) kinds.push(`${g.unsynced} not synced`);
   if (kinds.length) parts.push(kinds.join(', '));
+  parts.push(
+    g.periodVideos
+      ? `${money(g.periodGmv)} from the ${g.periodVideos} posted in this period`
+      : 'none of it from videos posted in this period',
+  );
   if (g.frozen && g.frozenAt) {
     const late = g.source === 'backfill' ? ', frozen after the month had ended' : '';
     const drift =
       g.liveGmv !== null && Math.round(g.liveGmv) !== Math.round(g.gmv)
         ? `. Now the same videos add up to ${money(g.liveGmv)}`
         : '';
-    return `${parts.join(' · ')}. Month-end figure, frozen ${dayOf(g.frozenAt)}${late}${drift}.`;
+    return `${parts.join(' · ')}. Month-end total, frozen ${dayOf(g.frozenAt)}${late}${drift}.`;
   }
   return `${parts.join(' · ')}. Live: it changes as videos sync.`;
 }
