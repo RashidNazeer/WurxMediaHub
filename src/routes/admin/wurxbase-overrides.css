@@ -4355,3 +4355,11 @@
   display: flex;
   flex-direction: column;
 }
+
+/* The toast stack ("needs your approval", "Exported 12 creators") is pinned at
+   `top-4`, which is exactly where our header sits, and the header wins the
+   paint order: the toast showed through its glass as a blurred circle and a
+   smudge of text. Same cause and same remedy as the modals above. */
+.wurxbase-root.wurxbase-root [class*="tw-z-[2400]"][class*="tw-top-4"] {
+  top: 4.75rem !important;
+}
