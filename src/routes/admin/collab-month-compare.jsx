@@ -182,30 +182,26 @@ const thisMonthKey = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
-/** One month's cell: videos delivered out of committed, or a faint dash. */
-function Cell({ fig, now }) {
-  if (!fig) return <span className="wx-cmp-cell off" aria-label="not hired">–</span>;
-  const text = fig.videos > 0 ? `${fig.delivered}/${fig.videos}` : 'Hired';
-  return <span className={`wx-cmp-cell on${now ? ' now' : ''}`}>{text}</span>;
-}
-
-function Group({ title, tone, people, Face }) {
+/** One column: a title, a count, and the creators placed under that month. */
+function Column({ title, sub, tone, people, Face }) {
   const [all, setAll] = useState(false);
-  if (people.length === 0) return null;
   const shown = all ? people : people.slice(0, FIRST);
   return (
-    <div className={`wx-cmp-group ${tone}`}>
-      <div className="wx-cmp-grouphead">
+    <section className={`wx-cmp-col ${tone}`}>
+      <header>
         <span className="wx-cmp-dot" aria-hidden />
-        <b>{title}</b>
-        <span>{people.length}</span>
-      </div>
-      <ul>
-        {shown.map((p, i) => (
-          <li key={`${p.handle || p.name}-${i}`} className="wx-cmp-row">
-            <span className="wx-cmp-id">
+        <h4>{title}</h4>
+        <span className="wx-cmp-count">{people.length}</span>
+      </header>
+      <p className="wx-cmp-hint">{sub}</p>
+      {people.length === 0 ? (
+        <p className="wx-cmp-none">Nobody.</p>
+      ) : (
+        <ul>
+          {shown.map((p, i) => (
+            <li key={`${p.handle || p.name}-${i}`} className="wx-cmp-row">
               {Face ? (
-                <Face handle={p.handle} name={p.name} size={34} />
+                <Face handle={p.handle} name={p.name} size={36} />
               ) : (
                 <span className="wx-cmp-initial">{(p.name || '?')[0].toUpperCase()}</span>
               )}
@@ -213,19 +209,19 @@ function Group({ title, tone, people, Face }) {
                 <b>{p.name}</b>
                 {p.handle && <em>@{p.handle}</em>}
               </span>
-            </span>
-            {p.figs.map((f, j) => (
-              <Cell key={j} fig={f} now={j === 2} />
-            ))}
-          </li>
-        ))}
-      </ul>
+              <span className="wx-cmp-fig">
+                {p.fig.videos > 0 ? `${p.fig.delivered}/${p.fig.videos}` : '–'}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
       {people.length > FIRST && (
         <button type="button" className="wx-cmp-more" onClick={() => setAll((v) => !v)}>
           {all ? 'Show fewer' : `Show all ${people.length}`}
         </button>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -233,6 +229,7 @@ function Group({ title, tone, people, Face }) {
  * Always the real current month and the two before it, whatever the month
  * picker says: "if the current month is November it shows September, October
  * and November" (Rashid, 2026-11-05). `month` and `allTime` are not read.
+ * Laid out side by side, oldest to newest, so the page reads left to right.
  */
 export function BrandMonthCompare({ brand, rows, budgets, helpers, monthLabel }) {
   const [open, setOpen] = useState(true);
@@ -249,11 +246,9 @@ export function BrandMonthCompare({ brand, rows, budgets, helpers, monthLabel })
   const [c0, c1, c2] = columns;
   const empty = columns.every((c) => c.count === 0);
 
-  const sentence = (f) =>
-    f.total > 0
-      ? `${f.stayed} of ${short(f.from)}'s ${f.total} were hired again in ${short(f.to)}`
-      : null;
-  const notes = flows.map(sentence).filter(Boolean);
+  const notes = flows
+    .filter((f) => f.total > 0)
+    .map((f) => `${f.stayed} of ${short(f.from)}'s ${f.total} were hired again in ${short(f.to)}`);
 
   return (
     <div className="wx-cmp" data-wx="month-compare">
@@ -271,47 +266,37 @@ export function BrandMonthCompare({ brand, rows, budgets, helpers, monthLabel })
 
       {open &&
         (empty ? (
-          <p className="wx-cmp-none">No creators were hired in the last three months.</p>
+          <p className="wx-cmp-none pad">No creators were hired in the last three months.</p>
         ) : (
           <>
             {notes.length > 0 && <p className="wx-cmp-notes">{notes.join(' · ')}</p>}
-
-            <div className="wx-cmp-grid" role="table">
-              <div className="wx-cmp-colhead" role="row">
-                <span />
-                {columns.map((c, i) => (
-                  <span key={c.month} className={i === 2 ? 'now' : ''} role="columnheader">
-                    <b>{short(c.month)}</b>
-                    <small>
-                      {c.count} hired{i === 2 ? ' so far' : ''}
-                    </small>
-                  </span>
-                ))}
-              </div>
-
-              <Group
-                title={`With us in ${short(c2.month)}`}
-                tone="stayed"
-                people={c2.people}
-                Face={Face}
-              />
-              <Group
-                title={`Left after ${short(c1.month)}`}
-                tone="dropped"
-                people={c1.people}
-                Face={Face}
-              />
-              <Group
+            <div className="wx-cmp-cols">
+              <Column
                 title={`Left after ${short(c0.month)}`}
+                sub={`Hired in ${lbl(c0.month)}, not since`}
                 tone="dropped"
                 people={c0.people}
                 Face={Face}
               />
+              <Column
+                title={`Left after ${short(c1.month)}`}
+                sub={`Hired in ${lbl(c1.month)}, not in ${lbl(c2.month)}`}
+                tone="dropped"
+                people={c1.people}
+                Face={Face}
+              />
+              <Column
+                title={`With us in ${short(c2.month)}`}
+                sub={`Hired in ${lbl(c2.month)} so far`}
+                tone="stayed"
+                people={c2.people}
+                Face={Face}
+              />
             </div>
             <p className="wx-cmp-foot">
-              Each creator is listed once, under the latest month they were hired. A number is
-              videos delivered out of committed; a dash means not hired that month. Same TikTok
-              handle means same creator.
+              Each creator is listed once, under the latest month they were hired. The number is
+              videos delivered out of committed in that month. Same TikTok handle means same
+              creator.
             </p>
           </>
         ))}
