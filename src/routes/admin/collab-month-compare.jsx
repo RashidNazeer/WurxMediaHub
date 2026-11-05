@@ -143,6 +143,15 @@ export function compareMonths(rows, month, budgets, brand, helpers) {
     return { videos: s.videos, delivered: s.delivered, gmv: s.gmv };
   };
 
+  /* Totally new: no hire in any earlier month at all (not only the two shown),
+     so someone back after a long gap is not "new". */
+  const before = index(
+    rows.filter((c) => {
+      const mk = String(c.hiring_date || '').slice(0, 7);
+      return mk && mk < month;
+    })
+  );
+
   /* Walk from the newest month back; a person already placed later is skipped. */
   const columns = months.map((mk, i) => ({ month: mk, i, people: [], count: idx[i].people.length }));
   for (let i = 2; i >= 0; i--) {
@@ -154,6 +163,7 @@ export function compareMonths(rows, month, budgets, brand, helpers) {
         handle: p.handle,
         trail,
         returning: trail.slice(0, i).some(Boolean),
+        fresh: i === 2 && !matchIn(before, p),
         fig: figures(p),
         /* What they did in each of the three months, or null where not hired. */
         figs: idx.map((ix, j) => (trail[j] ? figures(j === i ? p : matchIn(ix, p)) : null)),
@@ -161,6 +171,12 @@ export function compareMonths(rows, month, budgets, brand, helpers) {
     });
     columns[i].people.sort((x, y) => y.fig.gmv - x.fig.gmv);
   }
+
+  /* Totally new: this month's creators with no hire in any earlier month at all
+     (not only the two shown), so someone back after a long gap is not "new". */
+  const fresh = columns[2].people.filter((p) => p.fresh);
+  columns[2].people = columns[2].people.filter((p) => !p.fresh);
+  columns[3] = { month, i: 3, count: fresh.length, people: fresh };
 
   /* Of the people hired in one month, how many were hired again the next. */
   const flow = (a, b) => {
@@ -243,8 +259,8 @@ export function BrandMonthCompare({ brand, rows, budgets, helpers, monthLabel })
   const short = (k) => lbl(k).split(' ')[0];
   const Face = helpers && helpers.CreatorFace;
   const { columns, flows } = cmp;
-  const [c0, c1, c2] = columns;
-  const empty = columns.every((c) => c.count === 0);
+  const [c0, c1, c2, c3] = columns;
+  const empty = columns.every((c) => c.count === 0) && c2.people.length === 0;
 
   const notes = flows
     .filter((f) => f.total > 0)
@@ -286,10 +302,17 @@ export function BrandMonthCompare({ brand, rows, budgets, helpers, monthLabel })
                 Face={Face}
               />
               <Column
-                title={`With us in ${short(c2.month)}`}
-                sub={`Hired in ${lbl(c2.month)} so far`}
+                title={`Back in ${short(c2.month)}`}
+                sub={`Hired in ${lbl(c2.month)}, and before`}
                 tone="stayed"
                 people={c2.people}
+                Face={Face}
+              />
+              <Column
+                title={`New in ${short(c2.month)}`}
+                sub={`First time hired, ${lbl(c2.month)}`}
+                tone="fresh"
+                people={c3.people}
                 Face={Face}
               />
             </div>

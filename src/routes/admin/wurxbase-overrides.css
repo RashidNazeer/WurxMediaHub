@@ -4268,7 +4268,7 @@
 /* Three columns side by side, oldest to newest. */
 .wurxbase-root .wx-cmp-notes { margin: 0; padding: 0 20px 12px; font-size: 13px; color: var(--wx-text-muted); }
 .wurxbase-root .wx-cmp-cols {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0 16px 8px;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 0 16px 8px;
 }
 .wurxbase-root .wx-cmp-col {
   min-width: 0; padding: 14px 14px 10px; border-radius: 14px; --s: var(--wx-text-muted);
@@ -4276,6 +4276,7 @@
 }
 .wurxbase-root .wx-cmp-col.stayed { --s: var(--wx-success); background: color-mix(in srgb, var(--wx-success) 8%, var(--wx-glass-well, transparent)); }
 .wurxbase-root .wx-cmp-col.dropped { --s: var(--wx-danger); }
+.wurxbase-root .wx-cmp-col.fresh { --s: var(--wx-accent, #4f7cff); background: color-mix(in srgb, var(--wx-accent, #4f7cff) 9%, var(--wx-glass-well, transparent)); }
 .wurxbase-root .wx-cmp-col header { display: flex; align-items: center; gap: 8px; }
 .wurxbase-root .wx-cmp-col h4 { margin: 0; flex: 1; font-size: 14px; font-weight: 800; color: var(--wx-text); }
 .wurxbase-root .wx-cmp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--s); }
@@ -4308,6 +4309,9 @@
 .wurxbase-root .wx-cmp-more:focus-visible { outline: 2px solid var(--wx-text); outline-offset: 2px; }
 .wurxbase-root .wx-cmp-foot { margin: 0; padding: 8px 20px 14px; font-size: 11.5px; color: var(--wx-text-muted); }
 @media (max-width: 1100px) {
+  .wurxbase-root .wx-cmp-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
   .wurxbase-root .wx-cmp-cols { grid-template-columns: minmax(0, 1fr); }
 }
 
