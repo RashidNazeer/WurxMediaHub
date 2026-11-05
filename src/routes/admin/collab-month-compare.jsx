@@ -192,6 +192,8 @@ export function compareMonths(rows, month, budgets, brand, helpers) {
 
 const FIRST = 8;
 
+const usd = (n) => `$${Math.round(n).toLocaleString('en-US')}`;
+
 /** The real current month, `YYYY-MM`. The comparison always ends here. */
 const thisMonthKey = () => {
   const d = new Date();
@@ -226,7 +228,9 @@ function Column({ title, sub, tone, people, Face }) {
                 {p.handle && <em>@{p.handle}</em>}
               </span>
               <span className="wx-cmp-fig">
-                {p.fig.videos > 0 ? `${p.fig.delivered}/${p.fig.videos}` : '–'}
+                <b>{p.fig.videos > 0 ? `${p.fig.delivered}/${p.fig.videos}` : '–'}</b>
+                {/* No GMV reported is a dash, never $0. */}
+                <em>{p.fig.gmv > 0 ? usd(p.fig.gmv) : '–'}</em>
               </span>
             </li>
           ))}
@@ -242,14 +246,14 @@ function Column({ title, sub, tone, people, Face }) {
 }
 
 /**
- * Always the real current month and the two before it, whatever the month
- * picker says: "if the current month is November it shows September, October
- * and November" (Rashid, 2026-11-05). `month` and `allTime` are not read.
+ * The picked month and the two before it (Oct picked: Aug, Sep, Oct), as
+ * Rashid asked on 2026-11-05. With All Time picked there is no month to follow,
+ * so it falls back to the real current month.
  * Laid out side by side, oldest to newest, so the page reads left to right.
  */
-export function BrandMonthCompare({ brand, rows, budgets, helpers, monthLabel }) {
+export function BrandMonthCompare({ brand, month, allTime, rows, budgets, helpers, monthLabel }) {
   const [open, setOpen] = useState(true);
-  const anchor = thisMonthKey();
+  const anchor = !allTime && /^\d{4}-\d{2}$/.test(String(month || '')) ? month : thisMonthKey();
   const cmp = useMemo(
     () => compareMonths(rows || [], anchor, budgets, brand, helpers),
     [rows, anchor, budgets, brand, helpers]
@@ -317,9 +321,9 @@ export function BrandMonthCompare({ brand, rows, budgets, helpers, monthLabel })
               />
             </div>
             <p className="wx-cmp-foot">
-              Each creator is listed once, under the latest month they were hired. The number is
-              videos delivered out of committed in that month. Same TikTok handle means same
-              creator.
+              Each creator is listed once, under the latest month they were hired. On the right:
+              videos delivered out of committed, then GMV, both for the month they are listed
+              under. A dash means none reported. Same TikTok handle means same creator.
             </p>
           </>
         ))}
