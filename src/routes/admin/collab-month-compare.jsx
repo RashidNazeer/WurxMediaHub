@@ -246,14 +246,28 @@ function Column({ title, sub, tone, people, Face }) {
 }
 
 /**
+ * The month the comparison ends on, taken from what the calendar shows. A range
+ * that crosses months (Last 30 days, Last 6 months) has no single month for the
+ * contract, but it does have an END, and that is the month the reader is looking
+ * at: Oct 6 - Nov 4 ends in November. All Time has no calendar, so it is today.
+ */
+const MONTH_KEY = /^\d{4}-\d{2}$/;
+const anchorMonth = ({ month, allTime, periodRange }) => {
+  if (allTime) return thisMonthKey();
+  const end = String((periodRange && periodRange.to) || '').slice(0, 7);
+  if (MONTH_KEY.test(end)) return end;
+  return MONTH_KEY.test(String(month || '')) ? month : thisMonthKey();
+};
+
+/**
  * The picked month and the two before it (Oct picked: Aug, Sep, Oct), as
  * Rashid asked on 2026-11-05. With All Time picked there is no month to follow,
  * so it falls back to the real current month.
  * Laid out side by side, oldest to newest, so the page reads left to right.
  */
-export function BrandMonthCompare({ brand, month, allTime, rows, budgets, helpers, monthLabel }) {
+export function BrandMonthCompare({ brand, month, allTime, periodRange, rows, budgets, helpers, monthLabel }) {
   const [open, setOpen] = useState(true);
-  const anchor = !allTime && /^\d{4}-\d{2}$/.test(String(month || '')) ? month : thisMonthKey();
+  const anchor = anchorMonth({ month, allTime, periodRange });
   const cmp = useMemo(
     () => compareMonths(rows || [], anchor, budgets, brand, helpers),
     [rows, anchor, budgets, brand, helpers]
