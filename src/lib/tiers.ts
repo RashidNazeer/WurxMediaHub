@@ -25,6 +25,7 @@ export const ROLE_LABEL: Record<AppRole, string> = {
   affiliate_team_lead: 'Affiliate Team Lead',
   operations_lead: 'Operations Lead',
   ads_manager: 'Ads Manager',
+  apc_viewer: 'APC (view only)',
 };
 
 export const TIER_LABEL: Record<CreatorTier, string> = {

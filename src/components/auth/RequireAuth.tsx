@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth, HOME_FOR_ROLE, type AppRole } from '@/lib/auth/auth-context';
 import { RouteFallback } from '@/components/layout/RouteFallback';
+import { ForcePasswordChange } from '@/components/auth/ForcePasswordChange';
 
 /**
  * Route guard.
@@ -14,8 +16,9 @@ import { RouteFallback } from '@/components/layout/RouteFallback';
  * because every query underneath is still refused by row level security.
  */
 export function RequireAuth({ allow }: { allow?: readonly AppRole[] }) {
-  const { status, claims } = useAuth();
+  const { status, claims, user } = useAuth();
   const location = useLocation();
+  const [changed, setChanged] = useState(false);
 
   // Still reading the stored session. Showing the sign-in page here would make
   // every reload flash "signed out" before settling.
@@ -41,6 +44,16 @@ export function RequireAuth({ allow }: { allow?: readonly AppRole[] }) {
 
   if (allow && claims && !allow.includes(claims.role)) {
     return <Navigate to={HOME_FOR_ROLE[claims.role]} replace />;
+  }
+
+  /* An APC viewer on a password somebody else chose must pick their own first.
+     Only that role: nobody else is ever given a generated password. */
+  if (
+    claims?.role === 'apc_viewer' &&
+    user?.user_metadata?.must_change_password === true &&
+    !changed
+  ) {
+    return <ForcePasswordChange onDone={() => setChanged(true)} />;
   }
 
   return <Outlet />;

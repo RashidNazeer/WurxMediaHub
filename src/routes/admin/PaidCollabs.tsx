@@ -5,6 +5,7 @@ import { isCollabsOnlyRole, useAuth } from '@/lib/auth/auth-context';
 import { useProfile } from '@/lib/auth/useProfile';
 import { wurxbaseSession } from '@/lib/wurxbase-identity';
 import { useWurxbaseIdentity } from '@/lib/useWurxbaseIdentity';
+import { setApcViewer } from '@/vendor/wurxbase/supabaseClient';
 import { useTheme } from '@/components/theme/theme-context';
 import { useSuspendSmoothScroll } from '@/lib/motion';
 // Both win on specificity rather than on order. See the header of each file:
@@ -152,6 +153,10 @@ export function PaidCollabs() {
   const { data: profile, isPending: profilePending } = useProfile();
   /* Their own role and overrides where we can find them; our mapping if not. */
   const identity = useWurxbaseIdentity();
+  /* An APC viewer's queries are pointed at brand-scoped views. Set BEFORE the
+     app mounts (it waits on `identityReady`), and re-set on every render of
+     this layout so a role change cannot leave the flag stale. */
+  setApcViewer(profile?.role === 'apc_viewer');
   useLayoutEffect(() => {
     if (!user?.id) return;
     try {

@@ -25,6 +25,11 @@ export const ROLES = [
   /* Ads Manager was the third read-only role until 2026-09-15, when Rashid
      made it full staff. See STAFF_ROLES. */
   'ads_manager',
+  /* APC viewer, added 2026-11-05: a brand's account manager. Read-only, and
+     only for the brands assigned in `wurxbase.apc_brand_access`. Not staff, and
+     NOT in `is_collabs_viewer()`: it reads through brand-scoped views that
+     leave the contact and payment columns out. See 20261105090100. */
+  'apc_viewer',
 ] as const;
 export type AppRole = (typeof ROLES)[number];
 
@@ -57,6 +62,10 @@ export const isStaffRole = (r: AppRole | null | undefined): boolean =>
 export const COLLABS_ONLY_ROLES = [
   'affiliate_team_lead',
   'operations_lead',
+  /* The UI treats an APC viewer like the others (Paid Collabs only, nothing
+     exportable). What they can READ is a different, narrower thing: the
+     database gives them brand-scoped views, not the tables. */
+  'apc_viewer',
 ] as const satisfies readonly AppRole[];
 
 export const isCollabsOnlyRole = (r: AppRole | null | undefined): boolean =>
@@ -147,6 +156,7 @@ export const HOME_FOR_ROLE: Record<AppRole, string> = {
      dashboard, and they cannot read anything it is made of. */
   affiliate_team_lead: '/admin/collabs/brands',
   operations_lead: '/admin/collabs/brands',
+  apc_viewer: '/admin/collabs/brands',
 };
 
 const isRole = (v: unknown): v is AppRole =>
