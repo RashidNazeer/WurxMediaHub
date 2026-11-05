@@ -57,6 +57,7 @@ const APC_VIEWS = {
 };
 let apcViewer = false;
 export const setApcViewer = (on) => { apcViewer = Boolean(on); };
+export const isApcViewer = () => apcViewer;
 const tableFor = (table) => (apcViewer && APC_VIEWS[table]) || table;
 
 export const supabase = {

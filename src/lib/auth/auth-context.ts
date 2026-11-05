@@ -156,7 +156,7 @@ export const HOME_FOR_ROLE: Record<AppRole, string> = {
      dashboard, and they cannot read anything it is made of. */
   affiliate_team_lead: '/admin/collabs/brands',
   operations_lead: '/admin/collabs/brands',
-  apc_viewer: '/admin/collabs/brands',
+  apc_viewer: '/admin/apc',
 };
 
 const isRole = (v: unknown): v is AppRole =>

@@ -26,6 +26,9 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 
 const Brands = z.array(z.string().trim().min(1).max(200)).min(1, 'Assign at least one brand').max(100);
 
+/** Platform brands (public.brands) whose contests the APC may read. Optional. */
+const PlatformIds = z.array(z.uuid()).max(100).default([]);
+
 const Body = z.discriminatedUnion('action', [
   z.object({ action: z.literal('list') }),
   z.object({ action: z.literal('brands') }),
@@ -34,8 +37,14 @@ const Body = z.discriminatedUnion('action', [
     email: z.string().trim().toLowerCase().email().max(254),
     displayName: z.string().trim().min(1, 'A name is needed').max(120),
     brands: Brands,
+    platformBrandIds: PlatformIds,
   }),
-  z.object({ action: z.literal('set_brands'), userId: z.uuid(), brands: Brands }),
+  z.object({
+    action: z.literal('set_brands'),
+    userId: z.uuid(),
+    brands: Brands,
+    platformBrandIds: PlatformIds,
+  }),
   z.object({ action: z.literal('reset_password'), userId: z.uuid() }),
   z.object({ action: z.literal('set_active'), userId: z.uuid(), active: z.boolean() }),
 ]);
@@ -146,6 +155,30 @@ Deno.serve(async (req) => {
     return data && data.role === 'apc_viewer' ? data : null;
   };
 
+  /** Every platform brand, so contest access is picked by id, never typed. */
+  const platformBrands = async (): Promise<{ id: string; name: string }[]> => {
+    const { data, error } = await admin.from('brands').select('id, name').order('name');
+    if (error) throw error;
+    return data ?? [];
+  };
+
+  const setPlatformBrands = async (userId: string, ids: string[]) => {
+    const { error: delErr } = await admin.from('apc_platform_brand_access').delete().eq('user_id', userId);
+    if (delErr) throw delErr;
+    if (!ids.length) return;
+    const { error: insErr } = await admin
+      .from('apc_platform_brand_access')
+      .insert(ids.map((brand_id) => ({ user_id: userId, brand_id, assigned_by: actor.id })));
+    if (insErr) throw insErr;
+  };
+
+  /** Rejects any id that is not a real platform brand. */
+  const unknownPlatform = async (ids: string[]) => {
+    if (!ids.length) return null;
+    const known = new Set((await platformBrands()).map((b) => b.id));
+    return ids.find((i) => !known.has(i)) ?? null;
+  };
+
   const setBrands = async (userId: string, brands: string[]) => {
     const { error: delErr } = await wb().from('apc_brand_access').delete().eq('user_id', userId);
     if (delErr) throw delErr;
@@ -156,7 +189,9 @@ Deno.serve(async (req) => {
   };
 
   try {
-    if (input.action === 'brands') return reply({ brands: await knownBrands() });
+    if (input.action === 'brands') {
+      return reply({ brands: await knownBrands(), platformBrands: await platformBrands() });
+    }
 
     if (input.action === 'list') {
       const { data: people, error } = await admin
@@ -169,8 +204,18 @@ Deno.serve(async (req) => {
       if (linkErr) throw linkErr;
       const by = new Map<string, string[]>();
       for (const l of links ?? []) by.set(l.user_id, [...(by.get(l.user_id) ?? []), l.brand]);
+      const { data: pLinks, error: pErr } = await admin
+        .from('apc_platform_brand_access')
+        .select('user_id, brand_id');
+      if (pErr) throw pErr;
+      const pBy = new Map<string, string[]>();
+      for (const l of pLinks ?? []) pBy.set(l.user_id, [...(pBy.get(l.user_id) ?? []), l.brand_id]);
       return reply({
-        apcs: (people ?? []).map((p) => ({ ...p, brands: (by.get(p.id) ?? []).sort() })),
+        apcs: (people ?? []).map((p) => ({
+          ...p,
+          brands: (by.get(p.id) ?? []).sort(),
+          platformBrandIds: pBy.get(p.id) ?? [],
+        })),
       });
     }
 
@@ -178,6 +223,9 @@ Deno.serve(async (req) => {
       const known = new Set(await knownBrands());
       const unknown = input.brands.filter((b) => !known.has(b));
       if (unknown.length) return reply({ error: `Unknown brand: ${unknown[0]}` }, 400);
+      if (await unknownPlatform(input.platformBrandIds)) {
+        return reply({ error: 'Unknown platform brand' }, 400);
+      }
 
       const password = makePassword();
       const { data: made, error: mkErr } = await admin.auth.admin.createUser({
@@ -202,11 +250,16 @@ Deno.serve(async (req) => {
       try {
         if (roleErr) throw roleErr;
         await setBrands(uid, input.brands);
+        await setPlatformBrands(uid, input.platformBrandIds);
       } catch (e) {
         await admin.auth.admin.deleteUser(uid);
         throw e;
       }
-      await audit('apc.create', uid, { email: input.email, brands: input.brands });
+      await audit('apc.create', uid, {
+        email: input.email,
+        brands: input.brands,
+        platformBrandIds: input.platformBrandIds,
+      });
       return reply({ userId: uid, email: input.email, password });
     }
 
@@ -218,8 +271,15 @@ Deno.serve(async (req) => {
       const known = new Set(await knownBrands());
       const unknown = input.brands.filter((b) => !known.has(b));
       if (unknown.length) return reply({ error: `Unknown brand: ${unknown[0]}` }, 400);
+      if (await unknownPlatform(input.platformBrandIds)) {
+        return reply({ error: 'Unknown platform brand' }, 400);
+      }
       await setBrands(target.id, input.brands);
-      await audit('apc.set_brands', target.id, { brands: input.brands });
+      await setPlatformBrands(target.id, input.platformBrandIds);
+      await audit('apc.set_brands', target.id, {
+        brands: input.brands,
+        platformBrandIds: input.platformBrandIds,
+      });
       return reply({ ok: true });
     }
 

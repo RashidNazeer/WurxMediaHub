@@ -20,7 +20,11 @@ export type ApcAccount = {
   is_active: boolean;
   created_at: string;
   brands: string[];
+  /** Platform brands (public.brands) whose contests they may read. */
+  platformBrandIds: string[];
 };
+
+export type PlatformBrand = { id: string; name: string };
 
 type Credentials = { userId: string; email: string; password: string };
 
@@ -57,7 +61,7 @@ export function useApcAccounts() {
 export function useApcBrandChoices() {
   return useQuery({
     queryKey: [...KEY, 'brands'],
-    queryFn: async () => (await call<{ brands: string[] }>({ action: 'brands' })).brands,
+    queryFn: () => call<{ brands: string[]; platformBrands: PlatformBrand[] }>({ action: 'brands' }),
     staleTime: 5 * 60_000,
   });
 }
@@ -67,12 +71,17 @@ export function useApcActions() {
   const done = () => void qc.invalidateQueries({ queryKey: KEY });
   return {
     create: useMutation({
-      mutationFn: (v: { email: string; displayName: string; brands: string[] }) =>
+      mutationFn: (v: {
+        email: string;
+        displayName: string;
+        brands: string[];
+        platformBrandIds: string[];
+      }) =>
         call<Credentials>({ action: 'create', ...v }),
       onSuccess: done,
     }),
     setBrands: useMutation({
-      mutationFn: (v: { userId: string; brands: string[] }) =>
+      mutationFn: (v: { userId: string; brands: string[]; platformBrandIds: string[] }) =>
         call<{ ok: true }>({ action: 'set_brands', ...v }),
       onSuccess: done,
     }),

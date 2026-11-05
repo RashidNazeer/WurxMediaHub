@@ -1,3 +1,4 @@
+import { isApcViewer } from '@/vendor/wurxbase/supabaseClient';
 import {
   createContext,
   useCallback,
@@ -274,11 +275,12 @@ export function CollabAdFiguresProvider({ children }: { children: ReactNode }) {
         const found = new Map<string, AdFigures>();
         for (let i = 0; i < ids.length; i += BATCH) {
           const slice = ids.slice(i, i + BATCH);
-          const { data, error: rpcErr } = await getSupabase().rpc('euka_ad_totals_for_videos', {
-            p_item_ids: slice,
-            p_from: from ?? undefined,
-            p_to: to ?? undefined,
-          });
+          /* An APC viewer asks the brand-scoped wrapper, which only prices videos
+             inside their own brands (migration 20261106090000). */
+          const args = { p_item_ids: slice, p_from: from ?? undefined, p_to: to ?? undefined };
+          const { data, error: rpcErr } = isApcViewer()
+            ? await getSupabase().schema('wurxbase').rpc('apc_ad_totals_for_videos', args)
+            : await getSupabase().rpc('euka_ad_totals_for_videos', args);
           if (rpcErr) throw rpcErr;
           for (const row of (data ?? []) as Array<{
             item_id: string;
@@ -299,7 +301,8 @@ export function CollabAdFiguresProvider({ children }: { children: ReactNode }) {
         }
 
         const codes = new Map<string, SparkCode>();
-        for (let i = 0; i < sparkIds.length; i += BATCH) {
+        /* Spark codes authorise ads on a creator's video: never for an APC. */
+        for (let i = 0; !isApcViewer() && i < sparkIds.length; i += BATCH) {
           const slice = sparkIds.slice(i, i + BATCH);
           const { data, error: sparkErr } = await getSupabase().rpc('euka_spark_codes_for_videos', {
             p_item_ids: slice,
