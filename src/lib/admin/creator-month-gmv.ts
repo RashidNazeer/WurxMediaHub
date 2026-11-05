@@ -70,6 +70,26 @@ export function wholeMonthOf(range: Period | null): string | null {
   return range.to === lastDayOf(m[1]!) ? m[1]! : null;
 }
 
+/**
+ * The stored month a range is answered from, or null when it must be asked live.
+ *
+ * A whole calendar month, and the month so far (the 1st to TODAY, which is what the page opens
+ * on: "This month"), are both answered from what `collab-gmv-sync` stored, so opening the page
+ * asks nobody anything. Every other range, like 1 to 5 November, can only have come from the
+ * user picking those dates, and is the only thing asked of Euka or Reacher live.
+ *
+ * The month so far is only today's: 1 to 5 November on the 6th is NOT the month so far, and
+ * answering it from a figure that runs to the 6th would be wrong.
+ */
+export function storedMonthFor(period: Period | null, now: Date): string | null {
+  if (!period) return null;
+  const whole = wholeMonthOf(period);
+  if (whole) return whole;
+  const today = now.toISOString().slice(0, 10);
+  const cur = today.slice(0, 7);
+  return period.from === `${cur}-01` && period.to === today ? cur : null;
+}
+
 /** Two real `YYYY-MM-DD` days with the start not after the end, or null. */
 export function usablePeriod(range: { from?: string; to?: string } | null | undefined): Period | null {
   const f = range?.from ?? '';

@@ -23,7 +23,7 @@ import {
   recentMonths,
   settledAt,
 } from '../../../supabase/functions/_shared/collab-gmv.ts';
-import { cellFor, handleOf, periodText, rowHandles, usablePeriod, wholeMonthOf } from '../../../src/lib/admin/creator-month-gmv.ts';
+import { cellFor, handleOf, periodText, rowHandles, storedMonthFor, usablePeriod, wholeMonthOf } from '../../../src/lib/admin/creator-month-gmv.ts';
 
 let failed = 0;
 let passed = 0;
@@ -129,6 +129,19 @@ section('5. WHAT ONE ROW SHOWS');
   ok(handleOf('https://www.tiktok.com/@Some.Name/') === 'some.name', 'a profile link is read as the handle');
   ok(handleOf('https://www.tiktok.com/@some.name?lang=en') === 'some.name', 'a query string is dropped');
   ok(rowHandles({ tiktok_account: '@a', tiktok_account_2: 'A' }).length === 1, 'the same handle twice on a row is one');
+}
+
+section('7. ONLY WHAT THE USER SETS IS ASKED LIVE');
+{
+  const now = at('2026-11-06T09:00:00Z');
+  ok(storedMonthFor({ from: '2026-11-01', to: '2026-11-06' }, now) === '2026-11', 'opening the page (This month, 1st to today) is answered from what is stored: no request');
+  ok(storedMonthFor({ from: '2026-10-01', to: '2026-10-31' }, now) === '2026-10', 'a whole past month is answered from what is stored');
+  ok(storedMonthFor({ from: '2026-11-01', to: '2026-11-05' }, now) === null, '1 to 5 November on the 6th is NOT the month so far: it is asked live, because the user set it');
+  ok(storedMonthFor({ from: '2026-11-02', to: '2026-11-06' }, now) === null, 'a range that starts mid-month is asked live');
+  ok(storedMonthFor({ from: '2026-10-15', to: '2026-11-06' }, now) === null, 'a range across months is asked live');
+  ok(storedMonthFor(null, now) === null, 'no dates: nothing');
+  ok(storedMonthFor({ from: '2026-10-01', to: '2026-10-30' }, at('2026-10-30T09:00:00Z')) === '2026-10', 'the month so far on the 30th is that month');
+  ok(storedMonthFor({ from: '2026-10-01', to: '2026-10-29' }, at('2026-10-30T09:00:00Z')) === null, 'but not through the 29th');
 }
 
 section('6. ANY RANGE OF DAYS');

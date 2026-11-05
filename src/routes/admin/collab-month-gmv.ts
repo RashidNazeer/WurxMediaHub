@@ -3,8 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { getSupabase } from '@/lib/supabase';
 import {
   cellFor,
+  storedMonthFor,
   usablePeriod,
-  wholeMonthOf,
   type BrandMonth,
   type CellRow,
   type GmvCell,
@@ -29,6 +29,10 @@ import {
  *
  * THIS FILE IS THE SEAM, AND IT IS OURS, like `collab-ad-figures.tsx`. The vendored app
  * never imports our Supabase client; it calls this hook and reads cells back.
+ *
+ * A REQUEST GOES TO EUKA OR REACHER ONLY WHEN THE USER SETS DATES THAT NEED ONE. Opening the
+ * page ("This month") or picking a whole month sends nothing live; a custom range is asked once,
+ * when it is set, and nothing about it is stored.
  *
  * ALL TIME has no dates to ask about, so it shows a dash with a hover saying why.
  */
@@ -105,11 +109,13 @@ export function useMonthGmv(range: { from?: string; to?: string } | null | undef
   const from = range?.from;
   const to = range?.to;
   const period = useMemo(() => usablePeriod({ from, to }), [from, to]);
-  const month = wholeMonthOf(period);
+  /* a stored month (or the month so far) opens with the page and asks nobody; anything else
+     was typed in by the user, and is the only thing that sends a request to Euka or Reacher */
+  const month = useMemo(() => storedMonthFor(period, new Date()), [period]);
   const key = period ? `${period.from}|${period.to}` : null;
 
   const q = useQuery({
-    queryKey: ['collab-creator-gmv', month ? 'month' : 'range', key],
+    queryKey: ['collab-creator-gmv', month ? 'month' : 'range', month ?? key],
     queryFn: () => (month ? readMonth(month) : readRange(period!.from, period!.to)),
     enabled: period !== null,
     /* a stored month is re-read by the sync every few hours; a live range is remembered by
