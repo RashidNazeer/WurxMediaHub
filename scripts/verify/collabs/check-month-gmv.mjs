@@ -19,10 +19,11 @@ import {
   matchBrand,
   monthWindow,
   needsRead,
+  rangeWindow,
   recentMonths,
   settledAt,
 } from '../../../supabase/functions/_shared/collab-gmv.ts';
-import { cellFor, handleOf, rowHandles, wholeMonthOf } from '../../../src/lib/admin/creator-month-gmv.ts';
+import { cellFor, handleOf, periodText, rowHandles, usablePeriod, wholeMonthOf } from '../../../src/lib/admin/creator-month-gmv.ts';
 
 let failed = 0;
 let passed = 0;
@@ -104,29 +105,52 @@ section('4. WHAT EUKA AND REACHER SAY BECOME ROWS');
 
 section('5. WHAT ONE ROW SHOWS');
 {
+  const SEP = { from: '2026-09-01', to: '2026-09-30' };
   const row = (extra = {}) => ({ brand: 'Penetrex', tiktok_account: '@ErinRaganCooper', ...extra });
   const euka = { source: 'euka', truncated: true, floorGmv: 53.47 };
   const by = new Map([['erinragancooper', 4005.09], ['simplysarah.daily', 6507.03]]);
-  const a = cellFor(row(), '2026-09', euka, by);
+  const a = cellFor(row(), SEP, euka, by);
   ok(a.label === '$4,005' && a.gmv === 4005.09, 'a creator the platform lists shows her GMV', JSON.stringify(a));
-  ok(/Euka/.test(a.title) && /September 2026/.test(a.title) && /1 to 30 September/.test(a.title), 'and the hover names the source and the dates');
-  const u = cellFor(row({ tiktok_account: 'tinycreator' }), '2026-09', euka, by);
+  ok(/Euka/.test(a.title) && /September 2026/.test(a.title) && /by sales date/.test(a.title), 'and the hover names the source and the dates');
+  const u = cellFor(row({ tiktok_account: 'tinycreator' }), SEP, euka, by);
   ok(u.label === '< $53' && u.gmv === null, 'absent from a CUT Euka list: under the smallest figure, not $0', JSON.stringify(u));
-  const z = cellFor(row({ tiktok_account: 'tinycreator' }), '2026-09', { source: 'reacher', truncated: false, floorGmv: null }, by);
+  const z = cellFor(row({ tiktok_account: 'tinycreator' }), SEP, { source: 'reacher', truncated: false, floorGmv: null }, by);
   ok(z.label === '$0' && z.gmv === 0, 'absent from a COMPLETE list: $0', JSON.stringify(z));
-  const zeroE = cellFor(row({ tiktok_account: 'tinycreator' }), '2026-09', { source: 'euka', truncated: false, floorGmv: null }, by);
+  const zeroE = cellFor(row({ tiktok_account: 'tinycreator' }), SEP, { source: 'euka', truncated: false, floorGmv: null }, by);
   ok(zeroE.label === '$0', 'absent from an Euka list shorter than 50 is also complete: $0');
-  const none = cellFor(row({ brand: 'Bentgo' }), '2026-09', null, null);
+  const none = cellFor(row({ brand: 'Bentgo' }), SEP, null, null);
   ok(none.label === null && /Bentgo/.test(none.title), 'a brand on neither platform: a dash that says so');
   const week = cellFor(row(), null, euka, by);
-  ok(week.label === null && /whole calendar month/.test(week.title), 'not a whole month: a dash that says why');
-  const nohandle = cellFor(row({ tiktok_account: '' }), '2026-09', euka, by);
+  ok(week.label === null && /start and an end date/.test(week.title), 'no dates picked (All Time): a dash that says why');
+  const nohandle = cellFor(row({ tiktok_account: '' }), SEP, euka, by);
   ok(nohandle.label === null && /No TikTok handle/.test(nohandle.title), 'a row with no handle cannot be matched: a dash, never $0');
-  const two = cellFor(row({ tiktok_account: 'erinragancooper', tiktok_account_2: 'simplysarah.daily' }), '2026-09', euka, by);
+  const two = cellFor(row({ tiktok_account: 'erinragancooper', tiktok_account_2: 'simplysarah.daily' }), SEP, euka, by);
   ok(Math.round(two.gmv) === 10512, 'a creator with two accounts adds both');
   ok(handleOf('https://www.tiktok.com/@Some.Name/') === 'some.name', 'a profile link is read as the handle');
   ok(handleOf('https://www.tiktok.com/@some.name?lang=en') === 'some.name', 'a query string is dropped');
   ok(rowHandles({ tiktok_account: '@a', tiktok_account_2: 'A' }).length === 1, 'the same handle twice on a row is one');
+}
+
+section('6. ANY RANGE OF DAYS');
+{
+  const today = at('2026-11-06T12:00:00Z');
+  const w = rangeWindow('2026-11-01', '2026-11-05', today);
+  ok(w && w.start === '2026-11-01' && w.end === '2026-11-05', '1 to 5 November is asked as it is');
+  ok(rangeWindow('2026-11-01', '2026-11-30', today)?.end === '2026-11-06', 'an end in the future is cut to today');
+  ok(rangeWindow('2026-11-10', '2026-11-12', today) === null, 'a range entirely in the future cannot be asked');
+  ok(rangeWindow('2026-11-05', '2026-11-01', today) === null, 'a start after the end is refused');
+  ok(rangeWindow('2026-02-30', '2026-03-05', today) === null, 'a day that does not exist is refused');
+  ok(rangeWindow('nope', '2026-03-05', today) === null, 'junk is refused');
+  ok(rangeWindow('2025-01-01', '2026-11-06', today) === null, 'more than a year is refused');
+  ok(rangeWindow('2025-11-07', '2026-11-06', today) !== null, 'exactly a year is allowed');
+  ok(JSON.stringify(usablePeriod({ from: '2026-11-01', to: '2026-11-05' })) === '{"from":"2026-11-01","to":"2026-11-05"}', 'the screen accepts two real days');
+  ok(usablePeriod({ from: '2026-11-05', to: '2026-11-01' }) === null && usablePeriod(null) === null && usablePeriod({ from: '2026-11-01' }) === null, 'and nothing else');
+  ok(periodText({ from: '2026-09-01', to: '2026-09-30' }) === 'September 2026', 'a whole month reads as the month');
+  ok(periodText({ from: '2026-11-01', to: '2026-11-05' }) === '1 Nov 2026 to 5 Nov 2026', 'a range reads as its two days');
+  ok(periodText({ from: '2026-11-03', to: '2026-11-03' }) === '3 Nov 2026', 'one day reads as that day');
+  const rng = { from: '2026-11-01', to: '2026-11-05' };
+  const c = cellFor({ brand: 'Irwin Naturals', tiktok_account: 'clarkepayne3.0' }, rng, { source: 'reacher', truncated: false, floorGmv: null }, new Map([['clarkepayne3.0', 812.4]]));
+  ok(c.label === '$812' && /1 Nov 2026 to 5 Nov 2026/.test(c.title) && /Reacher/.test(c.title), 'a custom range shows her GMV for those days, and the hover says so', JSON.stringify(c));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

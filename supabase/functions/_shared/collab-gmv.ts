@@ -133,3 +133,28 @@ export function fromReacher(pages: unknown[]): { rows: CreatorGmv[]; truncated: 
   }
   return { rows: merge(rows), truncated: false, floor: null };
 }
+
+/* ───────────────────────────────── any range of days ───────────────────────────────── */
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+export const MAX_RANGE_DAYS = 366;
+
+/**
+ * A date range somebody picked, made safe to ask the platforms about: both ends real days,
+ * the start not after the end, the end no later than today (nothing has happened after it),
+ * and no longer than a year. Null when it cannot be used.
+ */
+export function rangeWindow(from: unknown, to: unknown, today: Date): { start: string; end: string } | null {
+  const f = String(from ?? '');
+  const t = String(to ?? '');
+  if (!DAY.test(f) || !DAY.test(t)) return null;
+  const fd = Date.parse(`${f}T00:00:00Z`);
+  const td = Date.parse(`${t}T00:00:00Z`);
+  if (!Number.isFinite(fd) || !Number.isFinite(td)) return null;
+  if (new Date(fd).toISOString().slice(0, 10) !== f || new Date(td).toISOString().slice(0, 10) !== t) return null;
+  const todayMs = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const endMs = Math.min(td, todayMs);
+  if (fd > endMs) return null;
+  if ((endMs - fd) / 86_400_000 + 1 > MAX_RANGE_DAYS) return null;
+  return { start: f, end: new Date(endMs).toISOString().slice(0, 10) };
+}

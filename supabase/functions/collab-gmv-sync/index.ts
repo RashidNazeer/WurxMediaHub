@@ -43,6 +43,7 @@ import {
   monthOf,
   monthWindow,
   needsRead,
+  rangeWindow,
   recentMonths,
   type CreatorGmv,
   type Platform,
@@ -58,6 +59,12 @@ const Body = z.object({
   /** Read even what is fresh. */
   force: z.boolean().optional(),
   dryRun: z.boolean().optional(),
+  /**
+   * ANY range of days, answered live and NOT stored: every owned brand is asked once for
+   * those dates and the figures come straight back. This is the one thing a Paid Collabs
+   * reader (not only staff) may ask, because it only reads.
+   */
+  range: z.object({ from: z.string(), to: z.string() }).optional(),
   budgetMs: z.number().int().min(5_000).max(140_000).optional(),
 });
 
@@ -151,6 +158,46 @@ async function save(
   if (del.error) throw new Error(del.error.message);
 }
 
+type Owner = { source: Platform; euka?: { id: string; auth: EukaAuth }; shopId?: number };
+
+/** Which platform owns each brand: Euka first, then Reacher, otherwise neither. */
+async function loadOwners(brands: string[]): Promise<{ owner: Map<string, Owner>; unmapped: string[] }> {
+  const euka = eukaKeys().length ? await eukaBrands() : [];
+  const rshops = reacherKey() ? (await reacherShops()).map((s) => ({ name: s.shop_name, id: s.shop_id })) : [];
+  const owner = new Map<string, Owner>();
+  const unmapped: string[] = [];
+  for (const b of brands) {
+    const e = matchBrand(b, euka);
+    if (e) { owner.set(b, { source: 'euka', euka: e }); continue; }
+    const r = matchBrand(b, rshops);
+    if (r) { owner.set(b, { source: 'reacher', shopId: r.id }); continue; }
+    unmapped.push(b);
+  }
+  return { owner, unmapped };
+}
+
+async function readBrand(o: Owner, start: string, end: string) {
+  return o.source === 'euka' ? await readEuka(o.euka!, start, end) : await readReacher(o.shopId!, start, end);
+}
+
+/** Run `fn` over `items`, at most `n` at a time (Reacher allows 60 calls a minute). */
+async function pool<T, R>(items: T[], n: number, fn: (x: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]!);
+    }
+  }));
+  return out;
+}
+
+/* A range somebody asked for is answered once and remembered for ten minutes, so a team
+   looking at the same dates does not spend a call per brand per screen. */
+const RANGE_TTL = 10 * 60_000;
+const rangeCache = new Map<string, { at: number; body: unknown }>();
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders(req) });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, req);
@@ -162,7 +209,19 @@ Deno.serve(async (req: Request) => {
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
 
-  /* ── who is asking: the scheduler's secret (timing-safe), or active staff ── */
+  let raw: unknown = {};
+  try {
+    raw = await req.json();
+  } catch {
+    /* an empty body is a scheduled run */
+  }
+  const parsed = Body.safeParse(raw ?? {});
+  if (!parsed.success) return json({ error: 'Bad request' }, 400, req);
+  const { force, dryRun, range } = parsed.data;
+  const deadline = started + (parsed.data.budgetMs ?? 100_000);
+
+  /* ── who is asking: the scheduler's secret (timing-safe), active staff, or, for a
+        range question only, any Paid Collabs reader ── */
   const secret = Deno.env.get('COLLAB_GMV_SYNC_SECRET') ?? '';
   const presented = req.headers.get('x-sync-secret') ?? '';
   let isCron = false;
@@ -176,26 +235,25 @@ Deno.serve(async (req: Request) => {
     }
   }
   if (!isCron) {
-    const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+    const auth = req.headers.get('Authorization') ?? '';
+    const token = auth.replace(/^Bearer\s+/i, '');
     if (!token) return json({ error: 'Not allowed' }, 401, req);
     const { data: who } = await db.auth.getUser(token);
     if (!who?.user) return json({ error: 'Not allowed' }, 401, req);
     const { data: profile } = await db.from('profiles').select('role, is_active').eq('id', who.user.id).single();
-    if (!profile?.is_active || !['ops', 'admin', 'ads_manager'].includes(profile.role)) {
-      return json({ error: 'Not allowed' }, 403, req);
+    const staff = !!profile?.is_active && ['ops', 'admin', 'ads_manager'].includes(profile.role);
+    if (!staff) {
+      /* a reader may only ask a range question, which writes nothing */
+      if (!range) return json({ error: 'Not allowed' }, 403, req);
+      const asUser = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: auth } } },
+      );
+      const { data: viewer } = await asUser.rpc('is_collabs_viewer');
+      if (viewer !== true) return json({ error: 'Not allowed' }, 403, req);
     }
   }
-
-  let raw: unknown = {};
-  try {
-    raw = await req.json();
-  } catch {
-    /* an empty body is a scheduled run */
-  }
-  const parsed = Body.safeParse(raw ?? {});
-  if (!parsed.success) return json({ error: 'Bad request' }, 400, req);
-  const { force, dryRun } = parsed.data;
-  const deadline = started + (parsed.data.budgetMs ?? 100_000);
 
   if (eukaKeys().length === 0 && !reacherKey()) {
     return json({ error: 'Neither a EUKA key nor REACHER_API_KEY is set on this project' }, 500, req);
@@ -219,17 +277,32 @@ Deno.serve(async (req: Request) => {
     const wanted = parsed.data.brands ? new Set(parsed.data.brands.map((b) => b.trim())) : null;
     const brands = [...names].filter((b) => !wanted || wanted.has(b)).sort();
 
-    /* which platform owns each: Euka first, then Reacher, otherwise neither */
-    const euka = eukaKeys().length ? await eukaBrands() : [];
-    const rshops = reacherKey() ? (await reacherShops()).map((s) => ({ name: s.shop_name, id: s.shop_id })) : [];
-    const owner = new Map<string, { source: Platform; euka?: (typeof euka)[number]; shopId?: number }>();
-    const unmapped: string[] = [];
-    for (const b of brands) {
-      const e = matchBrand(b, euka);
-      if (e) { owner.set(b, { source: 'euka', euka: e }); continue; }
-      const r = matchBrand(b, rshops);
-      if (r) { owner.set(b, { source: 'reacher', shopId: r.id }); continue; }
-      unmapped.push(b);
+    const { owner, unmapped } = await loadOwners(brands);
+
+    /* ── a range somebody picked: ask live, store nothing ── */
+    if (range) {
+      const w = rangeWindow(range.from, range.to, now);
+      if (!w) return json({ error: 'Pick two real days, the start not after the end, within a year' }, 400, req);
+      const key = `${w.start}|${w.end}`;
+      const hit = rangeCache.get(key);
+      if (hit && Date.now() - hit.at < RANGE_TTL) return json(hit.body, 200, req);
+      const failedR: { brand: string; error: string }[] = [];
+      const got = await pool([...owner.entries()], 4, async ([brand, o]) => {
+        try {
+          const g = await readBrand(o, w.start, w.end);
+          return { brand, source: o.source, truncated: g.truncated, floor: g.floor, rows: g.rows };
+        } catch (e) {
+          failedR.push({ brand, error: String((e as Error).message).slice(0, 160) });
+          return null;
+        }
+      });
+      const body = { range: w, brands: got.filter(Boolean), unmapped, failed: failedR };
+      /* only a complete answer is remembered: a half answer must not outlive the outage */
+      if (!failedR.length) {
+        if (rangeCache.size > 40) rangeCache.clear();
+        rangeCache.set(key, { at: Date.now(), body });
+      }
+      return json(body, 200, req);
     }
 
     /* what has been read, and when */
@@ -258,7 +331,7 @@ Deno.serve(async (req: Request) => {
       const { start, end } = monthWindow(u.month, now);
       if (start > end) continue; // a month that has not started
       try {
-        const got = o.source === 'euka' ? await readEuka(o.euka!, start, end) : await readReacher(o.shopId!, start, end);
+        const got = await readBrand(o, start, end);
         if (!dryRun) await save(db, u.month, u.brand, o.source, got);
         done.push({ month: u.month, brand: u.brand, source: o.source, creators: got.rows.length, truncated: got.truncated });
       } catch (e) {

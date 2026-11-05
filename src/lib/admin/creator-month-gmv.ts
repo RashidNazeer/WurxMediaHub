@@ -1,18 +1,23 @@
 /**
- * WHAT A CREATOR MADE FOR A BRAND IN A CALENDAR MONTH, as Euka or Reacher report it.
+ * WHAT A CREATOR MADE FOR A BRAND BETWEEN TWO DATES, as Euka or Reacher report it.
  *
  * Rashid, 2026-11-06: set the date to September and see the GMV the creator made from
- * 1 to 30 September. By SALES date, from any of her videos: a September sale on a July
- * video counts in September. `collab-gmv-sync` copies the platforms' monthly answer into
- * `collab_creator_month_gmv`; this file turns that into what one Creators-table row shows.
+ * 1 to 30 September; set it to 1 to 5 November and see those days. By SALES date, from
+ * any of her videos: a September sale on a July video counts in September, and an
+ * October video's November sales count in November.
+ *
+ * WHERE THE FIGURES COME FROM, by the dates picked:
+ *   a whole calendar month   what `collab-gmv-sync` stored for it (fast)
+ *   any other range          asked of the platforms live through the same function
+ * and the cell is the same either way.
  *
  * FOUR ANSWERS, because they mean four different things and only one of them is a dash:
- *   a figure    the platform lists her for that month: that is her GMV
+ *   a figure    the platform lists her for those dates: that is her GMV
  *   $0          the platform's list for the brand is COMPLETE and she is not on it
  *   under $X    Euka cut its list at 50 creators and she is not on it: she made no more
  *               than the smallest figure it reached. Not $0 and not unknown.
- *   a dash      we hold nothing for that brand and month (a brand on neither platform,
- *               or one not read yet), or the dates are not one whole month
+ *   a dash      we hold nothing for that brand and those dates (a brand on neither
+ *               platform, or not read yet), or no dates are picked (All Time)
  */
 
 export interface BrandMonth {
@@ -36,6 +41,8 @@ export interface GmvCell {
   title: string;
 }
 
+export type Period = { from: string; to: string };
+
 /** A TikTok handle however a Paid Collabs row holds it: `@name`, `name`, or a profile link. Lower-case, no @. */
 export function handleOf(raw: unknown): string {
   const t = String(raw ?? '').trim().toLowerCase();
@@ -56,47 +63,66 @@ function lastDayOf(month: string): string {
 }
 
 /** `YYYY-MM` when the range is exactly one whole calendar month (first day to last), otherwise null. */
-export function wholeMonthOf(range: { from: string; to: string } | null): string | null {
+export function wholeMonthOf(range: Period | null): string | null {
   if (!range) return null;
   const m = /^(\d{4}-\d{2})-01$/.exec(range.from);
   if (!m) return null;
   return range.to === lastDayOf(m[1]!) ? m[1]! : null;
 }
 
-export const monthName = (month: string): string => {
-  const [y, m] = month.split('-').map(Number) as [number, number];
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-};
+/** Two real `YYYY-MM-DD` days with the start not after the end, or null. */
+export function usablePeriod(range: { from?: string; to?: string } | null | undefined): Period | null {
+  const f = range?.from ?? '';
+  const t = range?.to ?? '';
+  const day = /^\d{4}-\d{2}-\d{2}$/;
+  if (!day.test(f) || !day.test(t) || f > t) return null;
+  if (Number.isNaN(Date.parse(`${f}T00:00:00Z`)) || Number.isNaN(Date.parse(`${t}T00:00:00Z`))) return null;
+  return { from: f, to: t };
+}
+
+const dayText = (iso: string) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+/** "September 2026" for a whole month, "1 Nov 2026 to 5 Nov 2026" for anything else. */
+export function periodText(p: Period): string {
+  const month = wholeMonthOf(p);
+  if (month) {
+    const [y, m] = month.split('-').map(Number) as [number, number];
+    return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  }
+  return p.from === p.to ? dayText(p.from) : `${dayText(p.from)} to ${dayText(p.to)}`;
+}
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 const sourceName = (s: 'euka' | 'reacher') => (s === 'euka' ? 'Euka' : 'Reacher');
 
 /**
- * The cell for one row. `meta` is what was read for this row's brand and month (null: nothing),
- * `byHandle` is handle -> GMV for that brand and month.
+ * The cell for one row. `meta` is what was read for this row's brand and dates (null: nothing),
+ * `byHandle` is handle -> GMV for that brand and those dates.
  */
 export function cellFor(
   c: CellRow,
-  month: string | null,
+  period: Period | null,
   meta: BrandMonth | null,
   byHandle: Map<string, number> | null,
 ): GmvCell {
   const brand = String(c?.brand ?? '').trim() || 'this brand';
-  if (!month) {
+  if (!period) {
     return {
       label: null,
       gmv: null,
-      title: 'Pick one whole calendar month (1st to the last day) to see what she made for this brand that month.',
+      title: 'Pick a start and an end date to see what she made for this brand between them.',
     };
   }
+  const when = periodText(period);
   if (!meta || !byHandle) {
     return {
       label: null,
       gmv: null,
-      title: `No Euka or Reacher figures for ${brand} in ${monthName(month)} (a brand on neither platform, or not read yet).`,
+      title: `No Euka or Reacher figures for ${brand} for ${when} (a brand on neither platform, or not read yet).`,
     };
   }
-  const from = `${sourceName(meta.source)}, sales 1 to ${lastDayOf(month).slice(8)} ${monthName(month).split(' ')[0]}`;
+  const via = `${sourceName(meta.source)}, by sales date`;
   const handles = rowHandles(c);
   if (!handles.length) {
     return { label: null, gmv: null, title: `No TikTok handle on this row, so ${sourceName(meta.source)} cannot be matched to her.` };
@@ -107,19 +133,19 @@ export function cellFor(
     return {
       label: money(gmv),
       gmv,
-      title: `${money(gmv)} made for ${brand} in ${monthName(month)} (${from}), from every video she has posted, not only that month's.`,
+      title: `${money(gmv)} made for ${brand} for ${when} (${via}), from every video she has posted, whenever it was posted.`,
     };
   }
   if (meta.truncated && meta.floorGmv !== null) {
     return {
       label: `< ${money(meta.floorGmv)}`,
       gmv: null,
-      title: `Not in ${sourceName(meta.source)}'s top 50 for ${brand} in ${monthName(month)}, so she made less than ${money(meta.floorGmv)} (${from}).`,
+      title: `Not in ${sourceName(meta.source)}'s top 50 for ${brand} for ${when}, so she made less than ${money(meta.floorGmv)} (${via}).`,
     };
   }
   return {
     label: '$0',
     gmv: 0,
-    title: `${sourceName(meta.source)} lists every creator who sold for ${brand} in ${monthName(month)} and she is not one of them (${from}).`,
+    title: `${sourceName(meta.source)} lists every creator who sold for ${brand} for ${when} and she is not one of them (${via}).`,
   };
 }

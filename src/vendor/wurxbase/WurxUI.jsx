@@ -23,8 +23,8 @@ import { DateRangePicker as WxDateRangePicker } from '@/components/creator/DateR
 import { presetToRange as wxPresetToRange } from '@/lib/creator/date-range';
 import { clipCreatorsToRange as wxClipToRange, rangeHeading as wxRangeHeading } from '@/lib/admin/collab-period';
 import { brandLogo } from '@/lib/brand-logos';
-/* The Creators and Brands tables' Brand GMV: what one creator made for one brand in the
-   calendar month on screen, by sales date, as Euka or Reacher report it.
+/* The Creators and Brands tables' Brand GMV: what one creator made for one brand between
+   the dates on screen, by sales date, as Euka or Reacher report it.
    src/routes/admin/collab-month-gmv.ts. */
 import { useMonthGmv as wxUseMonthGmv } from '@/routes/admin/collab-month-gmv';
 /* WURX-END */
@@ -3197,8 +3197,8 @@ function BrandFace({ brand }) {
 }
 
 function BrandDrilldown({ brand, creators, brandCreators, allCreators, budgets, refetchBudgets, month, allTime, periodKey, periodRange, eukaL30, currentUser, onBack, onSelectCreator, canEdit, canAdd, canDeleteBrand, onAddCreator, onEditCreator, onDeleteBrand, onSetCreatorStatus, onUpdateCreator, onDeleteCreator }) {
-  /* WURX-ADDED · Brand GMV beside L30 GMV: what each creator made for THIS brand in the
-     calendar month on screen, by sales date (from any of her videos), read from Euka or
+  /* WURX-ADDED · Brand GMV beside L30 GMV: what each creator made for THIS brand between
+     the dates on screen, by sales date (from any of her videos), read from Euka or
      Reacher. Same hook as the Creators table. WURX-END */
   const wxMonthGmv = wxUseMonthGmv(periodRange);
   /* WURX-ADDED · tell our ad figures which month is on screen.
@@ -4900,10 +4900,10 @@ function DrilldownCreatorRow({ c, idx, euka, deals, dealsMonth, monthGmv, open, 
       <div className="pc-cell pc-num" data-label="L30 GMV">
         <EukaL30Cell euka={euka} c={c} handles={[c.tiktok_account, c.tiktok_account_2]} />
       </div>
-      {/* WURX-ADDED · what this creator made for this brand in the calendar month on screen,
+      {/* WURX-ADDED · what this creator made for this brand between the dates on screen,
           by sales date, from Euka or Reacher. A figure, $0 (the platform's list is complete
           and she is not on it), "< $X" (Euka's top 50 stopped there), or a dash (nothing
-          held, or the dates are not one whole month). The hover says which. WURX-END */}
+          held, or no dates picked). The hover says which. WURX-END */}
       {(() => {
         const g = monthGmv ? monthGmv.forRow(c) : null;
         return (
@@ -7197,9 +7197,9 @@ function useGod() {
 }
 
 function CreatorsTab({ creators, allCreators, allTime, month, periodRange, eukaL30, onSetCreatorStatus, onUpdateCreator, onEditCreator }) {
-  /* WURX-ADDED · Brand GMV for every row: what the creator made for the brand in the
-     calendar month on screen, by sales date (from any of her videos), read from Euka or
-     Reacher. A dash when the dates are not one whole month. WURX-END */
+  /* WURX-ADDED · Brand GMV for every row: what the creator made for the brand between the
+     dates on screen, by sales date (from any of her videos), read from Euka or Reacher.
+     A whole month is stored; any other range is asked live. WURX-END */
   const wxMonthGmv = wxUseMonthGmv(periodRange);
   const [search, setSearch] = useState('');
   const [sel, setSel] = useState(() => new Set());
@@ -9512,10 +9512,9 @@ function CreatorsTabRow({ c, idx, selected, euka, deals, dealsMonth, monthGmv, o
       <div className="pc-cell" data-label="L30 GMV" style={{ ...cellCenter, ...colStyle("L30 GMV", god) }}>
         <EukaL30Cell euka={euka} c={c} handles={[c.tiktok_account, c.tiktok_account_2]} />
       </div>
-      {/* WURX-ADDED · what this creator made for this brand in the calendar month on
-          screen, by sales date, from Euka or Reacher (a September sale on a July video
-          counts in September). A figure, $0, "< $X" or a dash; the hover says which.
-          WURX-END */}
+      {/* WURX-ADDED · what this creator made for this brand between the dates on screen,
+          by sales date, from Euka or Reacher (a September sale on a July video counts in
+          September). A figure, $0, "< $X" or a dash; the hover says which. WURX-END */}
       {(() => {
         const g = monthGmv.forRow(c);
         return (

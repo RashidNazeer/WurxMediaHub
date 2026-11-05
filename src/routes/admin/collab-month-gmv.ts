@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getSupabase } from '@/lib/supabase';
 import {
   cellFor,
+  usablePeriod,
   wholeMonthOf,
   type BrandMonth,
   type CellRow,
@@ -10,20 +11,26 @@ import {
 } from '@/lib/admin/creator-month-gmv';
 
 /**
- * WHAT A CREATOR MADE FOR A BRAND IN THE MONTH ON SCREEN, for the Brand GMV column of
- * the Creators and Brands tables.
+ * WHAT A CREATOR MADE FOR A BRAND BETWEEN THE DATES ON SCREEN, for the Brand GMV column
+ * of the Creators and Brands tables.
  *
  * Rashid, 2026-11-06: set the date to September and see the GMV she made from 1 to 30
- * September, by sales date, from any of her videos. Euka and Reacher keep daily sales;
- * `collab-gmv-sync` copies their monthly answer into `collab_creator_month_gmv`, and
- * this hook reads it. See `@/lib/admin/creator-month-gmv` for the four things a cell can
- * say (a figure, $0, "under $X", a dash).
+ * September; set it to 1 to 5 November and see those days. By sales date, from any of her
+ * videos. Euka and Reacher keep daily sales and answer for any dates:
+ *
+ *   a whole calendar month   read from `collab_creator_month_gmv`, which `collab-gmv-sync`
+ *                            fills (instant)
+ *   any other range          asked live: `collab-gmv-sync` called with the range, which asks
+ *                            each platform once per brand and stores nothing (a few seconds,
+ *                            then remembered for ten minutes)
+ *
+ * See `@/lib/admin/creator-month-gmv` for the four things a cell can say (a figure, $0,
+ * "under $X", a dash).
  *
  * THIS FILE IS THE SEAM, AND IT IS OURS, like `collab-ad-figures.tsx`. The vendored app
  * never imports our Supabase client; it calls this hook and reads cells back.
  *
- * ONLY A WHOLE CALENDAR MONTH HAS A FIGURE. The platforms' answers are stored per month,
- * so a week, a custom range or All Time shows a dash with a hover saying why.
+ * ALL TIME has no dates to ask about, so it shows a dash with a hover saying why.
  */
 
 export interface MonthGmv {
@@ -74,15 +81,40 @@ async function readMonth(month: string): Promise<Month> {
   return { brands, byBrand };
 }
 
-export function useMonthGmv(range: { from: string; to: string } | null | undefined): MonthGmv {
-  const month = wholeMonthOf(range && range.from && range.to ? { from: range.from, to: range.to } : null);
+interface LiveBody {
+  brands?: { brand: string; source: 'euka' | 'reacher'; truncated: boolean; floor: number | null; rows: { handle: string; gmv: number }[] }[];
+  failed?: { brand: string }[];
+}
+
+/** Any range, asked live. A reply that failed for some brands still answers for the others. */
+async function readRange(from: string, to: string): Promise<Month> {
+  const { data, error } = await getSupabase().functions.invoke('collab-gmv-sync', { body: { range: { from, to } } });
+  if (error) throw new Error(error.message);
+  const body = (data ?? {}) as LiveBody;
+  const brands = new Map<string, BrandMonth>();
+  const byBrand = new Map<string, Map<string, number>>();
+  for (const b of body.brands ?? []) {
+    const k = String(b.brand).trim();
+    brands.set(k, { source: b.source, truncated: !!b.truncated, floorGmv: b.floor === null ? null : Number(b.floor) });
+    byBrand.set(k, new Map(b.rows.map((r) => [String(r.handle), Number(r.gmv)] as const)));
+  }
+  return { brands, byBrand };
+}
+
+export function useMonthGmv(range: { from?: string; to?: string } | null | undefined): MonthGmv {
+  const from = range?.from;
+  const to = range?.to;
+  const period = useMemo(() => usablePeriod({ from, to }), [from, to]);
+  const month = wholeMonthOf(period);
+  const key = period ? `${period.from}|${period.to}` : null;
 
   const q = useQuery({
-    queryKey: ['collab-creator-month-gmv', month],
-    queryFn: () => readMonth(month as string),
-    enabled: month !== null,
-    /* the current month is re-read by the sync every few hours; a minute is fresh enough here */
-    staleTime: 60_000,
+    queryKey: ['collab-creator-gmv', month ? 'month' : 'range', key],
+    queryFn: () => (month ? readMonth(month) : readRange(period!.from, period!.to)),
+    enabled: period !== null,
+    /* a stored month is re-read by the sync every few hours; a live range is remembered by
+       the function for ten minutes: a minute here, ten for a range, is fresh enough */
+    staleTime: month ? 60_000 : 10 * 60_000,
     retry: 1,
   });
 
@@ -91,9 +123,14 @@ export function useMonthGmv(range: { from: string; to: string } | null | undefin
       forRow: (c) => {
         const brand = String(c?.brand ?? '').trim();
         const data = q.data;
-        return cellFor(c, month, data?.brands.get(brand) ?? null, data?.brands.has(brand) ? (data.byBrand.get(brand) ?? new Map()) : null);
+        return cellFor(
+          c,
+          period,
+          data?.brands.get(brand) ?? null,
+          data?.brands.has(brand) ? (data.byBrand.get(brand) ?? new Map()) : null,
+        );
       },
     }),
-    [q.data, month],
+    [q.data, period],
   );
 }
