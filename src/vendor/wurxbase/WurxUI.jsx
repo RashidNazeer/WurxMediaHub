@@ -23,6 +23,9 @@ import { DateRangePicker as WxDateRangePicker } from '@/components/creator/DateR
 import { presetToRange as wxPresetToRange } from '@/lib/creator/date-range';
 import { clipCreatorsToRange as wxClipToRange, rangeHeading as wxRangeHeading } from '@/lib/admin/collab-period';
 import { brandLogo } from '@/lib/brand-logos';
+/* The Creators table's Brand GMV: one creator's total for one brand across ALL her
+   rows, frozen at month end. src/routes/admin/collab-month-gmv.ts. */
+import { useMonthGmv as wxUseMonthGmv, describeGmv as wxDescribeGmv } from '@/routes/admin/collab-month-gmv';
 /* WURX-END */
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { can } from './access';
@@ -7174,6 +7177,11 @@ function useGod() {
 }
 
 function CreatorsTab({ creators, allCreators, allTime, month, periodRange, eukaL30, onSetCreatorStatus, onUpdateCreator, onEditCreator }) {
+  /* WURX-ADDED · Brand GMV for every row: the creator's total for the brand over the
+     chosen dates, across all her rows (a September deal can carry an October video),
+     each video once, and the frozen month-end figure when the dates are a closed
+     calendar month. `allCreators` is every row, not just this month's. WURX-END */
+  const wxMonthGmv = wxUseMonthGmv(allCreators, periodRange);
   const [search, setSearch] = useState('');
   const [sel, setSel] = useState(() => new Set());
   const [videosCreatorId, setVideosCreatorId] = useState(null);
@@ -7423,7 +7431,7 @@ function CreatorsTab({ creators, allCreators, allTime, month, periodRange, eukaL
         c.name || '', c.tiktok_account || '', c.brand || '', c.category || '',
         c.deal || '', parseDealAmount(c.deal) || '', parseDealVideos(c.deal) || '',
         Math.round(creatorL30(c, eukaL30) || 0) || '',
-        (() => { const t = wxVideoTotals(wxClipToRange([c], periodRange)); return t.all.length ? Math.round(t.gmv) : ''; })(),
+        (() => { const g = wxMonthGmv.forRow(c); return g && g.videos ? Math.round(g.gmv) : ''; })(),
         c.payment_status || '', c.hired_by || '', c.hiring_date || '',
         c.email || '', fmtPhone(c.whatsapp_number), c.paypal || '', c.zelle || '',
       ].map(esc).join(','));
@@ -7850,7 +7858,7 @@ function CreatorsTab({ creators, allCreators, allTime, month, periodRange, eukaL
                           euka={eukaL30}
                           deals={wxDealsNow.get(wxPersonKey(c)) || 0}
                           dealsMonth={wxDealsMonth}
-                          periodRange={periodRange}
+                          monthGmv={wxMonthGmv}
                           onToggle={() => toggle(c.id)}
                           onOpen={() => setVideosCreatorId(c.id)}
                           onSetStatus={setStatus}
@@ -9421,7 +9429,7 @@ function KpiPill({ label, value, onClick, title }) {
 const cellCenter = { display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 0 };
 const cellEllipsis = { maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
-function CreatorsTabRow({ c, idx, selected, euka, deals, dealsMonth, periodRange, onToggle, onOpen, onSetStatus }) {
+function CreatorsTabRow({ c, idx, selected, euka, deals, dealsMonth, monthGmv, onToggle, onOpen, onSetStatus }) {
   const god = useGod();
   const amount = parseDealAmount(c.deal);
   const videoCount = parseDealVideos(c.deal);
@@ -9485,16 +9493,24 @@ function CreatorsTabRow({ c, idx, selected, euka, deals, dealsMonth, periodRange
       <div className="pc-cell" data-label="L30 GMV" style={{ ...cellCenter, ...colStyle("L30 GMV", god) }}>
         <EukaL30Cell euka={euka} c={c} handles={[c.tiktok_account, c.tiktok_account_2]} />
       </div>
-      {/* WURX-ADDED · this creator's GMV for this brand over the chosen dates.
-          The same sum the brand page shows (each video once), over this row's
-          videos clipped to the range. A dash when no video has synced: that is
-          "not reported", never $0. WURX-END */}
+      {/* WURX-ADDED · this creator's GMV for this brand over the chosen dates: ALL her
+          rows for the brand, each video once, so a deal signed in September that
+          carries an October video counts in October. For a whole closed month it is
+          the figure FROZEN when the month ended (a padlock marks it), because a
+          video's GMV keeps rising after the month does. A dash means no video in
+          the period, never $0; the hover says how many videos, and how many sold
+          nothing or have not synced. WURX-END */}
       {(() => {
-        const t = wxVideoTotals(wxClipToRange([c], periodRange));
+        const g = monthGmv.forRow(c);
         return (
-          <div className="pc-cell" data-label="Brand GMV" data-wx="brand-gmv" style={{ ...cellCenter, ...colStyle("Brand GMV", god) }}
-            title={t.all.length ? `${t.all.length} video${t.all.length === 1 ? '' : 's'} for ${c.brand || 'this brand'} in the chosen dates` : 'No synced videos in the chosen dates'}>
-            {t.all.length ? <span className="pc-metric pc-metric-gmv">{fmt$Exact(Math.round(t.gmv))}</span> : <span className="pc-handle">-</span>}
+          <div className="pc-cell" data-label="Brand GMV" data-wx="brand-gmv" data-frozen={g && g.frozen ? 'true' : undefined} style={{ ...cellCenter, ...colStyle("Brand GMV", god) }}
+            title={wxDescribeGmv(g, c.brand)}>
+            {g && g.videos ? <span className="pc-metric pc-metric-gmv">{fmt$Exact(Math.round(g.gmv))}</span> : <span className="pc-handle">-</span>}
+            {g && g.frozen ? (
+              <svg className="wx-frozen" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Frozen at the end of the month">
+                <rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              </svg>
+            ) : null}
           </div>
         );
       })()}
