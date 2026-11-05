@@ -3196,6 +3196,10 @@ function BrandFace({ brand }) {
 }
 
 function BrandDrilldown({ brand, creators, brandCreators, allCreators, budgets, refetchBudgets, month, allTime, periodKey, periodRange, eukaL30, currentUser, onBack, onSelectCreator, canEdit, canAdd, canDeleteBrand, onAddCreator, onEditCreator, onDeleteBrand, onSetCreatorStatus, onUpdateCreator, onDeleteCreator }) {
+  /* WURX-ADDED · Brand GMV beside L30 GMV: each creator's total for THIS brand over the
+     chosen dates, across all her rows, each video once, and the figure frozen at month
+     end when the dates are a closed calendar month. Same hook as the Creators table. WURX-END */
+  const wxMonthGmv = wxUseMonthGmv(allCreators || brandCreators || creators, periodRange);
   /* WURX-ADDED · tell our ad figures which month is on screen.
 
      THIS IS THE WHOLE REASON THE COLUMNS MATCH THE ROW THEY SIT IN. Everything
@@ -4047,6 +4051,8 @@ function BrandDrilldown({ brand, creators, brandCreators, allCreators, budgets, 
             <div className="pc-num">Total views</div>
             <div className="pc-num">New video GMV</div>
             <div className="pc-num">L30 GMV</div>
+            {/* WURX-ADDED · month-end Brand GMV, see wxMonthGmv above. WURX-END */}
+            <div className="pc-num">Brand GMV</div>
             <div className="pc-num">Items sold</div>
             {/* WURX-ADDED · from OUR TikTok ads data, summed over this
                 creator's DISTINCT delivered videos. */}
@@ -4071,6 +4077,7 @@ function BrandDrilldown({ brand, creators, brandCreators, allCreators, budgets, 
                   euka={eukaL30}
                   deals={wxDealsNow.get(wxPersonKey(c)) || 0}
                   dealsMonth={month}
+                  monthGmv={wxMonthGmv}
                   open={expandedId === c.id}
                   onSelect={() => setExpandedId(id => (id === c.id ? null : c.id))}
                   onSetStatus={setStatus}
@@ -4771,7 +4778,7 @@ function markContractDl(id) {
   try { localStorage.setItem(CONTRACT_DL_KEY, JSON.stringify(m)); } catch { /* storage full/blocked */ }
 }
 
-function DrilldownCreatorRow({ c, idx, euka, deals, dealsMonth, open, onSelect, onSetStatus, onEditContract, onView, onEditCreator, onDelete }) {
+function DrilldownCreatorRow({ c, idx, euka, deals, dealsMonth, monthGmv, open, onSelect, onSetStatus, onEditContract, onView, onEditCreator, onDelete }) {
   const amount = parseDealAmount(c.deal);
   const videoCount = parseDealVideos(c.deal);
   const filled = deliveredVideoCount(c);
@@ -4892,6 +4899,22 @@ function DrilldownCreatorRow({ c, idx, euka, deals, dealsMonth, open, onSelect, 
       <div className="pc-cell pc-num" data-label="L30 GMV">
         <EukaL30Cell euka={euka} c={c} handles={[c.tiktok_account, c.tiktok_account_2]} />
       </div>
+      {/* WURX-ADDED · this creator's GMV for this brand over the chosen dates: all her rows,
+          each video once; for a whole closed month, the figure frozen when it ended (padlock).
+          A dash is no video in the period, never $0. WURX-END */}
+      {(() => {
+        const g = monthGmv ? monthGmv.forRow(c) : null;
+        return (
+          <div className="pc-cell pc-num" data-label="Brand GMV" data-wx="brand-gmv" data-frozen={g && g.frozen ? 'true' : undefined} title={wxDescribeGmv(g, c.brand)}>
+            {g && g.videos ? <span className="pc-metric pc-metric-gmv">{fmt$Exact(Math.round(g.gmv))}</span> : <span className="pc-handle">-</span>}
+            {g && g.frozen ? (
+              <svg className="wx-frozen" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Frozen at the end of the month">
+                <rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              </svg>
+            ) : null}
+          </div>
+        );
+      })()}
       <div className="pc-cell pc-num" data-label="Items sold">
         {itemsSold > 0 ? <span className="pc-metric">{kNum(itemsSold)}</span> : <span className="pc-handle">-</span>}
       </div>

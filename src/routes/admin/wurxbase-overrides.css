@@ -368,7 +368,7 @@
 .wurxbase-root.wurxbase-root .pc-ct-head,
 .wurxbase-root.wurxbase-root .pc-ct-row {
   grid-template-columns:
-    0.36fr 0.74fr 1.42fr 0.66fr 0.46fr 0.5fr 0.64fr 0.6fr 0.46fr 0.58fr 0.42fr
+    0.36fr 0.74fr 1.42fr 0.66fr 0.46fr 0.5fr 0.64fr 0.6fr 0.6fr 0.46fr 0.58fr 0.42fr
     minmax(74px, 0.44fr) minmax(164px, 1.02fr) minmax(72px, 0.66fr);
 }
 
