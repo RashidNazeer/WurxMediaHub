@@ -53,4 +53,5 @@ declare module '@/vendor/wurxbase/access' {
 /** WURX-ADDED 2026-11-05: points the vendored client at the APC viewer's brand-scoped views. */
 declare module '@/vendor/wurxbase/supabaseClient' {
   export function setApcViewer(on: boolean): void;
+  export function isApcViewer(): boolean;
 }
