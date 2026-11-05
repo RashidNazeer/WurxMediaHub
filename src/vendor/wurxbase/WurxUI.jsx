@@ -3850,10 +3850,9 @@ function BrandDrilldown({ brand, creators, brandCreators, allCreators, budgets, 
           video once with the same rule as the GMV card above — so the pills add
           up to that card instead of quietly exceeding it. */}
       <ProductBand creators={sortedCreators} brand={brand.brand} period={allTime ? 'All time' : monthLabel(month)} />
-      {wxSource === 'reacher' && (
-        <ReacherUnrostered creators={sortedCreators} allTime={allTime} periodRange={periodRange}
-          periodLabel={allTime ? 'All time' : (periodRange ? wxRangeHeading(periodRange) : monthLabel(month))} />
-      )}
+      {/* WURX-ADJUSTED · Rashid, 2026-11-05: "I do not want to see this card please remove it".
+          The Reacher-videos-not-on-the-roster card is no longer mounted. The component and its
+          fetch stay defined above, unused, so it can come back by restoring this one line. WURX-END */}
 
       {/* WURX-ADDED · search and filter for this brand's creators. Their own
           toolbar shape, the one the Brands screen and the Creators tab already

@@ -4273,21 +4273,25 @@
 .wurxbase-root .wx-cmp-title { font-size: 16px; font-weight: 800; color: var(--wx-text); }
 .wurxbase-root .wx-cmp-sub { font-size: 12.5px; color: var(--wx-text-muted); }
 .wurxbase-root .wx-cmp-chev { color: var(--wx-text-muted); }
-/* Retention: one bar, one number. It is the only summary the header needs. */
-.wurxbase-root .wx-cmp-ret { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+/* Retention between neighbouring months: one bar and one number each. */
+.wurxbase-root .wx-cmp-flows { display: flex; gap: 22px; flex-shrink: 0; }
+.wurxbase-root .wx-cmp-flow { display: grid; grid-template-columns: auto auto; column-gap: 8px; row-gap: 2px; align-items: center; }
+.wurxbase-root .wx-cmp-flow em { grid-column: 1 / -1; font-style: normal; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--wx-text-muted); }
+.wurxbase-root .wx-cmp-flow b { font-size: 14px; font-weight: 800; color: var(--wx-text); text-align: right; }
+.wurxbase-root .wx-cmp-flow small { grid-column: 1 / -1; font-size: 11.5px; color: var(--wx-text-muted); }
 .wurxbase-root .wx-cmp-retbar {
-  width: 96px; height: 6px; border-radius: 999px; overflow: hidden;
+  width: 88px; height: 6px; border-radius: 999px; overflow: hidden;
   background: color-mix(in srgb, var(--wx-text-muted) 22%, transparent);
 }
 .wurxbase-root .wx-cmp-retbar i { display: block; height: 100%; border-radius: 999px; background: var(--wx-success); }
-.wurxbase-root .wx-cmp-ret b { font-size: 14px; font-weight: 800; color: var(--wx-text); }
-.wurxbase-root .wx-cmp-ret em { font-style: normal; font-size: 12px; color: var(--wx-text-muted); }
 .wurxbase-root .wx-cmp-cols {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
   gap: 12px;
   padding: 0 16px 8px;
 }
+.wurxbase-root .wx-cmp-cols.three { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr); }
+.wurxbase-root .wx-cmp-people.stayed { background: color-mix(in srgb, var(--wx-success) 7%, var(--wx-glass-well, transparent)); }
 .wurxbase-root .wx-cmp-people {
   min-width: 0;
   padding: 14px 14px 10px;
@@ -4305,6 +4309,20 @@
   font-size: 12px; font-weight: 800; color: var(--wx-text);
   background: color-mix(in srgb, var(--s) 18%, transparent);
 }
+.wurxbase-root .wx-cmp-hint { margin: 0 0 8px; font-size: 12px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-cmp-chips { display: flex; gap: 6px; margin: 0 0 6px; flex-wrap: wrap; }
+.wurxbase-root .wx-cmp-chips button {
+  all: unset; cursor: pointer; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  color: var(--wx-text-muted); background: color-mix(in srgb, var(--wx-text) 6%, transparent);
+}
+.wurxbase-root .wx-cmp-chips button.on { color: var(--wx-text); background: color-mix(in srgb, var(--s) 22%, transparent); }
+.wurxbase-root .wx-cmp-chips button:focus-visible { outline: 2px solid var(--wx-text); outline-offset: 2px; }
+.wurxbase-root .wx-cmp-trail { display: inline-flex; gap: 4px; flex-shrink: 0; }
+.wurxbase-root .wx-cmp-trail i {
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--wx-text-muted) 60%, transparent);
+}
+.wurxbase-root .wx-cmp-trail i.on { background: var(--s); border-color: var(--s); }
 .wurxbase-root .wx-cmp-none { margin: 0; padding: 8px 0; font-size: 12.5px; color: var(--wx-text-muted); }
 .wurxbase-root .wx-cmp-people ul { list-style: none; margin: 0; padding: 0; max-height: 400px; overflow-y: auto; }
 .wurxbase-root .wx-cmp-row {
@@ -4330,11 +4348,13 @@
 .wurxbase-root .wx-cmp-more:focus-visible { outline: 2px solid var(--wx-text); outline-offset: 2px; }
 .wurxbase-root .wx-cmp-foot { margin: 0; padding: 6px 20px 14px; font-size: 11.5px; color: var(--wx-text-muted); }
 @media (max-width: 1100px) {
-  .wurxbase-root .wx-cmp-cols { grid-template-columns: minmax(0, 1fr); }
+  .wurxbase-root .wx-cmp-cols,
+  .wurxbase-root .wx-cmp-cols.three { grid-template-columns: minmax(0, 1fr); }
+  .wurxbase-root .wx-cmp-head { flex-wrap: wrap; }
 }
 @media (max-width: 640px) {
-  .wurxbase-root .wx-cmp-head { flex-wrap: wrap; }
-  .wurxbase-root .wx-cmp-retbar { width: 64px; }
+  .wurxbase-root .wx-cmp-flows { gap: 14px; }
+  .wurxbase-root .wx-cmp-retbar { width: 56px; }
 }
 
 /* Brands list: one more column, GMV, after Cost / Video. The vendored rule has
