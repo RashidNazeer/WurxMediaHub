@@ -4265,47 +4265,50 @@
 .wurxbase-root .wx-cmp-head:focus-visible { outline: 2px solid var(--wx-text); outline-offset: -2px; }
 .wurxbase-root .wx-cmp-title { font-size: 16px; font-weight: 800; color: var(--wx-text); }
 .wurxbase-root .wx-cmp-chev { color: var(--wx-text-muted); }
-/* One grid: a creator per row, a column per month. */
+/* Three columns side by side, oldest to newest. */
 .wurxbase-root .wx-cmp-notes { margin: 0; padding: 0 20px 12px; font-size: 13px; color: var(--wx-text-muted); }
-.wurxbase-root .wx-cmp-grid { padding: 0 20px; --cmp-cols: minmax(0, 1fr) repeat(3, 92px); }
-.wurxbase-root .wx-cmp-colhead,
-.wurxbase-root .wx-cmp-row { display: grid; grid-template-columns: var(--cmp-cols); align-items: center; column-gap: 8px; }
-.wurxbase-root .wx-cmp-colhead { padding: 8px 0; border-bottom: 1px solid var(--wx-glass-line); }
-.wurxbase-root .wx-cmp-colhead span { display: flex; flex-direction: column; align-items: center; line-height: 1.25; }
-.wurxbase-root .wx-cmp-colhead b { font-size: 12.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--wx-text); }
-.wurxbase-root .wx-cmp-colhead small { font-size: 11.5px; color: var(--wx-text-muted); }
-.wurxbase-root .wx-cmp-group { margin-top: 14px; --s: var(--wx-text-muted); }
-.wurxbase-root .wx-cmp-group.stayed { --s: var(--wx-success); }
-.wurxbase-root .wx-cmp-group.dropped { --s: var(--wx-danger); }
-.wurxbase-root .wx-cmp-grouphead { display: flex; align-items: center; gap: 8px; padding-bottom: 4px; font-size: 13.5px; color: var(--wx-text); }
-.wurxbase-root .wx-cmp-grouphead b { font-weight: 800; }
-.wurxbase-root .wx-cmp-grouphead span:last-child { font-size: 12px; font-weight: 700; color: var(--wx-text-muted); }
+.wurxbase-root .wx-cmp-cols {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0 16px 8px;
+}
+.wurxbase-root .wx-cmp-col {
+  min-width: 0; padding: 14px 14px 10px; border-radius: 14px; --s: var(--wx-text-muted);
+  background: var(--wx-glass-well, color-mix(in srgb, var(--wx-text) 4%, transparent));
+}
+.wurxbase-root .wx-cmp-col.stayed { --s: var(--wx-success); background: color-mix(in srgb, var(--wx-success) 8%, var(--wx-glass-well, transparent)); }
+.wurxbase-root .wx-cmp-col.dropped { --s: var(--wx-danger); }
+.wurxbase-root .wx-cmp-col header { display: flex; align-items: center; gap: 8px; }
+.wurxbase-root .wx-cmp-col h4 { margin: 0; flex: 1; font-size: 14px; font-weight: 800; color: var(--wx-text); }
 .wurxbase-root .wx-cmp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--s); }
-.wurxbase-root .wx-cmp-group ul { list-style: none; margin: 0; padding: 0; }
-.wurxbase-root .wx-cmp-row { padding: 8px 0; border-top: 1px solid color-mix(in srgb, var(--wx-glass-line) 70%, transparent); }
-.wurxbase-root .wx-cmp-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.wurxbase-root .wx-cmp-count {
+  min-width: 24px; padding: 1px 8px; border-radius: 999px; text-align: center;
+  font-size: 12px; font-weight: 800; color: var(--wx-text);
+  background: color-mix(in srgb, var(--s) 18%, transparent);
+}
+.wurxbase-root .wx-cmp-hint { margin: 2px 0 8px; font-size: 12px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-cmp-col ul { list-style: none; margin: 0; padding: 0; }
+.wurxbase-root .wx-cmp-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 0;
+  border-top: 1px solid color-mix(in srgb, var(--wx-glass-line) 70%, transparent);
+}
 .wurxbase-root .wx-cmp-initial {
-  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; display: inline-flex;
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; display: inline-flex;
   align-items: center; justify-content: center; font-weight: 800; color: var(--wx-text);
   background: color-mix(in srgb, var(--wx-text) 10%, transparent);
 }
-.wurxbase-root .wx-cmp-who { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.wurxbase-root .wx-cmp-who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .wurxbase-root .wx-cmp-who b { font-size: 13.5px; color: var(--wx-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wurxbase-root .wx-cmp-who em { font-style: normal; font-size: 12px; color: var(--wx-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wurxbase-root .wx-cmp-cell { justify-self: center; min-width: 60px; text-align: center; padding: 4px 8px; border-radius: 999px; font-size: 12.5px; font-weight: 700; }
-.wurxbase-root .wx-cmp-cell.on { color: var(--wx-text); background: color-mix(in srgb, var(--s) 16%, transparent); }
-.wurxbase-root .wx-cmp-cell.off { color: color-mix(in srgb, var(--wx-text-muted) 70%, transparent); font-weight: 400; }
-.wurxbase-root .wx-cmp-none { margin: 0; padding: 4px 20px 16px; font-size: 13px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-cmp-fig { flex-shrink: 0; font-size: 12.5px; font-weight: 700; color: var(--wx-text); }
+.wurxbase-root .wx-cmp-none { margin: 0; padding: 8px 0; font-size: 12.5px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-cmp-none.pad { padding: 4px 20px 16px; font-size: 13px; }
 .wurxbase-root .wx-cmp-more {
-  all: unset; cursor: pointer; display: block; margin: 4px 0 0; padding: 4px 0; font-size: 12.5px; font-weight: 700; color: var(--wx-text);
+  all: unset; cursor: pointer; display: block; margin-top: 6px; padding: 4px 0; font-size: 12.5px; font-weight: 700; color: var(--wx-text);
 }
 .wurxbase-root .wx-cmp-more:hover { text-decoration: underline; }
 .wurxbase-root .wx-cmp-more:focus-visible { outline: 2px solid var(--wx-text); outline-offset: 2px; }
-.wurxbase-root .wx-cmp-foot { margin: 0; padding: 12px 20px 14px; font-size: 11.5px; color: var(--wx-text-muted); }
-@media (max-width: 640px) {
-  .wurxbase-root .wx-cmp-grid { --cmp-cols: minmax(0, 1fr) repeat(3, 56px); padding: 0 12px; }
-  .wurxbase-root .wx-cmp-cell { min-width: 0; padding: 3px 4px; font-size: 11.5px; }
-  .wurxbase-root .wx-cmp-who em { display: none; }
+.wurxbase-root .wx-cmp-foot { margin: 0; padding: 8px 20px 14px; font-size: 11.5px; color: var(--wx-text-muted); }
+@media (max-width: 1100px) {
+  .wurxbase-root .wx-cmp-cols { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Brands list: one more column, GMV, after Cost / Video. The vendored rule has
