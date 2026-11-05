@@ -27,6 +27,10 @@ import { brandLogo } from '@/lib/brand-logos';
    the dates on screen, by sales date, as Euka or Reacher report it.
    src/routes/admin/collab-month-gmv.ts. */
 import { useMonthGmv as wxUseMonthGmv } from '@/routes/admin/collab-month-gmv';
+/* The Performance matrix fills its own GMV and Ad cells for every month.
+   src/routes/admin/collab-matrix-autofill.ts, src/lib/admin/matrix-autofill.ts. */
+import { useMatrixFigures as wxUseMatrixFigures } from '@/routes/admin/collab-matrix-autofill';
+import { applyFills as wxApplyFills } from '@/lib/admin/matrix-autofill';
 /* WURX-END */
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { can } from './access';
@@ -2232,6 +2236,7 @@ export default function WurxUI({
             onDeleteCreator={onDeleteCreator}
             brandState={brandState}
             setBrandStateFor={setBrandStateFor}
+            canFill={!!(isSuper || perms?.canEdit) /* WURX-ADDED · who may let the matrix fill itself */}
           />
         )}
         {tab === 'reporting' && (
@@ -9729,7 +9734,7 @@ function monthShortLabel(mk) {
    Aggregates ONLY from the manually-entered monthly matrix data (creators.monthly JSONB).
    Per-deal c.gmv / c.ad_spent fields are NOT used here · they live in the legacy table.
 ════════ */
-function PerformanceTab({ creators, allCreators, allTime, month, onUpdateCreator, onDeleteCreator, brandState, setBrandStateFor }) {
+function PerformanceTab({ creators, allCreators, allTime, month, onUpdateCreator, onDeleteCreator, brandState, setBrandStateFor, canFill }) {
   // Persist drill brand by name (string) so refresh keeps user inside the matrix
   // and live brand data flows in (rather than a stale snapshot).
   const [drillBrandName, setDrillBrandName] = useState(() => loadUIState().perfDrill || null);
@@ -9955,6 +9960,7 @@ function PerformanceTab({ creators, allCreators, allTime, month, onUpdateCreator
       creators={(allCreators || creators).filter(c => (c.brand || '').trim() === drillBrand.brand)}
       allCreators={allCreators || creators}
       onBack={() => setDrillBrandName(null)}
+      canFill={canFill}
       onUpdateCreator={onUpdateCreator}
       onDeleteCreator={onDeleteCreator}
     />;
@@ -10379,7 +10385,7 @@ function monthRange(start, end) {
   return out;
 }
 
-function BrandMatrix({ brand, creators, allCreators, onBack, onUpdateCreator, onDeleteCreator }) {
+function BrandMatrix({ brand, creators, allCreators, onBack, onUpdateCreator, onDeleteCreator, canFill }) {
   // Use the shared creatorDedupKey so PerformanceTab brand-row creator counts
   // and the matrix rows agree on what "same person" means.
   const dedupKey = creatorDedupKey;
@@ -10505,6 +10511,12 @@ function BrandMatrix({ brand, creators, allCreators, onBack, onUpdateCreator, on
     const key = monthKeyForHandle(rec, m, handle);
     const cell = { ...(cur[key] || {}) };
     if (num == null || num === 0 || raw === '') delete cell[field]; else cell[field] = num;
+    /* WURX-ADDED · a figure somebody types is theirs: it leaves the list of fields the
+       autofill may refresh, and is never touched again. WURX-END */
+    if (Array.isArray(cell.auto)) {
+      const keep = cell.auto.filter(f => f !== field);
+      if (keep.length) cell.auto = keep; else delete cell.auto;
+    }
     const next = { ...cur, [key]: cell };
     if (cell.gmv == null && cell.adSpent == null) delete next[key];
     if (onUpdateCreator) onUpdateCreator(rec.id, { monthly: next });
@@ -10516,6 +10528,48 @@ function BrandMatrix({ brand, creators, allCreators, onBack, onUpdateCreator, on
     if (num == null || num === 0 || raw === '') delete next[key]; else next[key] = num;
     if (onUpdateCreator) onUpdateCreator(rec.id, { monthly: next });
   };
+
+  /* WURX-ADDED · EVERY MONTH FILLS ITSELF, 2026-11-06. Rashid: the GMV and Ad cells should
+     autofill for the month, because we already fetch both. GMV is what Euka or Reacher report
+     the creator made for this brand that month by sales date; Ad is what the ads for her videos
+     cost. A cell somebody TYPED is never touched: every field filled here is listed in the cell's
+     `auto`, and only listed fields are refreshed (late sales settle for about a week). Months
+     before a creator was onboarded stay sealed, as they are for typing. Only people who can edit
+     write; a failed read writes nothing. See lib/admin/matrix-autofill.ts. WURX-END */
+  const wxFig = wxUseMatrixFigures(brand && brand.brand, creators, months);
+  const wxFillSeen = useRef('');
+  useEffect(() => {
+    if (!canFill || !wxFig.ready || !onUpdateCreator) return;
+    const byRec = new Map();
+    canon.forEach(({ rec, handle }) => {
+      if (!handle) return;
+      const hired = monthKey(rec.hiring_date);
+      months.forEach(m => {
+        if (hired && m < hired) return;
+        const gmv = wxFig.gmv.get(`${m}|${handle}`);
+        const adSpent = wxFig.ad.get(`${m}|${handle}`);
+        if (!(gmv > 0) && !(adSpent > 0)) return;
+        const slot = byRec.get(rec.id) || { rec, entries: [] };
+        slot.entries.push({ key: monthKeyForHandle(rec, m, handle), gmv, adSpent });
+        byRec.set(rec.id, slot);
+      });
+    });
+    const jobs = [];
+    byRec.forEach(({ rec, entries }) => {
+      const next = wxApplyFills(rec.monthly, entries);
+      if (next) jobs.push([rec.id, next]);
+    });
+    if (!jobs.length) return;
+    /* the same plan twice in a row (a re-render before the saves echo back) is not run twice */
+    const sig = jobs.map(([id, n]) => id + ':' + JSON.stringify(n)).join('|');
+    if (wxFillSeen.current === sig) return;
+    wxFillSeen.current = sig;
+    (async () => {
+      for (const [id, next] of jobs) {
+        try { await onUpdateCreator(id, { monthly: next }); } catch { /* a reader cannot write; skip the row */ }
+      }
+    })();
+  }, [canFill, wxFig, canon, months, onUpdateCreator]);
 
   // Grand totals across all handle rows (each row contributes only its own slice)
   let grandGmv = 0, grandAd = 0;
@@ -10886,8 +10940,8 @@ function BrandMatrix({ brand, creators, allCreators, onBack, onUpdateCreator, on
                                 </span>
                               ) : (
                                 <>
-                                  <MatrixCell value={cell.gmv}     onCommit={v => commit(rec, handle, m, 'gmv', v)} />
-                                  <MatrixCell value={cell.adSpent} ad onCommit={v => commit(rec, handle, m, 'adSpent', v)} />
+                                  <MatrixCell value={cell.gmv}     auto={Array.isArray(cell.auto) && cell.auto.includes('gmv')} onCommit={v => commit(rec, handle, m, 'gmv', v)} />
+                                  <MatrixCell value={cell.adSpent} auto={Array.isArray(cell.auto) && cell.auto.includes('adSpent')} ad onCommit={v => commit(rec, handle, m, 'adSpent', v)} />
                                 </>
                               )}
                             </div>
@@ -11003,7 +11057,7 @@ function BrandMatrix({ brand, creators, allCreators, onBack, onUpdateCreator, on
   );
 }
 
-function MatrixCell({ value, onCommit, ad, l30, locked, lockWhy }) {
+function MatrixCell({ value, onCommit, ad, l30, locked, lockWhy, auto }) {
   const [v, setV] = useState(value == null ? '' : String(value));
   const [isFocused, setIsFocused] = useState(false);
   const skipCommit = useRef(false);
@@ -11053,7 +11107,8 @@ function MatrixCell({ value, onCommit, ad, l30, locked, lockWhy }) {
 
   return (
     <input
-      className={`pc-mx-input ${ad ? 'ad' : ''} ${l30 ? 'l30' : ''}`}
+      className={`pc-mx-input ${ad ? 'ad' : ''} ${l30 ? 'l30' : ''}${auto ? ' mx-auto' : ''}`}
+      title={auto ? 'Filled automatically from Euka or Reacher. Type over it to make it yours: it will not be refreshed again.' : undefined}
       type={isFocused ? 'number' : 'text'} inputMode="decimal" placeholder="–"
       value={display}
       onChange={e => setV(e.target.value)}

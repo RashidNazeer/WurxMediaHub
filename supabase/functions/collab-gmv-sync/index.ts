@@ -70,7 +70,7 @@ const Body = z.object({
 
 type Db = SupabaseClient;
 
-const MONTHS_BACK = 6;
+const MONTHS_BACK = 14; // the Performance sheet reaches back about a year
 const REACHER_MAX_PAGES = 60; // 6,000 creators for one brand-month is far past anything real
 
 /** Euka's brands, by name, each with the account (key) that owns it. First key wins a name. */
