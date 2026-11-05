@@ -4364,9 +4364,9 @@
   top: 4.75rem !important;
 }
 
-/* The padlock beside a Brand GMV figure that was frozen when its month ended. */
-.wurxbase-root.wurxbase-root [data-wx="brand-gmv"] .wx-frozen {
-  margin-left: 0.3rem;
-  opacity: 0.55;
-  flex: none;
+
+/* A Performance cell the sheet filled itself (from Euka or Reacher) rather than a person typing it:
+   a thin dotted underline, so a figure that will refresh can be told from one that is the team's. */
+.wurxbase-root.wurxbase-root .pc-mx-input.mx-auto {
+  box-shadow: inset 0 -1px 0 0 color-mix(in srgb, currentColor 35%, transparent);
 }

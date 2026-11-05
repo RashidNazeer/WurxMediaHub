@@ -23,9 +23,14 @@ import { DateRangePicker as WxDateRangePicker } from '@/components/creator/DateR
 import { presetToRange as wxPresetToRange } from '@/lib/creator/date-range';
 import { clipCreatorsToRange as wxClipToRange, rangeHeading as wxRangeHeading } from '@/lib/admin/collab-period';
 import { brandLogo } from '@/lib/brand-logos';
-/* The Creators table's Brand GMV: one creator's total for one brand across ALL her
-   rows, frozen at month end. src/routes/admin/collab-month-gmv.ts. */
-import { useMonthGmv as wxUseMonthGmv, describeGmv as wxDescribeGmv } from '@/routes/admin/collab-month-gmv';
+/* The Creators and Brands tables' Brand GMV: what one creator made for one brand between
+   the dates on screen, by sales date, as Euka or Reacher report it.
+   src/routes/admin/collab-month-gmv.ts. */
+import { useMonthGmv as wxUseMonthGmv } from '@/routes/admin/collab-month-gmv';
+/* The Performance matrix fills its own GMV and Ad cells for every month.
+   src/routes/admin/collab-matrix-autofill.ts, src/lib/admin/matrix-autofill.ts. */
+import { useMatrixFigures as wxUseMatrixFigures } from '@/routes/admin/collab-matrix-autofill';
+import { applyFills as wxApplyFills } from '@/lib/admin/matrix-autofill';
 /* WURX-END */
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { can } from './access';
@@ -2231,6 +2236,7 @@ export default function WurxUI({
             onDeleteCreator={onDeleteCreator}
             brandState={brandState}
             setBrandStateFor={setBrandStateFor}
+            canFill={!!(isSuper || perms?.canEdit) /* WURX-ADDED · who may let the matrix fill itself */}
           />
         )}
         {tab === 'reporting' && (
@@ -3196,10 +3202,10 @@ function BrandFace({ brand }) {
 }
 
 function BrandDrilldown({ brand, creators, brandCreators, allCreators, budgets, refetchBudgets, month, allTime, periodKey, periodRange, eukaL30, currentUser, onBack, onSelectCreator, canEdit, canAdd, canDeleteBrand, onAddCreator, onEditCreator, onDeleteBrand, onSetCreatorStatus, onUpdateCreator, onDeleteCreator }) {
-  /* WURX-ADDED · Brand GMV beside L30 GMV: each creator's total for THIS brand over the
-     chosen dates, across all her rows, each video once, and the figure frozen at month
-     end when the dates are a closed calendar month. Same hook as the Creators table. WURX-END */
-  const wxMonthGmv = wxUseMonthGmv(allCreators || brandCreators || creators, periodRange);
+  /* WURX-ADDED · Brand GMV beside L30 GMV: what each creator made for THIS brand between
+     the dates on screen, by sales date (from any of her videos), read from Euka or
+     Reacher. Same hook as the Creators table. WURX-END */
+  const wxMonthGmv = wxUseMonthGmv(periodRange);
   /* WURX-ADDED · tell our ad figures which month is on screen.
 
      THIS IS THE WHOLE REASON THE COLUMNS MATCH THE ROW THEY SIT IN. Everything
@@ -4899,19 +4905,15 @@ function DrilldownCreatorRow({ c, idx, euka, deals, dealsMonth, monthGmv, open, 
       <div className="pc-cell pc-num" data-label="L30 GMV">
         <EukaL30Cell euka={euka} c={c} handles={[c.tiktok_account, c.tiktok_account_2]} />
       </div>
-      {/* WURX-ADDED · this creator's GMV for this brand over the chosen dates: all her rows,
-          each video once; for a whole closed month, the figure frozen when it ended (padlock).
-          A dash is no video in the period, never $0. WURX-END */}
+      {/* WURX-ADDED · what this creator made for this brand between the dates on screen,
+          by sales date, from Euka or Reacher. A figure, $0 (the platform's list is complete
+          and she is not on it), "< $X" (Euka's top 50 stopped there), or a dash (nothing
+          held, or no dates picked). The hover says which. WURX-END */}
       {(() => {
         const g = monthGmv ? monthGmv.forRow(c) : null;
         return (
-          <div className="pc-cell pc-num" data-label="Brand GMV" data-wx="brand-gmv" data-frozen={g && g.frozen ? 'true' : undefined} title={wxDescribeGmv(g, c.brand)}>
-            {g && g.videos ? <span className="pc-metric pc-metric-gmv">{fmt$Exact(Math.round(g.gmv))}</span> : <span className="pc-handle">-</span>}
-            {g && g.frozen ? (
-              <svg className="wx-frozen" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Frozen at the end of the month">
-                <rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
-              </svg>
-            ) : null}
+          <div className="pc-cell pc-num" data-label="Brand GMV" data-wx="brand-gmv" title={g ? g.title : ''}>
+            {g && g.label ? <span className="pc-metric pc-metric-gmv">{g.label}</span> : <span className="pc-handle">-</span>}
           </div>
         );
       })()}
@@ -7200,11 +7202,10 @@ function useGod() {
 }
 
 function CreatorsTab({ creators, allCreators, allTime, month, periodRange, eukaL30, onSetCreatorStatus, onUpdateCreator, onEditCreator }) {
-  /* WURX-ADDED · Brand GMV for every row: the creator's total for the brand over the
-     chosen dates, across all her rows (a September deal can carry an October video),
-     each video once, and the frozen month-end figure when the dates are a closed
-     calendar month. `allCreators` is every row, not just this month's. WURX-END */
-  const wxMonthGmv = wxUseMonthGmv(allCreators, periodRange);
+  /* WURX-ADDED · Brand GMV for every row: what the creator made for the brand between the
+     dates on screen, by sales date (from any of her videos), read from Euka or Reacher.
+     A whole month is stored; any other range is asked live. WURX-END */
+  const wxMonthGmv = wxUseMonthGmv(periodRange);
   const [search, setSearch] = useState('');
   const [sel, setSel] = useState(() => new Set());
   const [videosCreatorId, setVideosCreatorId] = useState(null);
@@ -7454,7 +7455,7 @@ function CreatorsTab({ creators, allCreators, allTime, month, periodRange, eukaL
         c.name || '', c.tiktok_account || '', c.brand || '', c.category || '',
         c.deal || '', parseDealAmount(c.deal) || '', parseDealVideos(c.deal) || '',
         Math.round(creatorL30(c, eukaL30) || 0) || '',
-        (() => { const g = wxMonthGmv.forRow(c); return g && g.videos ? Math.round(g.gmv) : ''; })(),
+        (() => { const g = wxMonthGmv.forRow(c); return g && g.gmv !== null ? Math.round(g.gmv) : ''; })(),
         c.payment_status || '', c.hired_by || '', c.hiring_date || '',
         c.email || '', fmtPhone(c.whatsapp_number), c.paypal || '', c.zelle || '',
       ].map(esc).join(','));
@@ -9516,24 +9517,15 @@ function CreatorsTabRow({ c, idx, selected, euka, deals, dealsMonth, monthGmv, o
       <div className="pc-cell" data-label="L30 GMV" style={{ ...cellCenter, ...colStyle("L30 GMV", god) }}>
         <EukaL30Cell euka={euka} c={c} handles={[c.tiktok_account, c.tiktok_account_2]} />
       </div>
-      {/* WURX-ADDED · this creator's GMV for this brand over the chosen dates: ALL her
-          rows for the brand, each video once, so a deal signed in September that
-          carries an October video counts in October. For a whole closed month it is
-          the figure FROZEN when the month ended (a padlock marks it), because a
-          video's GMV keeps rising after the month does. A dash means no video in
-          the period, never $0; the hover says how many videos, and how many sold
-          nothing or have not synced. WURX-END */}
+      {/* WURX-ADDED · what this creator made for this brand between the dates on screen,
+          by sales date, from Euka or Reacher (a September sale on a July video counts in
+          September). A figure, $0, "< $X" or a dash; the hover says which. WURX-END */}
       {(() => {
         const g = monthGmv.forRow(c);
         return (
-          <div className="pc-cell" data-label="Brand GMV" data-wx="brand-gmv" data-frozen={g && g.frozen ? 'true' : undefined} style={{ ...cellCenter, ...colStyle("Brand GMV", god) }}
-            title={wxDescribeGmv(g, c.brand)}>
-            {g && g.videos ? <span className="pc-metric pc-metric-gmv">{fmt$Exact(Math.round(g.gmv))}</span> : <span className="pc-handle">-</span>}
-            {g && g.frozen ? (
-              <svg className="wx-frozen" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Frozen at the end of the month">
-                <rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
-              </svg>
-            ) : null}
+          <div className="pc-cell" data-label="Brand GMV" data-wx="brand-gmv" style={{ ...cellCenter, ...colStyle("Brand GMV", god) }}
+            title={g ? g.title : ''}>
+            {g && g.label ? <span className="pc-metric pc-metric-gmv">{g.label}</span> : <span className="pc-handle">-</span>}
           </div>
         );
       })()}
@@ -9742,7 +9734,7 @@ function monthShortLabel(mk) {
    Aggregates ONLY from the manually-entered monthly matrix data (creators.monthly JSONB).
    Per-deal c.gmv / c.ad_spent fields are NOT used here · they live in the legacy table.
 ════════ */
-function PerformanceTab({ creators, allCreators, allTime, month, onUpdateCreator, onDeleteCreator, brandState, setBrandStateFor }) {
+function PerformanceTab({ creators, allCreators, allTime, month, onUpdateCreator, onDeleteCreator, brandState, setBrandStateFor, canFill }) {
   // Persist drill brand by name (string) so refresh keeps user inside the matrix
   // and live brand data flows in (rather than a stale snapshot).
   const [drillBrandName, setDrillBrandName] = useState(() => loadUIState().perfDrill || null);
@@ -9968,6 +9960,7 @@ function PerformanceTab({ creators, allCreators, allTime, month, onUpdateCreator
       creators={(allCreators || creators).filter(c => (c.brand || '').trim() === drillBrand.brand)}
       allCreators={allCreators || creators}
       onBack={() => setDrillBrandName(null)}
+      canFill={canFill}
       onUpdateCreator={onUpdateCreator}
       onDeleteCreator={onDeleteCreator}
     />;
@@ -10392,7 +10385,7 @@ function monthRange(start, end) {
   return out;
 }
 
-function BrandMatrix({ brand, creators, allCreators, onBack, onUpdateCreator, onDeleteCreator }) {
+function BrandMatrix({ brand, creators, allCreators, onBack, onUpdateCreator, onDeleteCreator, canFill }) {
   // Use the shared creatorDedupKey so PerformanceTab brand-row creator counts
   // and the matrix rows agree on what "same person" means.
   const dedupKey = creatorDedupKey;
@@ -10518,6 +10511,12 @@ function BrandMatrix({ brand, creators, allCreators, onBack, onUpdateCreator, on
     const key = monthKeyForHandle(rec, m, handle);
     const cell = { ...(cur[key] || {}) };
     if (num == null || num === 0 || raw === '') delete cell[field]; else cell[field] = num;
+    /* WURX-ADDED · a figure somebody types is theirs: it leaves the list of fields the
+       autofill may refresh, and is never touched again. WURX-END */
+    if (Array.isArray(cell.auto)) {
+      const keep = cell.auto.filter(f => f !== field);
+      if (keep.length) cell.auto = keep; else delete cell.auto;
+    }
     const next = { ...cur, [key]: cell };
     if (cell.gmv == null && cell.adSpent == null) delete next[key];
     if (onUpdateCreator) onUpdateCreator(rec.id, { monthly: next });
@@ -10529,6 +10528,48 @@ function BrandMatrix({ brand, creators, allCreators, onBack, onUpdateCreator, on
     if (num == null || num === 0 || raw === '') delete next[key]; else next[key] = num;
     if (onUpdateCreator) onUpdateCreator(rec.id, { monthly: next });
   };
+
+  /* WURX-ADDED · EVERY MONTH FILLS ITSELF, 2026-11-06. Rashid: the GMV and Ad cells should
+     autofill for the month, because we already fetch both. GMV is what Euka or Reacher report
+     the creator made for this brand that month by sales date; Ad is what the ads for her videos
+     cost. A cell somebody TYPED is never touched: every field filled here is listed in the cell's
+     `auto`, and only listed fields are refreshed (late sales settle for about a week). Months
+     before a creator was onboarded stay sealed, as they are for typing. Only people who can edit
+     write; a failed read writes nothing. See lib/admin/matrix-autofill.ts. WURX-END */
+  const wxFig = wxUseMatrixFigures(brand && brand.brand, creators, months);
+  const wxFillSeen = useRef('');
+  useEffect(() => {
+    if (!canFill || !wxFig.ready || !onUpdateCreator) return;
+    const byRec = new Map();
+    canon.forEach(({ rec, handle }) => {
+      if (!handle) return;
+      const hired = monthKey(rec.hiring_date);
+      months.forEach(m => {
+        if (hired && m < hired) return;
+        const gmv = wxFig.gmv.get(`${m}|${handle}`);
+        const adSpent = wxFig.ad.get(`${m}|${handle}`);
+        if (!(gmv > 0) && !(adSpent > 0)) return;
+        const slot = byRec.get(rec.id) || { rec, entries: [] };
+        slot.entries.push({ key: monthKeyForHandle(rec, m, handle), gmv, adSpent });
+        byRec.set(rec.id, slot);
+      });
+    });
+    const jobs = [];
+    byRec.forEach(({ rec, entries }) => {
+      const next = wxApplyFills(rec.monthly, entries);
+      if (next) jobs.push([rec.id, next]);
+    });
+    if (!jobs.length) return;
+    /* the same plan twice in a row (a re-render before the saves echo back) is not run twice */
+    const sig = jobs.map(([id, n]) => id + ':' + JSON.stringify(n)).join('|');
+    if (wxFillSeen.current === sig) return;
+    wxFillSeen.current = sig;
+    (async () => {
+      for (const [id, next] of jobs) {
+        try { await onUpdateCreator(id, { monthly: next }); } catch { /* a reader cannot write; skip the row */ }
+      }
+    })();
+  }, [canFill, wxFig, canon, months, onUpdateCreator]);
 
   // Grand totals across all handle rows (each row contributes only its own slice)
   let grandGmv = 0, grandAd = 0;
@@ -10899,8 +10940,8 @@ function BrandMatrix({ brand, creators, allCreators, onBack, onUpdateCreator, on
                                 </span>
                               ) : (
                                 <>
-                                  <MatrixCell value={cell.gmv}     onCommit={v => commit(rec, handle, m, 'gmv', v)} />
-                                  <MatrixCell value={cell.adSpent} ad onCommit={v => commit(rec, handle, m, 'adSpent', v)} />
+                                  <MatrixCell value={cell.gmv}     auto={Array.isArray(cell.auto) && cell.auto.includes('gmv')} onCommit={v => commit(rec, handle, m, 'gmv', v)} />
+                                  <MatrixCell value={cell.adSpent} auto={Array.isArray(cell.auto) && cell.auto.includes('adSpent')} ad onCommit={v => commit(rec, handle, m, 'adSpent', v)} />
                                 </>
                               )}
                             </div>
@@ -11016,7 +11057,7 @@ function BrandMatrix({ brand, creators, allCreators, onBack, onUpdateCreator, on
   );
 }
 
-function MatrixCell({ value, onCommit, ad, l30, locked, lockWhy }) {
+function MatrixCell({ value, onCommit, ad, l30, locked, lockWhy, auto }) {
   const [v, setV] = useState(value == null ? '' : String(value));
   const [isFocused, setIsFocused] = useState(false);
   const skipCommit = useRef(false);
@@ -11066,7 +11107,8 @@ function MatrixCell({ value, onCommit, ad, l30, locked, lockWhy }) {
 
   return (
     <input
-      className={`pc-mx-input ${ad ? 'ad' : ''} ${l30 ? 'l30' : ''}`}
+      className={`pc-mx-input ${ad ? 'ad' : ''} ${l30 ? 'l30' : ''}${auto ? ' mx-auto' : ''}`}
+      title={auto ? 'Filled automatically from Euka or Reacher. Type over it to make it yours: it will not be refreshed again.' : undefined}
       type={isFocused ? 'number' : 'text'} inputMode="decimal" placeholder="–"
       value={display}
       onChange={e => setV(e.target.value)}

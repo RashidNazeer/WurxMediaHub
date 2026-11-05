@@ -2,188 +2,141 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getSupabase } from '@/lib/supabase';
 import {
-  creatorBrandGmv,
-  gmvKey,
-  monthHasEnded,
-  wholeMonthOf,
-  type CreatorBrandGmv,
-  type CreatorRow,
-  type DayRange,
-} from '@/lib/admin/month-gmv';
+  cellFor,
+  storedMonthFor,
+  usablePeriod,
+  type BrandMonth,
+  type CellRow,
+  type GmvCell,
+} from '@/lib/admin/creator-month-gmv';
 
 /**
- * A CREATOR'S GMV FOR A BRAND, for the Brand GMV column of the Creators table.
+ * WHAT A CREATOR MADE FOR A BRAND BETWEEN THE DATES ON SCREEN, for the Brand GMV column
+ * of the Creators and Brands tables.
  *
- * Rashid, 2026-11-05: the total GMV a creator has made for a certain brand
- * through her videos for that brand, "at the end of the month", shown in that
- * table.
+ * Rashid, 2026-11-06: set the date to September and see the GMV she made from 1 to 30
+ * September; set it to 1 to 5 November and see those days. By sales date, from any of her
+ * videos. Euka and Reacher keep daily sales and answer for any dates:
  *
- * THIS FILE IS THE SEAM, AND IT IS OURS, like `collab-ad-figures.tsx`. The
- * vendored app never imports our Supabase client; it calls this hook with the
- * creators it already holds and reads figures back.
+ *   a whole calendar month   read from `collab_creator_month_gmv`, which `collab-gmv-sync`
+ *                            fills (instant)
+ *   any other range          asked live: `collab-gmv-sync` called with the range, which asks
+ *                            each platform once per brand and stores nothing (a few seconds,
+ *                            then remembered for ten minutes)
  *
- * TWO SOURCES, and which one answers depends on what the calendar is showing:
+ * See `@/lib/admin/creator-month-gmv` for the four things a cell can say (a figure, $0,
+ * "under $X", a dash).
  *
- *   FROZEN   when the picked range is exactly one WHOLE calendar month that has
- *            ended and has been frozen, the figure is the one written when the
- *            month closed (collab_gmv_snapshots). A video's GMV is a running total
- *            that every sync raises, so October's live figure keeps climbing
- *            after October ends; only the frozen one is the month-end number.
- *   LIVE     for anything else (the month still running, a week, a custom range,
- *            All Time) the figure is worked out here from the rows the screen
- *            holds, by the same calculation the database froze it with.
+ * THIS FILE IS THE SEAM, AND IT IS OURS, like `collab-ad-figures.tsx`. The vendored app
+ * never imports our Supabase client; it calls this hook and reads cells back.
  *
- * A FROZEN MONTH WITH NO ROW FOR A CREATOR IS A FACT, NOT A GAP: she had no
- * dated video in that month when it closed, so the cell is a dash, even if a video
- * has since been dated into it. Her live figure is kept alongside, for the hover.
+ * A REQUEST GOES TO EUKA OR REACHER ONLY WHEN THE USER SETS DATES THAT NEED ONE. Opening the
+ * page ("This month") or picking a whole month sends nothing live; a custom range is asked once,
+ * when it is set, and nothing about it is stored.
  *
- * IF THE FROZEN FIGURES CANNOT BE READ (the tables are not there yet, the network
- * dropped) the table falls back to the live figure rather than breaking.
+ * ALL TIME has no dates to ask about, so it shows a dash with a hover saying why.
  */
 
-export interface MonthGmvCell extends CreatorBrandGmv {
-  /** True when `gmv` is the figure written when the month closed. */
-  frozen: boolean;
-  /** When it was written, for a frozen figure. */
-  frozenAt: string | null;
-  /** How it was written: on schedule, or late for a month that had already ended. */
-  source: string | null;
-  /** What the same videos add up to now, for a frozen figure. */
-  liveGmv: number | null;
-}
-
 export interface MonthGmv {
-  /** The cell for a creator row, or null when she has no video in the period. */
-  forRow: (c: CreatorRow) => MonthGmvCell | null;
+  /** The cell for a creator row. */
+  forRow: (c: CellRow) => GmvCell;
 }
 
-interface Frozen {
-  frozenAt: string;
-  source: string;
-  rows: Map<string, CreatorBrandGmv>;
+interface Month {
+  brands: Map<string, BrandMonth>;
+  byBrand: Map<string, Map<string, number>>;
 }
 
 const PAGE = 1000;
 
-async function readFrozen(month: string): Promise<Frozen | null> {
+async function readMonth(month: string): Promise<Month> {
   const db = getSupabase();
-  const { data: f, error } = await db
-    .from('collab_gmv_freezes')
-    .select('month, frozen_at, source')
-    .eq('month', month)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!f) return null;
+  const brands = new Map<string, BrandMonth>();
+  const b = await db.from('collab_brand_month_gmv').select('brand, source, truncated, floor_gmv').eq('month', month);
+  if (b.error) throw new Error(b.error.message);
+  for (const r of b.data ?? []) {
+    brands.set(String(r.brand).trim(), {
+      source: r.source as 'euka' | 'reacher',
+      truncated: !!r.truncated,
+      floorGmv: r.floor_gmv === null ? null : Number(r.floor_gmv),
+    });
+  }
 
-  const rows = new Map<string, CreatorBrandGmv>();
-  /* PostgREST answers at most 1000 rows, and a short answer would look like a creator
-     with no frozen row, so read every page. */
+  const byBrand = new Map<string, Map<string, number>>();
+  /* PostgREST answers at most 1000 rows, and a short answer would look like creators who
+     made nothing, so read every page. */
   for (let from = 0; ; from += PAGE) {
-    const { data, error: e } = await db
-      .from('collab_gmv_snapshots')
-      .select('brand, creator_key, creator_name, videos, videos_with_sales, videos_zero, videos_unsynced, gmv')
+    const { data, error } = await db
+      .from('collab_creator_month_gmv')
+      .select('brand, handle, gmv')
       .eq('month', month)
       .order('brand')
-      .order('creator_key')
+      .order('handle')
       .range(from, from + PAGE - 1);
-    if (e) throw new Error(e.message);
+    if (error) throw new Error(error.message);
     for (const r of data ?? []) {
-      rows.set(gmvKey(r.brand, r.creator_key), {
-        brand: r.brand,
-        creatorKey: r.creator_key,
-        creatorName: r.creator_name,
-        videos: r.videos,
-        withSales: r.videos_with_sales,
-        zero: r.videos_zero,
-        unsynced: r.videos_unsynced,
-        gmv: Number(r.gmv),
-      });
+      const k = String(r.brand).trim();
+      let m = byBrand.get(k);
+      if (!m) byBrand.set(k, (m = new Map()));
+      m.set(String(r.handle), Number(r.gmv));
     }
     if (!data || data.length < PAGE) break;
   }
-  return { frozenAt: String(f.frozen_at), source: String(f.source), rows };
+  return { brands, byBrand };
 }
 
-export function useMonthGmv(allCreators: CreatorRow[], range: DayRange): MonthGmv {
-  const from = range?.from ?? null;
-  const to = range?.to ?? null;
-  const month = wholeMonthOf(from && to ? { from, to } : null);
-  const closed = month !== null && monthHasEnded(month);
+interface LiveBody {
+  brands?: { brand: string; source: 'euka' | 'reacher'; truncated: boolean; floor: number | null; rows: { handle: string; gmv: number }[] }[];
+  failed?: { brand: string }[];
+}
 
-  const live = useMemo(
-    () => creatorBrandGmv(allCreators, from && to ? { from, to } : null),
-    [allCreators, from, to],
-  );
+/** Any range, asked live. A reply that failed for some brands still answers for the others. */
+async function readRange(from: string, to: string): Promise<Month> {
+  const { data, error } = await getSupabase().functions.invoke('collab-gmv-sync', { body: { range: { from, to } } });
+  if (error) throw new Error(error.message);
+  const body = (data ?? {}) as LiveBody;
+  const brands = new Map<string, BrandMonth>();
+  const byBrand = new Map<string, Map<string, number>>();
+  for (const b of body.brands ?? []) {
+    const k = String(b.brand).trim();
+    brands.set(k, { source: b.source, truncated: !!b.truncated, floorGmv: b.floor === null ? null : Number(b.floor) });
+    byBrand.set(k, new Map(b.rows.map((r) => [String(r.handle), Number(r.gmv)] as const)));
+  }
+  return { brands, byBrand };
+}
 
-  const frozen = useQuery({
-    queryKey: ['collab-gmv-frozen', month],
-    queryFn: () => readFrozen(month as string),
-    enabled: closed,
-    /* A frozen month never changes, so there is nothing to refresh. */
-    staleTime: 10 * 60_000,
+export function useMonthGmv(range: { from?: string; to?: string } | null | undefined): MonthGmv {
+  const from = range?.from;
+  const to = range?.to;
+  const period = useMemo(() => usablePeriod({ from, to }), [from, to]);
+  /* a stored month (or the month so far) opens with the page and asks nobody; anything else
+     was typed in by the user, and is the only thing that sends a request to Euka or Reacher */
+  const month = useMemo(() => storedMonthFor(period, new Date()), [period]);
+  const key = period ? `${period.from}|${period.to}` : null;
+
+  const q = useQuery({
+    queryKey: ['collab-creator-gmv', month ? 'month' : 'range', month ?? key],
+    queryFn: () => (month ? readMonth(month) : readRange(period!.from, period!.to)),
+    enabled: period !== null,
+    /* a stored month is re-read by the sync every few hours; a live range is remembered by
+       the function for ten minutes: a minute here, ten for a range, is fresh enough */
+    staleTime: month ? 60_000 : 10 * 60_000,
     retry: 1,
   });
 
-  return useMemo<MonthGmv>(() => {
-    const snap = closed ? frozen.data ?? null : null;
-    return {
+  return useMemo<MonthGmv>(
+    () => ({
       forRow: (c) => {
-        const key = gmvKey(c?.brand, c?.name);
-        const now = live.get(key) ?? null;
-        if (snap) {
-          const s = snap.rows.get(key);
-          return {
-            brand: s?.brand ?? now?.brand ?? String(c?.brand ?? '').trim(),
-            creatorKey: s?.creatorKey ?? now?.creatorKey ?? '',
-            creatorName: s?.creatorName ?? now?.creatorName ?? String(c?.name ?? '').trim(),
-            videos: s?.videos ?? 0,
-            withSales: s?.withSales ?? 0,
-            zero: s?.zero ?? 0,
-            unsynced: s?.unsynced ?? 0,
-            gmv: s?.gmv ?? 0,
-            frozen: true,
-            frozenAt: snap.frozenAt,
-            source: snap.source,
-            liveGmv: now?.gmv ?? 0,
-          };
-        }
-        return now
-          ? { ...now, frozen: false, frozenAt: null, source: null, liveGmv: null }
-          : null;
+        const brand = String(c?.brand ?? '').trim();
+        const data = q.data;
+        return cellFor(
+          c,
+          period,
+          data?.brands.get(brand) ?? null,
+          data?.brands.has(brand) ? (data.byBrand.get(brand) ?? new Map()) : null,
+        );
       },
-    };
-  }, [closed, frozen.data, live]);
-}
-
-const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
-const dayOf = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-
-/**
- * The hover text for a Brand GMV cell: how many videos it is made of, in the three
- * kinds, and whether it is frozen or live. Plain words, because the figure is only
- * as useful as what a person can tell about where it came from.
- */
-export function describeGmv(g: MonthGmvCell | null, brand: string): string {
-  const name = brand || 'this brand';
-  if (!g || !g.videos) {
-    return g?.frozen
-      ? `No video posted for ${name} in this month when it was frozen (${dayOf(g.frozenAt ?? '')}).`
-      : 'No video posted for this brand in the chosen dates.';
-  }
-  const parts = [`${g.videos} video${g.videos === 1 ? '' : 's'} for ${name}`];
-  const kinds: string[] = [];
-  if (g.withSales) kinds.push(`${g.withSales} with sales`);
-  if (g.zero) kinds.push(`${g.zero} at $0`);
-  if (g.unsynced) kinds.push(`${g.unsynced} not synced`);
-  if (kinds.length) parts.push(kinds.join(', '));
-  if (g.frozen && g.frozenAt) {
-    const late = g.source === 'backfill' ? ', frozen after the month had ended' : '';
-    const drift =
-      g.liveGmv !== null && Math.round(g.liveGmv) !== Math.round(g.gmv)
-        ? `. Now the same videos add up to ${money(g.liveGmv)}`
-        : '';
-    return `${parts.join(' · ')}. Month-end figure, frozen ${dayOf(g.frozenAt)}${late}${drift}.`;
-  }
-  return `${parts.join(' · ')}. Live: it changes as videos sync.`;
+    }),
+    [q.data, period],
+  );
 }

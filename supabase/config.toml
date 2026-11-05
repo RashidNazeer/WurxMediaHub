@@ -502,3 +502,8 @@ verify_jwt = false
 # restore). The platform check stays on as a second lock in front of it.
 [functions.backup-data]
 verify_jwt = true
+
+[functions.collab-gmv-sync]
+# Called by pg_cron through pg_net, which carries no JWT, exactly like reacher-sync.
+# The function checks x-sync-secret or a staff session itself.
+verify_jwt = false

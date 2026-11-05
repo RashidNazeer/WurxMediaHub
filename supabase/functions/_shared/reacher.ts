@@ -43,6 +43,9 @@ const ALLOWED = new Set([
   /* Added 2026-09-23 for the onboarding product picker. A read: it lists the
      shop's catalogue with titles, images and prices. */
   '/products/catalog',
+  /* Added 2026-11-06 for the monthly creator GMV. A read: creators ranked by GMV
+     earned inside a date range, from daily performance data. */
+  '/creators/performance',
 ]);
 
 export function reacherKey(): string {
