@@ -523,6 +523,25 @@
   .wurxbase-root.wurxbase-root .pc-back {
     margin-top: 0 !important;
   }
+
+  /*
+   * PINNED BELOW THE HEADER, SO SCROLLING NEVER SLICES THEM.
+   *
+   * Reported 2026-11-06 with a screenshot: after a little scrolling the
+   * "‹ All brands" button and the date range slid up and were cut by the
+   * edge of the scrolling area, which starts just under the header. Left
+   * unpinned, a half-letter sliver shows in the gap. Sticky inside the
+   * scroller keeps both controls whole and where the person needs them to
+   * change month, and the header never covers them. Measured on every tab:
+   * they hold at 0.25rem under the scroller's top and collide with no table
+   * header. z-index stays far below the overlays (1900+).
+   */
+  .wurxbase-root.wurxbase-root .pc-filterbar,
+  .wurxbase-root.wurxbase-root .pc-back {
+    position: sticky;
+    top: 0.25rem;
+    z-index: 50;
+  }
 }
 
 /*
