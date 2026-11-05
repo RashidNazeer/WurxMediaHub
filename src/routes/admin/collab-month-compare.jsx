@@ -155,6 +155,8 @@ export function compareMonths(rows, month, budgets, brand, helpers) {
         trail,
         returning: trail.slice(0, i).some(Boolean),
         fig: figures(p),
+        /* What they did in each of the three months, or null where not hired. */
+        figs: idx.map((ix, j) => (trail[j] ? figures(j === i ? p : matchIn(ix, p)) : null)),
       });
     });
     columns[i].people.sort((x, y) => y.fig.gmv - x.fig.gmv);
@@ -172,52 +174,86 @@ export function compareMonths(rows, month, budgets, brand, helpers) {
 
 /* ─── the screen ───────────────────────────────────────────────────────── */
 
-const pct = (n) => `${Math.round(n)}%`;
-const FIRST = 12;
+const FIRST = 8;
 
-function PersonRow({ p, Face }) {
-  const f = p.fig;
+/** The real current month, `YYYY-MM`. The comparison always ends here. */
+const thisMonthKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+/** One month's cell: videos delivered out of committed, or a faint dash. */
+function Cell({ fig, now }) {
+  if (!fig) return <span className="wx-cmp-cell off" aria-label="not hired">–</span>;
+  const text = fig.videos > 0 ? `${fig.delivered}/${fig.videos}` : 'Hired';
+  return <span className={`wx-cmp-cell on${now ? ' now' : ''}`}>{text}</span>;
+}
+
+function Group({ title, tone, people, Face }) {
+  const [all, setAll] = useState(false);
+  if (people.length === 0) return null;
+  const shown = all ? people : people.slice(0, FIRST);
   return (
-    <li className="wx-cmp-row">
-      {Face ? (
-        <Face handle={p.handle} name={p.name} size={36} />
-      ) : (
-        <span className="wx-cmp-initial">{(p.name || '?')[0].toUpperCase()}</span>
+    <div className={`wx-cmp-group ${tone}`}>
+      <div className="wx-cmp-grouphead">
+        <span className="wx-cmp-dot" aria-hidden />
+        <b>{title}</b>
+        <span>{people.length}</span>
+      </div>
+      <ul>
+        {shown.map((p, i) => (
+          <li key={`${p.handle || p.name}-${i}`} className="wx-cmp-row">
+            <span className="wx-cmp-id">
+              {Face ? (
+                <Face handle={p.handle} name={p.name} size={34} />
+              ) : (
+                <span className="wx-cmp-initial">{(p.name || '?')[0].toUpperCase()}</span>
+              )}
+              <span className="wx-cmp-who">
+                <b>{p.name}</b>
+                {p.handle && <em>@{p.handle}</em>}
+              </span>
+            </span>
+            {p.figs.map((f, j) => (
+              <Cell key={j} fig={f} now={j === 2} />
+            ))}
+          </li>
+        ))}
+      </ul>
+      {people.length > FIRST && (
+        <button type="button" className="wx-cmp-more" onClick={() => setAll((v) => !v)}>
+          {all ? 'Show fewer' : `Show all ${people.length}`}
+        </button>
       )}
-      <span className="wx-cmp-who">
-        <b>{p.name}</b>
-        {p.handle && <em>@{p.handle}</em>}
-      </span>
-      <span className="wx-cmp-fig">{f.videos > 0 ? `${f.delivered}/${f.videos} videos` : '–'}</span>
-    </li>
+    </div>
   );
 }
 
-export function BrandMonthCompare({ brand, month, allTime, rows, budgets, helpers, monthLabel }) {
+/**
+ * Always the real current month and the two before it, whatever the month
+ * picker says: "if the current month is November it shows September, October
+ * and November" (Rashid, 2026-11-05). `month` and `allTime` are not read.
+ */
+export function BrandMonthCompare({ brand, rows, budgets, helpers, monthLabel }) {
   const [open, setOpen] = useState(true);
-  const [tab, setTab] = useState(2);
-  const [all, setAll] = useState(false);
+  const anchor = thisMonthKey();
   const cmp = useMemo(
-    () => (allTime || !month ? null : compareMonths(rows || [], month, budgets, brand, helpers)),
-    [rows, month, allTime, budgets, brand, helpers]
+    () => compareMonths(rows || [], anchor, budgets, brand, helpers),
+    [rows, anchor, budgets, brand, helpers]
   );
-  /* All Time has no "last month", so there is nothing honest to compare. */
-  if (!cmp) return null;
 
   const lbl = (k) => (monthLabel ? monthLabel(k) : k);
   const short = (k) => lbl(k).split(' ')[0];
   const Face = helpers && helpers.CreatorFace;
   const { columns, flows } = cmp;
+  const [c0, c1, c2] = columns;
+  const empty = columns.every((c) => c.count === 0);
 
-  /* One list at a time, newest first: who is here now, then who left and when. */
-  const tabs = [
-    { i: 2, label: `Working with us in ${short(columns[2].month)}` },
-    { i: 1, label: `Left after ${short(columns[1].month)}` },
-    { i: 0, label: `Left after ${short(columns[0].month)}` },
-  ].filter((t) => t.i === 2 || columns[t.i].people.length > 0);
-  const cur = tabs.find((t) => t.i === tab) || tabs[0];
-  const list = columns[cur.i].people;
-  const shown = all ? list : list.slice(0, FIRST);
+  const sentence = (f) =>
+    f.total > 0
+      ? `${f.stayed} of ${short(f.from)}'s ${f.total} were hired again in ${short(f.to)}`
+      : null;
+  const notes = flows.map(sentence).filter(Boolean);
 
   return (
     <div className="wx-cmp" data-wx="month-compare">
@@ -227,73 +263,58 @@ export function BrandMonthCompare({ brand, month, allTime, rows, budgets, helper
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <span className="wx-cmp-title">
-          Creators, last three months
-          {cmp.month === new Date().toISOString().slice(0, 7) ? ' · month in progress' : ''}
-        </span>
+        <span className="wx-cmp-title">Creators, last three months</span>
         <span className="wx-cmp-chev" aria-hidden>
           {open ? '▾' : '▸'}
         </span>
       </button>
 
-      {open && (
-        <>
-          <div className="wx-cmp-flow" role="group" aria-label="Creators hired each month">
-            {columns.map((c, i) => (
-              <div key={c.month} className="wx-cmp-flowpart">
-                <div className={`wx-cmp-month${i === 2 ? ' now' : ''}`}>
-                  <b>{c.count}</b>
-                  <span>{short(c.month)}</span>
-                </div>
-                {i < 2 && (
-                  <div className="wx-cmp-arrow" title={`Hired in ${lbl(flows[i].from)} and again in ${lbl(flows[i].to)}`}>
-                    <span>{flows[i].total > 0 ? `${flows[i].stayed} stayed` : '–'}</span>
-                    <i aria-hidden>→</i>
-                    {flows[i].pct != null && <small>{pct(flows[i].pct)}</small>}
-                  </div>
-                )}
+      {open &&
+        (empty ? (
+          <p className="wx-cmp-none">No creators were hired in the last three months.</p>
+        ) : (
+          <>
+            {notes.length > 0 && <p className="wx-cmp-notes">{notes.join(' · ')}</p>}
+
+            <div className="wx-cmp-grid" role="table">
+              <div className="wx-cmp-colhead" role="row">
+                <span />
+                {columns.map((c, i) => (
+                  <span key={c.month} className={i === 2 ? 'now' : ''} role="columnheader">
+                    <b>{short(c.month)}</b>
+                    <small>
+                      {c.count} hired{i === 2 ? ' so far' : ''}
+                    </small>
+                  </span>
+                ))}
               </div>
-            ))}
-          </div>
 
-          <div className="wx-cmp-tabs" role="tablist">
-            {tabs.map((t) => (
-              <button
-                key={t.i}
-                type="button"
-                role="tab"
-                aria-selected={cur.i === t.i}
-                className={cur.i === t.i ? 'on' : ''}
-                onClick={() => {
-                  setTab(t.i);
-                  setAll(false);
-                }}
-              >
-                {t.label} <b>{columns[t.i].people.length}</b>
-              </button>
-            ))}
-          </div>
-
-          {list.length === 0 ? (
-            <p className="wx-cmp-none">Nobody.</p>
-          ) : (
-            <ul className="wx-cmp-list">
-              {shown.map((p, i) => (
-                <PersonRow key={`${p.handle || p.name}-${i}`} p={p} Face={Face} />
-              ))}
-            </ul>
-          )}
-          {list.length > FIRST && (
-            <button type="button" className="wx-cmp-more" onClick={() => setAll((v) => !v)}>
-              {all ? 'Show fewer' : `Show all ${list.length}`}
-            </button>
-          )}
-          <p className="wx-cmp-foot">
-            A creator is listed once, under the latest month they were hired. Same TikTok handle
-            means same creator.
-          </p>
-        </>
-      )}
+              <Group
+                title={`With us in ${short(c2.month)}`}
+                tone="stayed"
+                people={c2.people}
+                Face={Face}
+              />
+              <Group
+                title={`Left after ${short(c1.month)}`}
+                tone="dropped"
+                people={c1.people}
+                Face={Face}
+              />
+              <Group
+                title={`Left after ${short(c0.month)}`}
+                tone="dropped"
+                people={c0.people}
+                Face={Face}
+              />
+            </div>
+            <p className="wx-cmp-foot">
+              Each creator is listed once, under the latest month they were hired. A number is
+              videos delivered out of committed; a dash means not hired that month. Same TikTok
+              handle means same creator.
+            </p>
+          </>
+        ))}
     </div>
   );
 }
