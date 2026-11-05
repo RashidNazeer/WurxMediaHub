@@ -29,17 +29,21 @@ import {
 
 type Shown = { email: string; password: string; what: 'created' | 'reset' };
 
+type Choice = { id: string; label: string };
+
 function BrandPicker({
   choices,
   value,
   onChange,
+  label,
 }: {
-  choices: string[];
+  choices: Choice[];
   value: string[];
   onChange: (next: string[]) => void;
+  label: string;
 }) {
   const [q, setQ] = useState('');
-  const list = choices.filter((b) => b.toLowerCase().includes(q.trim().toLowerCase()));
+  const list = choices.filter((b) => b.label.toLowerCase().includes(q.trim().toLowerCase()));
   const toggle = (b: string) =>
     onChange(value.includes(b) ? value.filter((x) => x !== b) : [...value, b]);
   return (
@@ -47,16 +51,16 @@ function BrandPicker({
       <Input
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search brands"
-        aria-label="Search brands"
+        placeholder={`Search ${label}`}
+        aria-label={`Search ${label}`}
         className="h-10"
       />
       <ul className="wx-neo-inset mt-2 max-h-56 overflow-auto rounded-md p-2">
         {list.map((b) => (
-          <li key={b}>
+          <li key={b.id}>
             <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[0.875rem]">
-              <input type="checkbox" checked={value.includes(b)} onChange={() => toggle(b)} />
-              {b}
+              <input type="checkbox" checked={value.includes(b.id)} onChange={() => toggle(b.id)} />
+              {b.label}
             </label>
           </li>
         ))}
@@ -102,17 +106,26 @@ function Credentials({ shown, onClose }: { shown: Shown; onClose: () => void }) 
 
 export function ApcAccounts() {
   const accounts = useApcAccounts();
-  const choices = useApcBrandChoices();
+  const choiceQuery = useApcBrandChoices();
+  const collabChoices: Choice[] = (choiceQuery.data?.brands ?? []).map((b) => ({ id: b, label: b }));
+  const platformChoices: Choice[] = (choiceQuery.data?.platformBrands ?? []).map((b) => ({
+    id: b.id,
+    label: b.name,
+  }));
+  const platformName = (id: string) =>
+    platformChoices.find((b) => b.id === id)?.label ?? 'Unknown brand';
   const actions = useApcActions();
 
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [brands, setBrands] = useState<string[]>([]);
+  const [platformIds, setPlatformIds] = useState<string[]>([]);
   const [problem, setProblem] = useState('');
   const [shown, setShown] = useState<Shown | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [editBrands, setEditBrands] = useState<string[]>([]);
+  const [editPlatform, setEditPlatform] = useState<string[]>([]);
 
   const fail = (e: unknown) => setProblem(e instanceof Error ? e.message : 'That did not go through.');
 
@@ -126,12 +139,14 @@ export function ApcAccounts() {
         email: email.trim(),
         displayName: name.trim(),
         brands,
+        platformBrandIds: platformIds,
       });
       setShown({ email: r.email, password: r.password, what: 'created' });
       setCreating(false);
       setName('');
       setEmail('');
       setBrands([]);
+      setPlatformIds([]);
     } catch (e) {
       fail(e);
     }
@@ -152,7 +167,10 @@ export function ApcAccounts() {
     setProblem('');
     if (editBrands.length === 0) return setProblem('Assign at least one brand, or disable the account');
     try {
-      await actions.setBrands.mutateAsync({ userId: a.id, brands: editBrands });
+      await actions.setBrands.mutateAsync({ userId: a.id,
+        brands: editBrands,
+        platformBrandIds: editPlatform,
+      });
       setEditing(null);
     } catch (e) {
       fail(e);
@@ -220,12 +238,21 @@ export function ApcAccounts() {
             </div>
           </div>
           <div className="mt-4">
-            <Label htmlFor="apc-brands">Brands they can see</Label>
-            {choices.isPending ? (
+            <Label htmlFor="apc-brands">Paid Collabs brands they can see</Label>
+            {choiceQuery.isPending ? (
               <p className="text-muted mt-2 text-[0.875rem]">Loading brands…</p>
             ) : (
-              <BrandPicker choices={choices.data ?? []} value={brands} onChange={setBrands} />
+              <BrandPicker label="brands" choices={collabChoices} value={brands} onChange={setBrands} />
             )}
+          </div>
+          <div className="mt-4">
+            <Label htmlFor="apc-platform">Contest brands they can see (optional)</Label>
+            <BrandPicker
+              label="contest brands"
+              choices={platformChoices}
+              value={platformIds}
+              onChange={setPlatformIds}
+            />
           </div>
           <div className="mt-4 flex gap-2">
             <Button size="sm" onClick={() => void create()} disabled={actions.create.isPending}>
@@ -275,6 +302,7 @@ export function ApcAccounts() {
                   onClick={() => {
                     setEditing(editing === a.id ? null : a.id);
                     setEditBrands(a.brands);
+                    setEditPlatform(a.platformBrandIds);
                     setProblem('');
                   }}
                 >
@@ -292,7 +320,17 @@ export function ApcAccounts() {
             </div>
             {editing === a.id ? (
               <div className="mt-4">
-                <BrandPicker choices={choices.data ?? []} value={editBrands} onChange={setEditBrands} />
+                <Label htmlFor="apc-edit-brands">Paid Collabs brands</Label>
+                <BrandPicker label="brands" choices={collabChoices} value={editBrands} onChange={setEditBrands} />
+                <div className="mt-3">
+                  <Label htmlFor="apc-edit-platform">Contest brands</Label>
+                  <BrandPicker
+                    label="contest brands"
+                    choices={platformChoices}
+                    value={editPlatform}
+                    onChange={setEditPlatform}
+                  />
+                </div>
                 <div className="mt-3 flex gap-2">
                   <Button size="sm" onClick={() => void saveBrands(a)} disabled={actions.setBrands.isPending}>
                     Save brands
@@ -305,6 +343,8 @@ export function ApcAccounts() {
             ) : (
               <p className="text-muted mt-3 text-[0.875rem]">
                 {a.brands.length ? a.brands.join(' · ') : 'No brands assigned'}
+                {a.platformBrandIds.length > 0 &&
+                  ` · Contests: ${a.platformBrandIds.map(platformName).join(', ')}`}
               </p>
             )}
           </li>

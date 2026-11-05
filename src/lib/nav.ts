@@ -408,6 +408,24 @@ export function navForRole(role: AppRole | undefined, collabTabs?: string[]): Na
    * into the address bar is refused by the route guard, and the queries behind
    * it return nothing under RLS. See COLLABS_ONLY_ROLES.
    */
+  /* An APC viewer: their own Dashboard and Contests, then Paid Collabs. Rows
+     only; what they can read is decided by the brand-scoped views. */
+  if (role === 'apc_viewer') {
+    const collabs = ADMIN.filter((g) => g.label === COLLABS_GROUP).map((g) => ({
+      ...g,
+      items: g.items.filter((i) => i.to?.startsWith('/admin/collabs')),
+    }));
+    return [
+      {
+        label: 'Overview',
+        items: [
+          { label: 'Dashboard', icon: LayoutDashboard, to: '/admin/apc' },
+          { label: 'Contests', icon: Trophy, to: '/admin/apc/contests' },
+        ],
+      },
+      ...withCollabTabs(collabs, role, collabTabs),
+    ];
+  }
   if (isCollabsOnlyRole(role)) {
     const collabsOnly = ADMIN.filter((g) => g.items.some((i) => i.to?.startsWith('/admin/collabs')))
       .map((g) => ({ ...g, items: g.items.filter((i) => i.to?.startsWith('/admin/collabs')) }));

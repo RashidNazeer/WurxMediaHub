@@ -209,6 +209,8 @@ const AdminContent = screen(() => import('@/routes/admin/Content'), 'AdminConten
 const AdminActivity = screen(() => import('@/routes/admin/Activity'), 'Activity');
 const AdminClientLinks = screen(() => import('@/routes/admin/ClientLinks'), 'ClientLinks');
 const AdminApcAccounts = screen(() => import('@/routes/admin/ApcAccounts'), 'ApcAccounts');
+const ApcDashboard = screen(() => import('@/routes/admin/ApcDashboard'), 'ApcDashboard');
+const ApcContests = screen(() => import('@/routes/admin/ApcContests'), 'ApcContests');
 const AdminBackups = screen(() => import('@/routes/admin/Backups'), 'Backups');
 const AdminTikTok = screen(() => import('@/routes/admin/TikTokSettings'), 'TikTokSettings');
 const AdminPaidCollabs = screen(() => import('@/routes/admin/PaidCollabs'), 'PaidCollabs');
@@ -610,6 +612,25 @@ export const router = createBrowserRouter([
             path: '/admin/collabs/:tab',
             element: <AdminPaidCollabs />,
           },
+        ],
+      },
+    ],
+  },
+
+  {
+    /*
+     * APC VIEWER HOME: their own dashboard and contests, on a guard that admits
+     * ONLY apc_viewer. The guard picks the screen; the views behind it
+     * (`wurxbase.apc_*`, `public.apc_contests`) are what limit the data.
+     */
+    Component: () => <RequireAuth allow={['apc_viewer']} />,
+    children: [
+      {
+        HydrateFallback: RouteFallback,
+        lazy: lazyRoute(() => import('@/components/layout/ShellLayout'), 'ShellLayout'),
+        children: [
+          { path: '/admin/apc', element: <ApcDashboard /> },
+          { path: '/admin/apc/contests', element: <ApcContests /> },
         ],
       },
     ],

@@ -35,6 +35,25 @@ insert into wurxbase.apc_brand_access (user_id, brand) values ('aaaaaaaa-0000-00
 insert into wurxbase.apc_brand_access (user_id, brand) values ('aaaaaaaa-0000-0000-0000-000000000002', 'Beta');
 set session_replication_role = origin;
 
+-- ---- phase 2 fixtures: platform brands + contests, creator videos, ad rows ----
+insert into public.brands (id, name, slug, store_id) values
+  ('bbbbbbbb-0000-0000-0000-00000000000a','Plat Alpha','plat-alpha','store-a'),
+  ('bbbbbbbb-0000-0000-0000-00000000000b','Plat Beta','plat-beta','store-b');
+insert into public.contests (id, brand_id, name, expires_at) values
+  ('cccccccc-0000-0000-0000-00000000000a','bbbbbbbb-0000-0000-0000-00000000000a','Alpha contest', now() + interval '10 days'),
+  ('cccccccc-0000-0000-0000-00000000000b','bbbbbbbb-0000-0000-0000-00000000000b','Beta contest',  now() + interval '10 days');
+insert into public.contest_commercials (contest_id, total_budget, internal_note) values
+  ('cccccccc-0000-0000-0000-00000000000a', 1000, 'INTERNAL SECRET NOTE'),
+  ('cccccccc-0000-0000-0000-00000000000b', 2000, 'other');
+insert into public.apc_platform_brand_access (user_id, brand_id) values
+  ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-00000000000a'),
+  ('aaaaaaaa-0000-0000-0000-000000000002','bbbbbbbb-0000-0000-0000-00000000000b');
+update wurxbase.creators set video_codes = '[{"video":"https://www.tiktok.com/@a/video/111111111"}]'::jsonb where name = 'Ann';
+update wurxbase.creators set video_codes = '[{"video":"https://www.tiktok.com/@b/video/222222222"}]'::jsonb where name = 'Bob';
+insert into public.euka_ad_video_month (item_id, month, store_id, advertiser_id, campaign_id, cost, orders, gross_revenue, currency) values
+  ('111111111', date_trunc('month', now())::date, 's', 'adv', 'c1', 50, 2, 300, 'USD'),
+  ('222222222', date_trunc('month', now())::date, 's', 'adv', 'c2', 99, 9, 900, 'USD');
+
 create temp table results (n serial, test text, outcome text);
 grant all on results to authenticated, anon; grant usage, select on sequence results_n_seq to authenticated, anon;
 
@@ -112,6 +131,40 @@ select pg_temp.expect_count('plain user: apc view empty', 'select * from wurxbas
 reset role; set local role anon;
 select pg_temp.expect_count('anon: apc view denied', 'select * from wurxbase.apc_creators', 0);
 
+
+-- ============ PHASE 2 ============
+reset role; set local role authenticated;
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+select pg_temp.expect_count('p2 apc1: sees only Alpha contest (1)', 'select * from public.apc_contests', 1);
+select pg_temp.expect_count('p2 apc1: no Beta contest', $q$select * from public.apc_contests where name = 'Beta contest'$q$, 0);
+select pg_temp.expect_count('p2 apc1: contest budget visible', 'select * from public.apc_contests where total_budget = 1000', 1);
+select pg_temp.expect_count('p2 contest view has NO creator/internal columns', $q$select 1 from information_schema.columns where table_schema='public' and table_name='apc_contests' and column_name ~ '(creator|email|handle|internal|note)'$q$, 0);
+select pg_temp.expect_count('p2 apc1: raw contests unreadable', 'select * from public.contests', 0);
+select pg_temp.expect_count('p2 apc1: raw contest_commercials unreadable', 'select * from public.contest_commercials', 0);
+select pg_temp.expect_count('p2 apc1: contest_entries unreadable', 'select * from public.contest_entries', 0);
+select pg_temp.expect_count('p2 apc1: platform brand assignments unreadable', 'select * from public.apc_platform_brand_access', 0);
+select pg_temp.expect_denied('p2 apc1: INSERT into contest view', $q$insert into public.apc_contests (id, name) values (gen_random_uuid(), 'x')$q$);
+select pg_temp.expect_denied('p2 apc1: UPDATE contest view', $q$update public.apc_contests set name = 'x'$q$);
+select pg_temp.expect_denied('p2 apc1: UPDATE raw contests', $q$update public.contests set name = 'x'$q$);
+select pg_temp.expect_denied('p2 apc1: self-assign platform brand', $q$insert into public.apc_platform_brand_access (user_id, brand_id) values ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-00000000000b')$q$);
+select pg_temp.expect_count('p2 apc1: ad figures for OWN video (1)', $q$select * from wurxbase.apc_ad_totals_for_videos(array['111111111'])$q$, 1);
+select pg_temp.expect_count('p2 apc1: ad figures for ANOTHER brand video (0)', $q$select * from wurxbase.apc_ad_totals_for_videos(array['222222222'])$q$, 0);
+select pg_temp.expect_count('p2 apc1: both asked, only own returned (1)', $q$select * from wurxbase.apc_ad_totals_for_videos(array['111111111','222222222'])$q$, 1);
+select pg_temp.expect_count('p2 apc1: raw ad table unreadable', 'select * from public.euka_ad_video_month', 0);
+select pg_temp.expect_count('p2 apc1: spark codes function refused', $q$select * from public.euka_spark_codes_for_videos(array['111111111'])$q$, 0);
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000002');
+select pg_temp.expect_count('p2 apc2: sees only Beta contest (1)', $q$select * from public.apc_contests where name = 'Beta contest'$q$, 1);
+select pg_temp.expect_count('p2 apc2: no Alpha contest', $q$select * from public.apc_contests where name = 'Alpha contest'$q$, 0);
+select pg_temp.expect_count('p2 apc2: cannot price Alpha video', $q$select * from wurxbase.apc_ad_totals_for_videos(array['111111111'])$q$, 0);
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000003');
+select pg_temp.expect_count('p2 admin: contest view empty', 'select * from public.apc_contests', 0);
+select pg_temp.expect_count('p2 admin: ad wrapper empty', $q$select * from wurxbase.apc_ad_totals_for_videos(array['111111111'])$q$, 0);
+reset role; set local role anon;
+select pg_temp.expect_count('p2 anon: contest view denied', 'select * from public.apc_contests', 0);
+select pg_temp.expect_count('p2 anon: ad wrapper denied', $q$select * from wurxbase.apc_ad_totals_for_videos(array['111111111'])$q$, 0);
+reset role;
+
+reset role; set local role authenticated;
 -- ============ a disabled APC loses access at once ============
 reset role;
 set session_replication_role = replica;
