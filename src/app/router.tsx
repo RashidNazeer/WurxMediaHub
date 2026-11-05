@@ -208,6 +208,7 @@ const AdminContestSetup = screen(() => import('@/routes/admin/ContestSetup'), 'C
 const AdminContent = screen(() => import('@/routes/admin/Content'), 'AdminContent');
 const AdminActivity = screen(() => import('@/routes/admin/Activity'), 'Activity');
 const AdminClientLinks = screen(() => import('@/routes/admin/ClientLinks'), 'ClientLinks');
+const AdminApcAccounts = screen(() => import('@/routes/admin/ApcAccounts'), 'ApcAccounts');
 const AdminBackups = screen(() => import('@/routes/admin/Backups'), 'Backups');
 const AdminTikTok = screen(() => import('@/routes/admin/TikTokSettings'), 'TikTokSettings');
 const AdminPaidCollabs = screen(() => import('@/routes/admin/PaidCollabs'), 'PaidCollabs');
@@ -637,7 +638,12 @@ export const router = createBrowserRouter([
            until it arrived. Reported from a real handset. */
         HydrateFallback: RouteFallback,
         lazy: lazyRoute(() => import('@/components/layout/ShellLayout'), 'ShellLayout'),
-        children: [{ path: '/admin/client-links', element: <AdminClientLinks /> }],
+        children: [
+          { path: '/admin/client-links', element: <AdminClientLinks /> },
+          /* APC logins: same owners-only guard, and the manage-apc Edge Function
+             re-checks admin/ops from the profiles table. */
+          { path: '/admin/apc-accounts', element: <AdminApcAccounts /> },
+        ],
       },
     ],
   },

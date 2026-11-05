@@ -49,3 +49,8 @@ declare module '@/vendor/wurxbase/access' {
   export const ALL_CAPS: string[];
   export const ROLE_LIST: string[];
 }
+
+/** WURX-ADDED 2026-11-05: points the vendored client at the APC viewer's brand-scoped views. */
+declare module '@/vendor/wurxbase/supabaseClient' {
+  export function setApcViewer(on: boolean): void;
+}

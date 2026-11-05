@@ -39,8 +39,28 @@ export const WURXBASE_SCHEMA = 'wurxbase';
    imported by the lazy Paid Collabs chunk, so there is no import-time work. */
 const db = () => getSupabase().schema(WURXBASE_SCHEMA);
 
+/* ── APC viewers read VIEWS, not tables ────────────────────────────
+   WURX-ADDED 2026-11-05. An APC viewer has no policy on any base table: the
+   `wurxbase.creators` row carries WhatsApp, email, PayPal and Zelle, and row
+   level security cannot hide a column. They get brand-scoped views instead
+   (migration 20261105090100) and this map points the vendored code's
+   `.from('creators')` at them, so none of its forty-five call sites change.
+
+   THIS MAP IS A CONVENIENCE, NOT THE BOUNDARY. If it were wrong or bypassed,
+   the APC would reach a base table and the database would answer with nothing.
+   Tables not listed (app_users, audit_logs, join_requests, revoked_sessions,
+   app_settings) are left alone ON PURPOSE: they come back empty for an APC. */
+const APC_VIEWS = {
+  creators: 'apc_creators',
+  brand_monthly_budgets: 'apc_brand_monthly_budgets',
+  activity_logs: 'apc_activity_logs',
+};
+let apcViewer = false;
+export const setApcViewer = (on) => { apcViewer = Boolean(on); };
+const tableFor = (table) => (apcViewer && APC_VIEWS[table]) || table;
+
 export const supabase = {
-  from: (table) => db().from(table),
+  from: (table) => db().from(tableFor(table)),
   rpc: (fn, args, opts) => db().rpc(fn, args, opts),
   /* Realtime lives on the root client, not on the schema-scoped one. Their
      `postgres_changes` filters name the schema themselves and have all been

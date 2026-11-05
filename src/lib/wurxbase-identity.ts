@@ -56,6 +56,8 @@ const ROLE_MAP: Record<AppRole, WurxBaseRole> = {
   affiliate_team_lead: 'viewer',
   operations_lead: 'viewer',
   ads_manager: 'superadmin',
+  /* Never their `apc`, which can edit. Ours is view only. */
+  apc_viewer: 'viewer',
 };
 
 /**
