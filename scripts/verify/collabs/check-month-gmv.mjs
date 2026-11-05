@@ -23,6 +23,7 @@ import {
   recentMonths,
   settledAt,
 } from '../../../supabase/functions/_shared/collab-gmv.ts';
+import { applyFills, monthKeyOf, videoHandleOf, videoIdOf } from '../../../src/lib/admin/matrix-autofill.ts';
 import { cellFor, handleOf, periodText, rowHandles, storedMonthFor, usablePeriod, wholeMonthOf } from '../../../src/lib/admin/creator-month-gmv.ts';
 
 let failed = 0;
@@ -142,6 +143,30 @@ section('7. ONLY WHAT THE USER SETS IS ASKED LIVE');
   ok(storedMonthFor(null, now) === null, 'no dates: nothing');
   ok(storedMonthFor({ from: '2026-10-01', to: '2026-10-30' }, at('2026-10-30T09:00:00Z')) === '2026-10', 'the month so far on the 30th is that month');
   ok(storedMonthFor({ from: '2026-10-01', to: '2026-10-29' }, at('2026-10-30T09:00:00Z')) === null, 'but not through the 29th');
+}
+
+section('8. THE PERFORMANCE SHEET FILLS ITSELF, AND NEVER OVER THE TEAM');
+{
+  const fill = (m, e) => applyFills(m, e);
+  const a = fill({}, [{ key: '2026-10', gmv: 4005.09, adSpent: 2245.41 }]);
+  ok(a && a['2026-10'].gmv === 4005.09 && a['2026-10'].adSpent === 2245.41 && a['2026-10'].auto.length === 2, 'an empty month fills GMV and Ad, and records that the sheet filled them');
+  ok(applyFills(a, [{ key: '2026-10', gmv: 4005.09, adSpent: 2245.41 }]) === null, 'filling the same figures again changes nothing (so opening the sheet twice writes nothing)');
+  const up = fill(a, [{ key: '2026-10', gmv: 4100.5, adSpent: 2245.41 }]);
+  ok(up && up['2026-10'].gmv === 4100.5 && up['2026-10'].adSpent === 2245.41, 'a figure the sheet filled is refreshed when it moves (late sales settle)');
+  const typed = { '2026-09': { gmv: 100, adSpent: 50 } };
+  ok(applyFills(typed, [{ key: '2026-09', gmv: 4005.09, adSpent: 2245.41 }]) === null, 'a cell the team TYPED is never touched');
+  const mixed = fill({ '2026-09': { gmv: 100 } }, [{ key: '2026-09', gmv: 999, adSpent: 70 }]);
+  ok(mixed && mixed['2026-09'].gmv === 100 && mixed['2026-09'].adSpent === 70 && mixed['2026-09'].auto.length === 1 && mixed['2026-09'].auto[0] === 'adSpent', 'a typed GMV stays while the empty Ad beside it is filled');
+  ok(applyFills(a, [{ key: '2026-10' }]) === null, 'no figure for a field leaves it alone: unknown is not zero');
+  ok(applyFills(a, [{ key: '2026-10', gmv: 0, adSpent: 0 }]) === null, 'and a zero never removes what was filled');
+  const second = fill({}, [{ key: '2026-10@other.account', gmv: 12 }]);
+  ok(second && second['2026-10@other.account'].gmv === 12 && !second['2026-10'], 'a second account fills its own key');
+  const other = fill({ l30: 5, perf: { hidden: false } }, [{ key: '2026-10', gmv: 3 }]);
+  ok(other && other.l30 === 5 && other.perf && other['2026-10'].gmv === 3, 'the rest of the monthly record is carried across untouched');
+  ok(videoIdOf('https://www.tiktok.com/@erin/video/7641255386334383390?x=1') === '7641255386334383390', 'a video id is read from the link');
+  ok(videoHandleOf('https://www.tiktok.com/@ErinRaganCooper/video/764') === 'erinragancooper', 'a video link names the handle');
+  ok(videoHandleOf('https://vm.tiktok.com/ZSabc/') === '', 'a short link names nobody (the handle on the row is used)');
+  ok(monthKeyOf('2026-10-01') === '2026-10', 'an ad month is a sheet month');
 }
 
 section('6. ANY RANGE OF DAYS');
