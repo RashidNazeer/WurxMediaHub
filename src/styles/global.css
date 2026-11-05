@@ -2001,6 +2001,10 @@ body::after {
  */
 @utility wx-glass-overlay {
   background-color: var(--wx-glass-modal);
+  /* 0.89 alone let table text show through the calendar; blur makes whatever is
+     behind it unreadable instead of competing with the dates. */
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
+  backdrop-filter: blur(20px) saturate(1.1);
   background-image: var(--wx-glass-rim-top), var(--wx-glass-rim-left);
   background-size:
     100% 1px,

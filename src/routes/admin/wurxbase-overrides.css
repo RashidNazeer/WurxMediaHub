@@ -4324,3 +4324,34 @@
 .wurxbase-root.wurxbase-root .pc-bt-row {
   grid-template-columns: 2.4fr 0.95fr 0.95fr 0.95fr 0.95fr 1.15fr 0.6fr 0.8fr 0.95fr 0.95fr 28px;
 }
+
+/* ============================================================================
+   POPUPS NO LONGER SLIDE UNDER OUR TOP BAR  (Rashid, 2026-11-05)
+
+   `.wurxbase-root` is `isolation: isolate`, so every z-index inside it, the
+   1900 on their modal overlays included, is sealed beneath our app header
+   (`z-40`). A modal centred in the whole window therefore had its title and
+   close button painted over by the bar above it. Raising z-index cannot cure
+   that from inside a sealed context, so the overlays start where the header
+   ends instead, and the panel inside is held to the space that is left.
+   `4.75rem` = header `mt-3` + `h-14` + a little air, in rem so it follows the
+   text size and browser zoom, which the old fixed 64px did not.
+   ============================================================================ */
+.wurxbase-root.wurxbase-root [class*="tw-z-[1900]"],
+.wurxbase-root.wurxbase-root [style*="z-index: 1900"],
+.wurxbase-root.wurxbase-root .modal-overlay {
+  padding-top: 4.75rem !important;
+  box-sizing: border-box;
+}
+.wurxbase-root.wurxbase-root [class*="tw-z-[1900]"] > *,
+.wurxbase-root.wurxbase-root [style*="z-index: 1900"] > *,
+.wurxbase-root.wurxbase-root .modal-overlay > * {
+  max-height: calc(100dvh - 5.5rem);
+}
+/* The bell's dropdown: same reason, and it must scroll rather than run off. */
+.wurxbase-root.wurxbase-root .notif-panel {
+  top: 4.75rem !important;
+  max-height: calc(100dvh - 5.5rem);
+  display: flex;
+  flex-direction: column;
+}
