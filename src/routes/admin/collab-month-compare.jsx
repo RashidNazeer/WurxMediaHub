@@ -192,6 +192,8 @@ export function compareMonths(rows, month, budgets, brand, helpers) {
 
 const FIRST = 8;
 
+const usd = (n) => `$${Math.round(n).toLocaleString('en-US')}`;
+
 /** The real current month, `YYYY-MM`. The comparison always ends here. */
 const thisMonthKey = () => {
   const d = new Date();
@@ -226,7 +228,9 @@ function Column({ title, sub, tone, people, Face }) {
                 {p.handle && <em>@{p.handle}</em>}
               </span>
               <span className="wx-cmp-fig">
-                {p.fig.videos > 0 ? `${p.fig.delivered}/${p.fig.videos}` : '–'}
+                <b>{p.fig.videos > 0 ? `${p.fig.delivered}/${p.fig.videos}` : '–'}</b>
+                {/* No GMV reported is a dash, never $0. */}
+                <em>{p.fig.gmv > 0 ? usd(p.fig.gmv) : '–'}</em>
               </span>
             </li>
           ))}
@@ -317,9 +321,9 @@ export function BrandMonthCompare({ brand, month, allTime, rows, budgets, helper
               />
             </div>
             <p className="wx-cmp-foot">
-              Each creator is listed once, under the latest month they were hired. The number is
-              videos delivered out of committed in that month. Same TikTok handle means same
-              creator.
+              Each creator is listed once, under the latest month they were hired. On the right:
+              videos delivered out of committed, then GMV, both for the month they are listed
+              under. A dash means none reported. Same TikTok handle means same creator.
             </p>
           </>
         ))}
