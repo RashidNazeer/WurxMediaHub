@@ -9,6 +9,8 @@ const SHIPPED: Record<string, string> = {
   swisse: '/brands/swisse.png',
   'dr-tobias': '/brands/dr-tobias.png',
   aurelia: '/brands/aurelia.png',
+  /* Biostime has no Euka store, so no photo comes from there. Its own mark, from biostime.us. */
+  biostime: '/brands/biostime.png',
 };
 
 export function brandLogo(slug: string | null | undefined, url: string | null | undefined) {

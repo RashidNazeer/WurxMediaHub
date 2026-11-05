@@ -90,23 +90,26 @@ export function summarise(rows, helpers) {
   };
 }
 
+
 /**
- * The comparison itself. `rows` is every creator row the brand has, in any
- * month; `month` is the one on screen.
+ * THE LAST THREE MONTHS, ONE PLACE PER CREATOR.
+ *
+ * Rashid, 2026-11-05: "the repeated creators of September that worked in October
+ * will be displayed in October only, and the creators of September who are no
+ * longer with us will also be shown."
+ *
+ * So a creator is listed ONCE, in the newest of the three months they were hired
+ * in. Someone hired in Aug, Sep and Oct sits under Oct, with a trail showing the
+ * two months before. Someone hired in Aug and Sep but not Oct sits under Sep, as
+ * having left after Sep. Someone hired only in Aug sits under Aug. Reading the
+ * columns left to right is reading who stayed and who dropped off, month by month.
  */
 export function compareMonths(rows, month, budgets, brand, helpers) {
-  const prev = prevMonthKey(month);
+  const m1 = prevMonthKey(month);
+  const m2 = prevMonthKey(m1);
+  const months = [m2, m1, month];
   const inMonth = (mk) => rows.filter((c) => String(c.hiring_date || '').slice(0, 7) === mk);
-  const curRows = inMonth(month);
-  const prevRows = inMonth(prev);
-
-  const budgetOf = (mk) => {
-    const b = (budgets || []).find((x) => x.brand === brand && x.month === mk);
-    return b ? Number(b.budget) || 0 : 0;
-  };
-
-  const cur = { ...summarise(curRows, helpers), budget: budgetOf(month) };
-  const old = { ...summarise(prevRows, helpers), budget: budgetOf(prev) };
+  const monthRows = months.map(inMonth);
 
   /* Who is in which month. A creator hired twice in one month is one person. */
   const index = (list) => {
@@ -125,70 +128,72 @@ export function compareMonths(rows, month, budgets, brand, helpers) {
     });
     return { byId, people };
   };
-  const a = index(prevRows);
-  const b = index(curRows);
+  const idx = monthRows.map(index);
 
-  const figures = (p) => {
-    const s = summarise(p.rows, helpers);
-    return { allocated: s.allocated, videos: s.videos, delivered: s.delivered, gmv: s.gmv };
-  };
-  const matchIn = (idx, p) => {
+  const matchIn = (ix, p) => {
     for (const row of p.rows)
       for (const i of identitiesOf(row)) {
-        const hit = idx.byId.get(i);
+        const hit = ix.byId.get(i);
         if (hit) return hit;
       }
     return null;
   };
-
-  const stayed = [],
-    dropped = [],
-    joined = [];
-  a.people.forEach((p) => {
-    const now = matchIn(b, p);
-    if (now)
-      stayed.push({
-        name: now.name,
-        handle: now.handle || p.handle,
-        before: figures(p),
-        now: figures(now),
-      });
-    else dropped.push({ name: p.name, handle: p.handle, before: figures(p) });
-  });
-  b.people.forEach((p) => {
-    if (!matchIn(a, p)) joined.push({ name: p.name, handle: p.handle, now: figures(p) });
-  });
-
-  const byGmv = (x, y) => (y.now || y.before).gmv - (x.now || x.before).gmv;
-  stayed.sort(byGmv);
-  dropped.sort(byGmv);
-  joined.sort(byGmv);
-
-  return {
-    month,
-    prev,
-    cur,
-    old,
-    people: { before: a.people.length, now: b.people.length },
-    stayed,
-    dropped,
-    joined,
-    retention: a.people.length > 0 ? (stayed.length / a.people.length) * 100 : null,
+  const figures = (p) => {
+    const s = summarise(p.rows, helpers);
+    return { videos: s.videos, delivered: s.delivered, gmv: s.gmv };
   };
+
+  /* Walk from the newest month back; a person already placed later is skipped. */
+  const columns = months.map((mk, i) => ({ month: mk, i, people: [], count: idx[i].people.length }));
+  for (let i = 2; i >= 0; i--) {
+    idx[i].people.forEach((p) => {
+      const trail = idx.map((ix, j) => (j === i ? true : !!matchIn(ix, p)));
+      if (trail.slice(i + 1).some(Boolean)) return;
+      columns[i].people.push({
+        name: p.name,
+        handle: p.handle,
+        trail,
+        returning: trail.slice(0, i).some(Boolean),
+        fig: figures(p),
+      });
+    });
+    columns[i].people.sort((x, y) => y.fig.gmv - x.fig.gmv);
+  }
+
+  /* Of the people hired in one month, how many were hired again the next. */
+  const flow = (a, b) => {
+    const total = idx[a].people.length;
+    const stayed = idx[a].people.filter((p) => matchIn(idx[b], p)).length;
+    return { from: months[a], to: months[b], total, stayed, pct: total > 0 ? (stayed / total) * 100 : null };
+  };
+
+  return { month, months, columns, flows: [flow(0, 1), flow(1, 2)] };
 }
 
 /* ─── the screen ───────────────────────────────────────────────────────── */
 
 const usd = (n) => `$${Math.round(n).toLocaleString('en-US')}`;
 const pct = (n) => `${Math.round(n)}%`;
-const FIRST = 6;
+const FIRST = 7;
 
-/**
- * One creator: face, name, handle, and the single figure that matters for the
- * column they are in (videos done, plus GMV when there is any to show).
- */
-function PersonRow({ p, fig, Face }) {
-  const videos = fig.videos > 0 ? `${fig.delivered}/${fig.videos} videos` : 'No deal size';
+/** One dot per month up to the column's own, filled where the creator was hired. */
+function Trail({ trail, labels, upto }) {
+  return (
+    <span className="wx-cmp-trail">
+      {trail.slice(0, upto + 1).map((on, j) => (
+        <i
+          key={j}
+          className={on ? 'on' : ''}
+          title={`${labels[j]}: ${on ? 'hired' : 'not hired'}`}
+        />
+      ))}
+    </span>
+  );
+}
+
+function PersonRow({ p, Face, labels, col }) {
+  const f = p.fig;
+  const videos = f.videos > 0 ? `${f.delivered}/${f.videos} videos` : 'No deal size';
   return (
     <li className="wx-cmp-row">
       {Face ? (
@@ -200,36 +205,73 @@ function PersonRow({ p, fig, Face }) {
         <b>{p.name}</b>
         {p.handle && <em>@{p.handle}</em>}
       </span>
+      {col > 0 && <Trail trail={p.trail} labels={labels} upto={col} />}
       <span className="wx-cmp-fig">
         <b>{videos}</b>
-        {fig.gmv > 0 && <em>{usd(fig.gmv)} GMV</em>}
+        {f.gmv > 0 && <em>{usd(f.gmv)} GMV</em>}
       </span>
     </li>
   );
 }
 
-function PeopleList({ title, tone, items, figOf, Face }) {
+function Column({ col, title, sub, tone, Face, labels, filters }) {
   const [all, setAll] = useState(false);
-  const shown = all ? items : items.slice(0, FIRST);
+  const [which, setWhich] = useState('all');
+  const list =
+    which === 'all'
+      ? col.people
+      : col.people.filter((p) => (which === 'returning' ? p.returning : !p.returning));
+  const shown = all ? list : list.slice(0, FIRST);
+  const nBack = col.people.filter((p) => p.returning).length;
   return (
     <section className={`wx-cmp-people ${tone}`}>
       <header>
         <span className="wx-cmp-dot" aria-hidden />
         <h4>{title}</h4>
-        <span className="wx-cmp-count">{items.length}</span>
+        <span className="wx-cmp-count">{col.people.length}</span>
       </header>
-      {items.length === 0 ? (
+      <p className="wx-cmp-hint">{sub}</p>
+      {filters && col.people.length > 0 && (
+        <div className="wx-cmp-chips" role="tablist">
+          {[
+            ['all', `All ${col.people.length}`],
+            ['returning', `Returning ${nBack}`],
+            ['new', `New ${col.people.length - nBack}`],
+          ].map(([k, t]) => (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={which === k}
+              className={which === k ? 'on' : ''}
+              onClick={() => {
+                setWhich(k);
+                setAll(false);
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
+      {list.length === 0 ? (
         <p className="wx-cmp-none">Nobody.</p>
       ) : (
         <ul>
           {shown.map((p, i) => (
-            <PersonRow key={`${p.handle || p.name}-${i}`} p={p} fig={figOf(p)} Face={Face} />
+            <PersonRow
+              key={`${p.handle || p.name}-${i}`}
+              p={p}
+              Face={Face}
+              labels={labels}
+              col={col.i}
+            />
           ))}
         </ul>
       )}
-      {items.length > FIRST && (
+      {list.length > FIRST && (
         <button type="button" className="wx-cmp-more" onClick={() => setAll((v) => !v)}>
-          {all ? 'Show fewer' : `Show all ${items.length}`}
+          {all ? 'Show fewer' : `Show all ${list.length}`}
         </button>
       )}
     </section>
@@ -245,9 +287,15 @@ export function BrandMonthCompare({ brand, month, allTime, rows, budgets, helper
   /* All Time has no "last month", so there is nothing honest to compare. */
   if (!cmp) return null;
 
-  const noPrev = cmp.old.creators === 0;
   const lbl = (k) => (monthLabel ? monthLabel(k) : k);
+  const short = (k) => lbl(k).split(' ')[0];
+  const labels = cmp.months.map(short);
   const Face = helpers && helpers.CreatorFace;
+  const [c0, c1, c2] = cmp.columns;
+  /* The oldest month is dropped when nobody was hired in it: an empty column
+     says nothing and takes a third of the width. */
+  const showOldest = c0.count > 0;
+  const flows = cmp.flows.filter((f) => f.total > 0);
 
   return (
     <div className="wx-cmp" data-wx="month-compare">
@@ -259,27 +307,33 @@ export function BrandMonthCompare({ brand, month, allTime, rows, budgets, helper
       >
         <span className="wx-cmp-titles">
           <span className="wx-cmp-title">
-            {lbl(cmp.month)} vs {lbl(cmp.prev)}
+            {lbl(cmp.month)} · last three months
             {cmp.month === new Date().toISOString().slice(0, 7) ? ' · month in progress' : ''}
           </span>
           <span className="wx-cmp-sub">
-            {noPrev
-              ? `No creators were hired in ${lbl(cmp.prev)}`
-              : `${cmp.stayed.length} of ${cmp.people.before} creators from ${lbl(cmp.prev)} are back`}
+            Each creator is listed once, in the latest month they were hired.
           </span>
         </span>
-        {!noPrev && cmp.retention != null && (
-          <span
-            className="wx-cmp-ret"
-            title={`${pct(cmp.retention)} of ${lbl(cmp.prev)}'s creators were hired again`}
-          >
-            <span className="wx-cmp-retbar">
-              <i style={{ width: `${Math.min(100, Math.max(0, cmp.retention))}%` }} />
+        <span className="wx-cmp-flows">
+          {flows.map((f) => (
+            <span
+              key={f.from}
+              className="wx-cmp-flow"
+              title={`${f.stayed} of ${f.total} creators hired in ${lbl(f.from)} were hired again in ${lbl(f.to)}`}
+            >
+              <em>
+                {short(f.from)} → {short(f.to)}
+              </em>
+              <span className="wx-cmp-retbar">
+                <i style={{ width: `${Math.min(100, Math.max(0, f.pct))}%` }} />
+              </span>
+              <b>{pct(f.pct)}</b>
+              <small>
+                {f.stayed}/{f.total} stayed
+              </small>
             </span>
-            <b>{pct(cmp.retention)}</b>
-            <em>retained</em>
-          </span>
-        )}
+          ))}
+        </span>
         <span className="wx-cmp-chev" aria-hidden>
           {open ? '▾' : '▸'}
         </span>
@@ -287,33 +341,39 @@ export function BrandMonthCompare({ brand, month, allTime, rows, budgets, helper
 
       {open && (
         <>
-          <div className="wx-cmp-cols">
-            <PeopleList
-              title="Back again"
-              tone="stayed"
-              items={cmp.stayed}
-              figOf={(p) => p.now}
-              Face={Face}
-            />
-            <PeopleList
-              title="Not back"
+          <div className={`wx-cmp-cols${showOldest ? ' three' : ''}`}>
+            {showOldest && (
+              <Column
+                col={c0}
+                title={`Left after ${short(c0.month)}`}
+                sub={`Hired in ${lbl(c0.month)}, not since`}
+                tone="dropped"
+                Face={Face}
+                labels={labels}
+              />
+            )}
+            <Column
+              col={c1}
+              title={`Left after ${short(c1.month)}`}
+              sub={`Hired in ${lbl(c1.month)}, not in ${lbl(c2.month)}`}
               tone="dropped"
-              items={cmp.dropped}
-              figOf={(p) => p.before}
               Face={Face}
+              labels={labels}
             />
-            <PeopleList
-              title="New"
-              tone="joined"
-              items={cmp.joined}
-              figOf={(p) => p.now}
+            <Column
+              col={c2}
+              title={`Working with us in ${short(c2.month)}`}
+              sub={`Hired in ${lbl(c2.month)}`}
+              tone="stayed"
               Face={Face}
+              labels={labels}
+              filters
             />
           </div>
           <p className="wx-cmp-foot">
-            Back again: hired in {lbl(cmp.prev)} and {lbl(cmp.month)}. Not back: hired in{' '}
-            {lbl(cmp.prev)} only. New: hired in {lbl(cmp.month)} only. Same TikTok handle means
-            same creator.
+            Dots show which of the three months a creator was hired in. Returning means hired in an
+            earlier month too; the same TikTok handle counts as the same creator. Figures are for
+            the month they are listed under.
           </p>
         </>
       )}
