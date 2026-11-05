@@ -24,6 +24,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,css,json,md}\"",
     "check:contrast": "node scripts/build/check-contrast.mjs",
     "verify:collab-period": "npx tsx scripts/verify/collabs/check-collab-period.mjs",
+    "verify:month-gmv": "tsx scripts/verify/collabs/check-month-gmv.mjs",
     "verify:browser": "node scripts/verify/verify-page.mjs",
     "verify:rls": "node scripts/verify/auth/check-rls.mjs",
     "verify:tiktok": "node scripts/verify/tiktok/check-tiktok.mjs",
