@@ -242,14 +242,14 @@ function Column({ title, sub, tone, people, Face }) {
 }
 
 /**
- * Always the real current month and the two before it, whatever the month
- * picker says: "if the current month is November it shows September, October
- * and November" (Rashid, 2026-11-05). `month` and `allTime` are not read.
+ * The picked month and the two before it (Oct picked: Aug, Sep, Oct), as
+ * Rashid asked on 2026-11-05. With All Time picked there is no month to follow,
+ * so it falls back to the real current month.
  * Laid out side by side, oldest to newest, so the page reads left to right.
  */
-export function BrandMonthCompare({ brand, rows, budgets, helpers, monthLabel }) {
+export function BrandMonthCompare({ brand, month, allTime, rows, budgets, helpers, monthLabel }) {
   const [open, setOpen] = useState(true);
-  const anchor = thisMonthKey();
+  const anchor = !allTime && /^\d{4}-\d{2}$/.test(String(month || '')) ? month : thisMonthKey();
   const cmp = useMemo(
     () => compareMonths(rows || [], anchor, budgets, brand, helpers),
     [rows, anchor, budgets, brand, helpers]
