@@ -49,6 +49,7 @@ import {
   rangeWindow,
   recentMonths,
   rosterHandle,
+  sumCreatives,
   sumOrders,
   type CreatorGmv,
   type Roster,
@@ -78,6 +79,7 @@ type Db = SupabaseClient;
 
 const MONTHS_BACK = 14; // the Performance sheet reaches back about a year
 const REACHER_MAX_PAGES = 60;
+const AD_PAGES = 60; // 6,000 creatives that spent in one brand-month
 const ORDER_PAGES_MONTH = 80; // 8,000 orders for one brand-month is more than any brand here sells
 const ORDER_PAGES_RANGE = 30; // a live range must answer in seconds, so it reads fewer // 6,000 creators for one brand-month is far past anything real
 
@@ -166,6 +168,35 @@ async function readEuka(
   }
 }
 
+/**
+ * Every GMV Max creative that spent in the dates, with the creator's handle, summed per creator.
+ * `read` is false when a page cap or the clock stopped it: a partial sum is a lower bound, so the
+ * caller then stores nothing and the screen keeps using what it had.
+ */
+async function readEukaAds(
+  brand: { id: string; auth: EukaAuth },
+  start: string,
+  end: string,
+  until: number,
+): Promise<{ rows: CreatorGmv[]; read: boolean }> {
+  const pages: unknown[] = [];
+  for (let page = 1; page <= AD_PAGES; page++) {
+    if (Date.now() > until) return { rows: [], read: false };
+    const q = new URLSearchParams({
+      brandId: brand.id, startDate: start, endDate: end, compare: 'none',
+      sortBy: 'cost', sortDirection: 'desc', minCost: '0.01', page: String(page), pageSize: '100',
+    });
+    const r = await fetch(`${EUKA_V1}/gmv-max/creatives?${q}`, { headers: brand.auth, signal: AbortSignal.timeout(60_000) });
+    /* TikTok Ads not connected for the brand is an ANSWER (nothing to read), not a failure */
+    if (r.status === 404 || r.status === 400) return { rows: [], read: false };
+    if (!r.ok) throw new Error(`euka creatives ${r.status} ${(await r.text()).slice(0, 160)}`);
+    const j = await r.json();
+    pages.push(j);
+    if (!(j as { hasMore?: boolean }).hasMore) return { rows: sumCreatives(pages), read: true };
+  }
+  return { rows: [], read: false };
+}
+
 async function readReacher(shopId: number, start: string, end: string) {
   const pages: unknown[] = [];
   for (let page = 1; page <= REACHER_MAX_PAGES; page++) {
@@ -192,10 +223,12 @@ async function save(
   brand: string,
   source: Platform,
   got: { rows: CreatorGmv[]; truncated: boolean; floor: number | null },
+  ad?: { rows: CreatorGmv[]; read: boolean },
 ) {
   const t0 = new Date().toISOString();
   const meta = await db.from('collab_brand_month_gmv').upsert({
     month, brand, source, creators: got.rows.length, truncated: got.truncated, floor_gmv: got.floor, fetched_at: t0, orders_checked: true,
+    ...(ad ? { ad_checked: true, ad_read: ad.read } : {}),
   }, { onConflict: 'month,brand' });
   if (meta.error) throw new Error(meta.error.message);
 
@@ -209,6 +242,17 @@ async function save(
   /* creators the platform no longer lists for that month (a correction) */
   const del = await db.from('collab_creator_month_gmv').delete().eq('month', month).eq('brand', brand).lt('fetched_at', t0);
   if (del.error) throw new Error(del.error.message);
+
+  /* the ad spend per creator, when it was read completely */
+  if (ad && ad.read) {
+    for (let i = 0; i < ad.rows.length; i += 500) {
+      const chunk = ad.rows.slice(i, i + 500).map((r) => ({ month, brand, handle: r.handle, cost: r.gmv, fetched_at: t0 }));
+      const { error } = await db.from('collab_creator_month_ad').upsert(chunk, { onConflict: 'month,brand,handle' });
+      if (error) throw new Error(error.message);
+    }
+    const d2 = await db.from('collab_creator_month_ad').delete().eq('month', month).eq('brand', brand).lt('fetched_at', t0);
+    if (d2.error) throw new Error(d2.error.message);
+  }
 }
 
 type Owner = { source: Platform; euka?: { id: string; auth: EukaAuth }; shopId?: number };
@@ -394,7 +438,7 @@ Deno.serve(async (req: Request) => {
     /* what has been read, and when */
     const { data: have, error: haveErr } = await db
       .from('collab_brand_month_gmv')
-      .select('month, brand, fetched_at, truncated, orders_checked')
+      .select('month, brand, fetched_at, truncated, orders_checked, source, ad_checked')
       .in('month', months);
     if (haveErr) throw new Error(haveErr.message);
     const fetched = new Map<string, Date>();
@@ -403,6 +447,8 @@ Deno.serve(async (req: Request) => {
       fetched.set(`${h.month}\u0000${h.brand}`, new Date(h.fetched_at));
       /* a list cut at 50 that was stored before the orders were read: read it once more */
       if (h.truncated && !h.orders_checked) unchecked.add(`${h.month}\u0000${h.brand}`);
+      /* an Euka brand-month whose ad spend was never asked for: ask once */
+      if (h.source === 'euka' && !h.ad_checked) unchecked.add(`${h.month}\u0000${h.brand}`);
     }
 
     /* newest month first, so a fresh install fills this month before last year */
@@ -423,7 +469,12 @@ Deno.serve(async (req: Request) => {
       if (start > end) continue; // a month that has not started
       try {
         const got = await readBrand(o, start, end, rosters.get(u.brand), ORDER_PAGES_MONTH, deadline);
-        if (!dryRun) await save(db, u.month, u.brand, o.source, got);
+        /* Euka brands also get the month's ad spend per creator; a failure there must not lose the GMV */
+        let ad: { rows: CreatorGmv[]; read: boolean } | undefined;
+        if (o.source === 'euka') {
+          try { ad = await readEukaAds(o.euka!, start, end, deadline); } catch { ad = { rows: [], read: false }; }
+        }
+        if (!dryRun) await save(db, u.month, u.brand, o.source, got, ad);
         done.push({ month: u.month, brand: u.brand, source: o.source, creators: got.rows.length, truncated: got.truncated });
       } catch (e) {
         failed.push({ month: u.month, brand: u.brand, error: String((e as Error).message).slice(0, 200) });

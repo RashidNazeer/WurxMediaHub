@@ -85,6 +85,44 @@ async function readAd(owner: Map<string, string>, months: string[]): Promise<Map
   return out;
 }
 
+/**
+ * Ad spend per creator straight from Euka's GMV Max creatives (`collab_creator_month_ad`), for the
+ * brand-months where `collab-gmv-sync` read it completely. This is what replaces the older per-video
+ * figures where both exist: that copy stopped refreshing on 27 October, so a month stopped on the
+ * 26th. A month not in `months` of the answer was not read, and the per-video figure stands.
+ */
+async function readCreatorAds(
+  brand: string,
+  months: string[],
+): Promise<{ cost: Map<string, number>; covered: Set<string> }> {
+  const db = getSupabase();
+  const covered = new Set<string>();
+  const meta = await db
+    .from('collab_brand_month_gmv')
+    .select('month, ad_read')
+    .eq('brand', brand)
+    .in('month', months);
+  if (meta.error) throw new Error(meta.error.message);
+  for (const r of meta.data ?? []) if (r.ad_read) covered.add(String(r.month));
+
+  const cost = new Map<string, number>();
+  if (!covered.size) return { cost, covered };
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from('collab_creator_month_ad')
+      .select('month, handle, cost')
+      .eq('brand', brand)
+      .in('month', [...covered])
+      .order('month')
+      .order('handle')
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    for (const r of data ?? []) cost.set(`${r.month}|${r.handle}`, Number(r.cost));
+    if (!data || data.length < PAGE) break;
+  }
+  return { cost, covered };
+}
+
 export function useMatrixFigures(brand: string, creators: MatrixRow[], months: string[]): MatrixFigures {
   const name = String(brand ?? '').trim();
   const monthsKey = months.join(',');
@@ -114,8 +152,18 @@ export function useMatrixFigures(brand: string, creators: MatrixRow[], months: s
   });
   const ad = useQuery({
     queryKey: ['matrix-autofill-ad', name, monthsKey, owner.size],
-    queryFn: () => readAd(owner, months),
-    enabled: on && owner.size > 0,
+    queryFn: async () => {
+      const [perVideo, fromEuka] = await Promise.all([
+        owner.size ? readAd(owner, months) : Promise.resolve(new Map<string, number>()),
+        readCreatorAds(name, months),
+      ]);
+      /* where Euka's own per-creator figure was read, it replaces the per-video sum for that month */
+      const out = new Map<string, number>();
+      for (const [k, v] of perVideo) if (!fromEuka.covered.has(k.split('|')[0]!)) out.set(k, v);
+      for (const [k, v] of fromEuka.cost) out.set(k, v);
+      return out;
+    },
+    enabled: on,
     staleTime: 5 * 60_000,
     retry: 1,
   });
@@ -123,10 +171,10 @@ export function useMatrixFigures(brand: string, creators: MatrixRow[], months: s
   return useMemo<MatrixFigures>(
     () => ({
       /* a failed read must not write: half the figures would read as "none" */
-      ready: on && gmv.isSuccess && (owner.size === 0 || ad.isSuccess),
+      ready: on && gmv.isSuccess && ad.isSuccess,
       gmv: gmv.data ?? new Map(),
       ad: ad.data ?? new Map(),
     }),
-    [on, gmv.isSuccess, gmv.data, ad.isSuccess, ad.data, owner.size],
+    [on, gmv.isSuccess, gmv.data, ad.isSuccess, ad.data],
   );
 }
