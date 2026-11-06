@@ -34,6 +34,14 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.1
 import { z } from 'npm:zod@4.4.3';
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { EUKA_V0, EUKA_V1, eukaKeys, type EukaAuth } from '../_shared/euka-accounts.ts';
+import {
+  categoriesForHandle,
+  dueHandles,
+  labelFrom,
+  planWrites,
+  type RosterRow,
+  type StoredCategory,
+} from '../_shared/creator-category.ts';
 import { read as reacherRead, reacherKey, shops as reacherShops } from '../_shared/reacher.ts';
 import {
   EUKA_CAP,
@@ -72,6 +80,11 @@ const Body = z.object({
    * reader (not only staff) may ask, because it only reads.
    */
   range: z.object({ from: z.string(), to: z.string() }).optional(),
+  /**
+   * Fill the Category column from Euka instead of reading GMV: look up a few creators Euka has not
+   * been asked about, then write what is known into rows whose Category is blank. Staff or the cron.
+   */
+  categories: z.boolean().optional(),
   budgetMs: z.number().int().min(5_000).max(140_000).optional(),
 });
 
@@ -322,6 +335,103 @@ async function pool<T, R>(items: T[], n: number, fn: (x: T) => Promise<R>): Prom
   return out;
 }
 
+const CATEGORY_BATCH = 8; // Euka rations fresh market-intelligence lookups; 8 every 10 minutes fills the roster in hours
+
+/**
+ * THE CATEGORY COLUMN, FROM EUKA (see `_shared/creator-category.ts` for the rules).
+ * Writes known labels first, so a creator added for a handle already looked up is filled at once,
+ * then looks up a few new handles and writes those.
+ */
+async function runCategories(db: Db, deadline: number, dryRun: boolean) {
+  const key = eukaKeys()[0];
+  if (!key) throw new Error('No EUKA key is set on this project');
+  const auth: EukaAuth = { Authorization: `Bearer ${key}` };
+
+  const roster: RosterRow[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db.schema('wurxbase').from('creators')
+      .select('id, category, tiktok_account, tiktok_account_2').order('id').range(from, from + 999);
+    if (error) throw new Error(error.message);
+    roster.push(...((data ?? []) as RosterRow[]));
+    if (!data || data.length < 1000) break;
+  }
+
+  const stored = new Map<string, StoredCategory>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db.from('euka_creator_categories')
+      .select('handle, categories, written, found, checked_at').order('handle').range(from, from + 999);
+    if (error) throw new Error(error.message);
+    for (const r of data ?? []) {
+      stored.set(r.handle, {
+        label: labelFrom(r.categories), written: r.written, found: r.found, checkedAt: new Date(r.checked_at).getTime(),
+      });
+    }
+    if (!data || data.length < 1000) break;
+  }
+
+  /* write what is known into rows that may take it; remember the label written */
+  const apply = async () => {
+    const plan = planWrites(roster, stored);
+    if (!dryRun) {
+      const byLabel = new Map<string, number[]>();
+      for (const w of plan) byLabel.set(w.category, [...(byLabel.get(w.category) ?? []), w.id]);
+      for (const [category, ids] of byLabel) {
+        for (let i = 0; i < ids.length; i += 200) {
+          const { error } = await db.schema('wurxbase').from('creators').update({ category }).in('id', ids.slice(i, i + 200));
+          if (error) throw new Error(error.message);
+        }
+      }
+      const byHandle = new Map(plan.map((w) => [w.handle, w.category]));
+      for (const [handle, written] of byHandle) {
+        await db.from('euka_creator_categories').update({ written }).eq('handle', handle);
+        const s = stored.get(handle);
+        if (s) s.written = written;
+      }
+      for (const w of plan) {
+        const r = roster.find((x) => x.id === w.id);
+        if (r) r.category = w.category;
+      }
+    }
+    return plan.length;
+  };
+
+  let written = await apply();
+  let found = 0, missed = 0, failed = 0, looked = 0, inARow = 0;
+  const why = new Set<string>();
+  for (const handle of dueHandles(roster, stored, Date.now(), CATEGORY_BATCH)) {
+    if (Date.now() > deadline - 10_000) break;
+    looked++;
+    try {
+      const cats = await categoriesForHandle(auth, handle);
+      if (!dryRun) {
+        const { error } = await db.from('euka_creator_categories').upsert({
+          handle, categories: cats ?? [], found: cats !== null, last_error: null, checked_at: new Date().toISOString(),
+        });
+        if (error) throw new Error(error.message);
+      }
+      stored.set(handle, { label: labelFrom(cats), written: stored.get(handle)?.written ?? null, found: cats !== null, checkedAt: Date.now() });
+      if (cats && labelFrom(cats)) found++; else missed++;
+      inARow = 0;
+    } catch (e) {
+      failed++;
+      inARow++;
+      const msg = String((e as Error).message).slice(0, 80);
+      why.add(`@${handle}: ${msg}`);
+      /* recorded and put back in line for about a day, so one bad handle cannot block the queue */
+      if (!dryRun) {
+        await db.from('euka_creator_categories').upsert({
+          handle, categories: [], found: false, last_error: msg, checked_at: new Date(Date.now() - 29 * 86_400_000).toISOString(),
+        });
+      }
+      stored.set(handle, { label: '', written: stored.get(handle)?.written ?? null, found: false, checkedAt: Date.now() - 29 * 86_400_000 });
+      if (inARow >= 2) break;
+    }
+    await new Promise((res) => setTimeout(res, 1_200));
+  }
+  written += await apply();
+  return { rows: roster.length, looked, found, missed, failed, written, ...(why.size ? { why: [...why].slice(0, 3) } : {}) };
+}
+
 /* A range somebody asked for is answered once and remembered for ten minutes, so a team
    looking at the same dates does not spend a call per brand per screen. */
 const RANGE_TTL = 10 * 60_000;
@@ -381,6 +491,14 @@ Deno.serve(async (req: Request) => {
       );
       const { data: viewer } = await asUser.rpc('is_collabs_viewer');
       if (viewer !== true) return json({ error: 'Not allowed' }, 403, req);
+    }
+  }
+
+  if (parsed.data.categories) {
+    try {
+      return json({ categories: await runCategories(db, deadline, dryRun === true), ms: Date.now() - started }, 200, req);
+    } catch (e) {
+      return json({ error: String((e as Error).message).slice(0, 300) }, 502, req);
     }
   }
 

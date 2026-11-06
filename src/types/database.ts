@@ -2499,6 +2499,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      euka_creator_categories: {
+        Row: {
+          categories: string[];
+          checked_at: string;
+          found: boolean;
+          handle: string;
+          last_error: string | null;
+          written: string | null;
+        };
+        Insert: {
+          categories?: string[];
+          checked_at?: string;
+          found?: boolean;
+          handle: string;
+          last_error?: string | null;
+          written?: string | null;
+        };
+        Update: {
+          categories?: string[];
+          checked_at?: string;
+          found?: boolean;
+          handle?: string;
+          last_error?: string | null;
+          written?: string | null;
+        };
+        Relationships: [];
+      };
       euka_creator_followers: {
         Row: {
           checked_at: string;
