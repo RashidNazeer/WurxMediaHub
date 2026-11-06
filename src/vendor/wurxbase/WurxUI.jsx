@@ -3794,6 +3794,29 @@ function BrandDrilldown({ brand, creators, brandCreators, allCreators, budgets, 
           error: `Ad spend could not be loaded: ${wxAdsB.error}`,
           none: `Euka has no ad spend for these videos · ${wxPeriod}`,
         }[wxSpendState];
+        /* WURX-ADDED · THE CREATORS' GMV FOR THE BRAND: the sum of the Brand GMV column in the
+           table below, so the card and the column cannot disagree. A creator is counted once
+           (one person can have several rows, and every row shows the same figure); a cell that
+           shows "< $X" or a dash holds no figure and is not added, and the hover says how many. */
+        const wxCg = (() => {
+          const seen = new Set();
+          let sum = 0, counted = 0, under = 0, none = 0;
+          sortedCreators.forEach((c) => {
+            const key = getCreatorHandles(c).slice().sort().join('+') || ('id:' + c.id);
+            if (seen.has(key)) return;
+            seen.add(key);
+            const g = wxMonthGmv.forRow(c);
+            if (g && g.gmv !== null) { sum += g.gmv; counted += 1; }
+            else if (g && g.label) under += 1;
+            else none += 1;
+          });
+          return { sum, counted, under, none };
+        })();
+        const wxCgTitle = wxCg.counted
+          ? `${fmt$Exact(Math.round(wxCg.sum))} made for ${brand.brand} by ${wxCg.counted} creator${wxCg.counted === 1 ? '' : 's'}, the sum of the Brand GMV column (sales in ${wxPeriod}, from any of their videos)`
+            + (wxCg.under ? ` · ${wxCg.under} more made less than the smallest figure Euka lists and are not added` : '')
+            + (wxCg.none ? ` · ${wxCg.none} have no figure` : '')
+          : 'No Brand GMV figures for these creators in these dates yet';
         /* WURX-END */
         return (
           <div className="pc-topvids">
@@ -3835,6 +3858,13 @@ function BrandDrilldown({ brand, creators, brandCreators, allCreators, budgets, 
                   </span>
                   <span className="pc-topvids-stat-lbl">GMV</span>
                   <span className="pc-topvids-stat-val">{fmt$Exact(wxGmv)}</span>
+                </div>
+                <div className="pc-topvids-stat creators" data-value={wxCg.counted ? wxCg.sum.toFixed(2) : ''} title={wxCgTitle}>
+                  <span className="pc-topvids-stat-ico" aria-hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                  </span>
+                  <span className="pc-topvids-stat-lbl">Creators GMV</span>
+                  <span className={`pc-topvids-stat-val${wxCg.counted ? '' : ' none'}`}>{wxCg.counted ? fmt$Exact(Math.round(wxCg.sum)) : '–'}</span>
                 </div>
                 <div className="pc-topvids-stat spend" data-state={wxSpendState} data-value={wxSpendState === 'ok' ? wxSpend.cost.toFixed(2) : ''} title={wxSpendTitle}>
                   <span className="pc-topvids-stat-ico" aria-hidden>

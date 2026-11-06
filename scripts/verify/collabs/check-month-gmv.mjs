@@ -14,6 +14,11 @@
 import {
   EUKA_CAP,
   cleanHandle,
+  completeWithOrders,
+  linkHandle,
+  linkVideoId,
+  rosterHandle,
+  sumOrders,
   fromEuka,
   fromReacher,
   matchBrand,
@@ -90,6 +95,10 @@ section('4. WHAT EUKA AND REACHER SAY BECOME ROWS');
   ok(e.truncated === false && e.floor === null, 'a list shorter than 50 is complete');
   const full = fromEuka({ affiliates: Array.from({ length: EUKA_CAP }, (_, i) => ({ handle: 'c' + i, totalGmv: 1000 - i })) });
   ok(full.truncated === true && full.floor === 951, 'a list of exactly 50 is cut, and the floor is the smallest figure (951)');
+  const padded = fromEuka({ affiliates: Array.from({ length: EUKA_CAP }, (_, i) => ({ handle: 'p' + i, totalGmv: i < 3 ? 100 - i : 0 })) });
+  ok(padded.truncated === false && padded.floor === null, 'a full list that already ran down to $0 is complete (a small brand), not cut');
+  const zeroCut = cellFor({ brand: 'Mineral Ice Extreme', tiktok_account: 'nobody' }, { from: '2026-10-01', to: '2026-10-31' }, { source: 'euka', truncated: true, floorGmv: 0 }, new Map([['someone', 5]]));
+  ok(zeroCut.label === '$0', 'and a stored "cut" list whose floor is $0 shows $0, never "< $0"');
   let threw = false;
   try { fromEuka({ nope: 1 }); } catch { threw = true; }
   ok(threw, 'an answer with no list is an error, never "nobody sold"');
@@ -167,6 +176,45 @@ section('8. THE PERFORMANCE SHEET FILLS ITSELF, AND NEVER OVER THE TEAM');
   ok(videoHandleOf('https://www.tiktok.com/@ErinRaganCooper/video/764') === 'erinragancooper', 'a video link names the handle');
   ok(videoHandleOf('https://vm.tiktok.com/ZSabc/') === '', 'a short link names nobody (the handle on the row is used)');
   ok(monthKeyOf('2026-10-01') === '2026-10', 'an ad month is a sheet month');
+}
+
+section('9. EXACT FIGURES BELOW EUKA\'S TOP 50, FROM THE ORDERS');
+{
+  /* the 16 affiliate orders Euka returned for Dr Tobias on 15 Oct 2026, and the figures its own
+     top-creators report gave for the same day: the orders must add up to the same cents */
+  const KELLY = '7638828876864671006';
+  const lines = [
+    ['444adan', 16.19], ['cakes.by.cynthia', 17.99], ['selfless.entrepreneur', 17.09], ['', 14.39, KELLY],
+    ['filmsandfitness', 17.99], ['holistic.rx', 17.99], ['auntietheinfluencer', 11.51], ['philsmypharmacist', 22.49],
+    ['selfless.entrepreneur', 16.19], ['donniesdealss', 9.78], ['donniesdealss', 17.01], ['nayesilva.1', 11.18],
+    ['', 14.39, KELLY], ['donniesdealss', 14.39], ['judithrtiktokshop', 9.49], ['philsmypharmacist', 22.49],
+  ];
+  const page = { orders: lines.map(([u, price, content], i) => ({ orderId: String(i), skus: [{ creatorUsername: u, contentId: content ?? 'x' + i, price, quantity: 1 }] })), nextPageToken: null };
+  const roster = {
+    handles: new Set(['philsmypharmacist', 'donniesdealss', 'selfless.entrepreneur', 'kelly.rebelwhitecoat', '444adan', 'nayesilva.1', 'quietcreator']),
+    owner: new Map([[KELLY, 'kelly.rebelwhitecoat']]),
+  };
+  const sums = sumOrders([page], roster);
+  const r2 = (h) => Math.round((sums.get(h) ?? 0) * 100) / 100;
+  ok(r2('philsmypharmacist') === 44.98 && r2('donniesdealss') === 41.18 && r2('selfless.entrepreneur') === 33.28, 'orders add up to the same cents as Euka\'s report (44.98, 41.18, 33.28)');
+  ok(r2('kelly.rebelwhitecoat') === 28.78, 'orders that name no creator belong to whoever posted the video (28.78, as in Euka\'s report)');
+  ok(!sums.has(''), 'an order that cannot be placed is left out, as in Euka\'s list');
+  const top = { rows: [{ handle: 'philsmypharmacist', gmv: 44.98 }], truncated: true, floor: 44.98 };
+  const done = completeWithOrders(top, sums, roster, true);
+  const got = new Map(done.rows.map((r) => [r.handle, r.gmv]));
+  ok(done.truncated === false && done.floor === null, 'a cut list completed from every order page is no longer cut');
+  ok(got.get('donniesdealss') === 41.18 && got.get('444adan') === 16.19 && got.get('nayesilva.1') === 11.18 && got.get('kelly.rebelwhitecoat') === 28.78, 'creators on the roster below the list get their exact figures');
+  ok(!got.has('quietcreator') && done.rows.length === 6, 'a roster creator with no orders is simply absent (the screen reads that as $0)');
+  ok(got.get('philsmypharmacist') === 44.98, 'a creator Euka listed keeps Euka\'s own figure');
+  ok(completeWithOrders(top, sums, roster, false) === top, 'with a page missing, nothing is added: a partial sum is a lower bound, not a figure');
+  const whole = { rows: [{ handle: 'a', gmv: 5 }], truncated: false, floor: null };
+  ok(completeWithOrders(whole, sums, roster, true) === whole, 'a list that was never cut is left alone');
+  let threw = false;
+  try { sumOrders([{ nope: 1 }], roster); } catch { threw = true; }
+  ok(threw, 'an orders page with no orders is an error, never "nobody sold"');
+  ok(sumOrders([{ orders: [{ skus: [{ creatorUsername: 'A', price: 10, quantity: 3 }, { creatorUsername: 'a', price: -5, quantity: 1 }] }] }], roster).get('a') === 30, 'quantity multiplies the price, and a negative line is never GMV');
+  ok(rosterHandle('https://www.tiktok.com/@Some.Name/') === 'some.name' && rosterHandle(' @X ') === 'x', 'roster handles are cleaned like the screen\'s');
+  ok(linkHandle('https://www.tiktok.com/@Erin/video/123') === 'erin' && linkVideoId('https://www.tiktok.com/@e/video/123?x=1') === '123', 'a video link gives its handle and id');
 }
 
 section('6. ANY RANGE OF DAYS');
