@@ -156,7 +156,9 @@ export function cellFor(
       title: `${money(gmv)} made for ${brand} for ${when} (${via}), from every video she has posted, whenever it was posted.`,
     };
   }
-  if (meta.truncated && meta.floorGmv !== null) {
+  /* a list cut at 50 that already ran down to $0 (a small brand: Euka pads the list with zeros) is
+     complete for anyone who sold, so a creator missing from it made nothing */
+  if (meta.truncated && meta.floorGmv !== null && meta.floorGmv > 0) {
     return {
       label: `< ${money(meta.floorGmv)}`,
       gmv: null,

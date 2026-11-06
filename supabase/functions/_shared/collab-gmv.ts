@@ -117,8 +117,11 @@ export function fromEuka(body: unknown): { rows: CreatorGmv[]; truncated: boolea
     : null;
   if (!list) throw new Error('euka: the answer had no affiliates list');
   const rows = merge(list.map((a) => ({ handle: cleanHandle(a.handle), gmv: money(a.totalGmv) })));
-  const truncated = list.length >= EUKA_CAP;
-  return { rows, truncated, floor: truncated && rows.length ? Math.min(...rows.map((r) => r.gmv)) : null };
+  const reachedCap = list.length >= EUKA_CAP;
+  const floor = reachedCap && rows.length ? Math.min(...rows.map((r) => r.gmv)) : null;
+  /* a list that is full but already down to $0 lost nobody who sold: it is complete */
+  const truncated = reachedCap && (floor ?? 0) > 0;
+  return { rows, truncated, floor: truncated ? floor : null };
 }
 
 /** Reacher's creator performance pages: `{ data: [{ creator_handle, gmv }] }`, every creator. */
@@ -157,4 +160,87 @@ export function rangeWindow(from: unknown, to: unknown, today: Date): { start: s
   if (fd > endMs) return null;
   if ((endMs - fd) / 86_400_000 + 1 > MAX_RANGE_DAYS) return null;
   return { start: f, end: new Date(endMs).toISOString().slice(0, 10) };
+}
+
+/* ───────────────────── exact figures for creators below Euka's top 50 ─────────────────────
+ *
+ * Euka's top-creators report stops at 50, so a smaller creator showed "< $18". Euka also lists
+ * every affiliate ORDER in a date range (one SKU line each, with the creator, price and
+ * quantity), and the price times quantity added up per creator equals Euka's own total to the
+ * cent (checked on Dr Tobias, 15 Oct 2026: philsmypharmacist 44.98, donniesdealss 41.18,
+ * selfless.entrepreneur 33.28, all identical to the report). So for the creators we have on a
+ * brand's roster who are not in the top 50, the orders give the exact figure.
+ */
+
+/** The creators on a brand's roster, and which handle each of their videos belongs to. */
+export interface Roster {
+  handles: Set<string>;
+  /** TikTok video id -> the handle that posted it, for orders that name no creator. */
+  owner: Map<string, string>;
+}
+
+/** A TikTok handle however a Paid Collabs row holds it: `@name`, `name`, or a profile link. */
+export function rosterHandle(raw: unknown): string {
+  const t = String(raw ?? '').trim().toLowerCase();
+  if (!t) return '';
+  const last = t.startsWith('http') ? (t.replace(/\/+$/, '').split('/').pop() ?? '') : t;
+  return last.replace(/^@+/, '').split(/[?#]/)[0]!.trim();
+}
+
+/** The handle in a TikTok video link, or ''. */
+export function linkHandle(url: unknown): string {
+  return (/tiktok\.com\/@([^/?#]+)\/video\//i.exec(String(url ?? ''))?.[1] ?? '').trim().toLowerCase();
+}
+
+/** The video id in a TikTok video link, or ''. */
+export function linkVideoId(url: unknown): string {
+  return /\/video\/(\d+)/.exec(String(url ?? ''))?.[1] ?? '';
+}
+
+/**
+ * Add up order pages per creator: price x quantity on every SKU line. An order that names no
+ * creator (a partner-commission order) belongs to whoever posted the video it came from, when
+ * that is one of ours; one we cannot place is left out, as it is in Euka's own list.
+ */
+export function sumOrders(pages: unknown[], roster: Roster): Map<string, number> {
+  const sums = new Map<string, number>();
+  for (const p of pages) {
+    const orders = (p as { orders?: unknown })?.orders;
+    if (!Array.isArray(orders)) throw new Error('euka: an orders page had no orders list');
+    for (const o of orders as { skus?: unknown }[]) {
+      for (const s of (Array.isArray(o?.skus) ? o.skus : []) as {
+        creatorUsername?: unknown; contentId?: unknown; price?: unknown; quantity?: unknown;
+      }[]) {
+        const h = cleanHandle(s.creatorUsername) || roster.owner.get(String(s.contentId ?? '')) || '';
+        if (!h) continue;
+        const gmv = Number(s.price) * (Number(s.quantity) || 1);
+        if (!Number.isFinite(gmv) || gmv <= 0) continue;
+        sums.set(h, (sums.get(h) ?? 0) + gmv);
+      }
+    }
+  }
+  return sums;
+}
+
+/**
+ * Euka's list, completed from the orders: the creators on the roster that the list did not reach
+ * get the figure the orders give them (or nothing, which is $0). Only when every order page was
+ * read: a partial sum is a lower bound, and a lower bound shown as a figure is wrong, so then the
+ * list stays as it was, cut, and the screen keeps saying "less than".
+ */
+export function completeWithOrders(
+  top: { rows: CreatorGmv[]; truncated: boolean; floor: number | null },
+  sums: Map<string, number>,
+  roster: Roster,
+  complete: boolean,
+): { rows: CreatorGmv[]; truncated: boolean; floor: number | null } {
+  if (!top.truncated || !complete) return top;
+  const listed = new Set(top.rows.map((r) => r.handle));
+  const rows = [...top.rows];
+  for (const h of roster.handles) {
+    if (listed.has(h)) continue;
+    const g = Math.round((sums.get(h) ?? 0) * 100) / 100;
+    if (g > 0) rows.push({ handle: h, gmv: g });
+  }
+  return { rows, truncated: false, floor: null };
 }

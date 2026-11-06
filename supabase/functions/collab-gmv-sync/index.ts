@@ -37,15 +37,21 @@ import { EUKA_V0, EUKA_V1, eukaKeys, type EukaAuth } from '../_shared/euka-accou
 import { read as reacherRead, reacherKey, shops as reacherShops } from '../_shared/reacher.ts';
 import {
   EUKA_CAP,
+  completeWithOrders,
   fromEuka,
   fromReacher,
   matchBrand,
   monthOf,
   monthWindow,
   needsRead,
+  linkHandle,
+  linkVideoId,
   rangeWindow,
   recentMonths,
+  rosterHandle,
+  sumOrders,
   type CreatorGmv,
+  type Roster,
   type Platform,
 } from '../_shared/collab-gmv.ts';
 
@@ -71,7 +77,9 @@ const Body = z.object({
 type Db = SupabaseClient;
 
 const MONTHS_BACK = 14; // the Performance sheet reaches back about a year
-const REACHER_MAX_PAGES = 60; // 6,000 creators for one brand-month is far past anything real
+const REACHER_MAX_PAGES = 60;
+const ORDER_PAGES_MONTH = 80; // 8,000 orders for one brand-month is more than any brand here sells
+const ORDER_PAGES_RANGE = 30; // a live range must answer in seconds, so it reads fewer // 6,000 creators for one brand-month is far past anything real
 
 /** Euka's brands, by name, each with the account (key) that owns it. First key wins a name. */
 async function eukaBrands(): Promise<{ name: string; id: string; auth: EukaAuth }[]> {
@@ -97,7 +105,45 @@ async function eukaBrands(): Promise<{ name: string; id: string; auth: EukaAuth 
   return out;
 }
 
-async function readEuka(brand: { id: string; auth: EukaAuth }, start: string, end: string) {
+/** Every affiliate order for a brand and dates, a page at a time. `complete` is false when a cap was hit. */
+async function readEukaOrders(
+  brand: { id: string; auth: EukaAuth },
+  start: string,
+  end: string,
+  pageCap: number,
+  until: number,
+): Promise<{ pages: unknown[]; complete: boolean }> {
+  const pages: unknown[] = [];
+  let token: string | null = null;
+  for (let i = 0; i < pageCap; i++) {
+    if (Date.now() > until) return { pages, complete: false };
+    const r = await fetch(`${EUKA_V1}/dashboard/affiliate-orders`, {
+      method: 'POST',
+      headers: { ...brand.auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId: brand.id, startDate: start, endDate: end, pageSize: 100, ...(token ? { pageToken: token } : {}) }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!r.ok) throw new Error(`euka orders ${r.status} ${(await r.text()).slice(0, 160)}`);
+    const j = await r.json();
+    pages.push(j);
+    token = (j as { nextPageToken?: string | null }).nextPageToken ?? null;
+    if (!token) return { pages, complete: true };
+  }
+  return { pages, complete: false };
+}
+
+/**
+ * Euka's top 50, then, if the list was cut, the orders for the creators on our roster that it did
+ * not reach, so nobody on a roster shows "less than $X" when an exact figure exists.
+ */
+async function readEuka(
+  brand: { id: string; auth: EukaAuth },
+  start: string,
+  end: string,
+  roster: Roster | undefined,
+  pageCap: number,
+  until: number,
+) {
   const r = await fetch(`${EUKA_V1}/dashboard/top-creators-by-gmv`, {
     method: 'POST',
     headers: { ...brand.auth, 'Content-Type': 'application/json' },
@@ -110,7 +156,14 @@ async function readEuka(brand: { id: string; auth: EukaAuth }, start: string, en
     signal: AbortSignal.timeout(60_000),
   });
   if (!r.ok) throw new Error(`euka ${r.status} ${(await r.text()).slice(0, 160)}`);
-  return fromEuka(await r.json());
+  const top = fromEuka(await r.json());
+  if (!top.truncated || !roster || roster.handles.size === 0) return top;
+  try {
+    const o = await readEukaOrders(brand, start, end, pageCap, until);
+    return completeWithOrders(top, sumOrders(o.pages, roster), roster, o.complete);
+  } catch {
+    return top; // the orders failed: keep the cut list, which is still true
+  }
 }
 
 async function readReacher(shopId: number, start: string, end: string) {
@@ -142,7 +195,7 @@ async function save(
 ) {
   const t0 = new Date().toISOString();
   const meta = await db.from('collab_brand_month_gmv').upsert({
-    month, brand, source, creators: got.rows.length, truncated: got.truncated, floor_gmv: got.floor, fetched_at: t0,
+    month, brand, source, creators: got.rows.length, truncated: got.truncated, floor_gmv: got.floor, fetched_at: t0, orders_checked: true,
   }, { onConflict: 'month,brand' });
   if (meta.error) throw new Error(meta.error.message);
 
@@ -176,8 +229,40 @@ async function loadOwners(brands: string[]): Promise<{ owner: Map<string, Owner>
   return { owner, unmapped };
 }
 
-async function readBrand(o: Owner, start: string, end: string) {
-  return o.source === 'euka' ? await readEuka(o.euka!, start, end) : await readReacher(o.shopId!, start, end);
+async function readBrand(o: Owner, start: string, end: string, roster: Roster | undefined, pageCap: number, until: number) {
+  return o.source === 'euka'
+    ? await readEuka(o.euka!, start, end, roster, pageCap, until)
+    : await readReacher(o.shopId!, start, end);
+}
+
+/** The creators on each brand's roster, and which handle posted each of their videos. */
+async function loadRosters(db: Db): Promise<Map<string, Roster>> {
+  const out = new Map<string, Roster>();
+  for (let from = 0; ; from += 500) {
+    const { data, error } = await db
+      .schema('wurxbase')
+      .from('creators')
+      .select('brand, tiktok_account, tiktok_account_2, video_codes')
+      .range(from, from + 499);
+    if (error) throw new Error(error.message);
+    for (const c of (data ?? []) as {
+      brand?: string; tiktok_account?: string; tiktok_account_2?: string; video_codes?: { video?: string }[] | null;
+    }[]) {
+      const brand = String(c.brand ?? '').trim();
+      if (!brand) continue;
+      let r = out.get(brand);
+      if (!r) out.set(brand, (r = { handles: new Set(), owner: new Map() }));
+      const mine = [rosterHandle(c.tiktok_account), rosterHandle(c.tiktok_account_2)].filter(Boolean);
+      mine.forEach((h) => r!.handles.add(h));
+      for (const v of Array.isArray(c.video_codes) ? c.video_codes : []) {
+        const id = linkVideoId(v?.video);
+        const h = linkHandle(v?.video) || mine[0] || '';
+        if (id && h) r.owner.set(id, h);
+      }
+    }
+    if (!data || data.length < 500) break;
+  }
+  return out;
 }
 
 /** Run `fn` over `items`, at most `n` at a time (Reacher allows 60 calls a minute). */
@@ -278,6 +363,7 @@ Deno.serve(async (req: Request) => {
     const brands = [...names].filter((b) => !wanted || wanted.has(b)).sort();
 
     const { owner, unmapped } = await loadOwners(brands);
+    const rosters = await loadRosters(db);
 
     /* ── a range somebody picked: ask live, store nothing ── */
     if (range) {
@@ -289,7 +375,7 @@ Deno.serve(async (req: Request) => {
       const failedR: { brand: string; error: string }[] = [];
       const got = await pool([...owner.entries()], 4, async ([brand, o]) => {
         try {
-          const g = await readBrand(o, w.start, w.end);
+          const g = await readBrand(o, w.start, w.end, rosters.get(brand), ORDER_PAGES_RANGE, Date.now() + 40_000);
           return { brand, source: o.source, truncated: g.truncated, floor: g.floor, rows: g.rows };
         } catch (e) {
           failedR.push({ brand, error: String((e as Error).message).slice(0, 160) });
@@ -308,17 +394,22 @@ Deno.serve(async (req: Request) => {
     /* what has been read, and when */
     const { data: have, error: haveErr } = await db
       .from('collab_brand_month_gmv')
-      .select('month, brand, fetched_at')
+      .select('month, brand, fetched_at, truncated, orders_checked')
       .in('month', months);
     if (haveErr) throw new Error(haveErr.message);
     const fetched = new Map<string, Date>();
-    for (const h of have ?? []) fetched.set(`${h.month}\u0000${h.brand}`, new Date(h.fetched_at));
+    const unchecked = new Set<string>();
+    for (const h of have ?? []) {
+      fetched.set(`${h.month}\u0000${h.brand}`, new Date(h.fetched_at));
+      /* a list cut at 50 that was stored before the orders were read: read it once more */
+      if (h.truncated && !h.orders_checked) unchecked.add(`${h.month}\u0000${h.brand}`);
+    }
 
     /* newest month first, so a fresh install fills this month before last year */
     const units: { month: string; brand: string }[] = [];
     for (const m of [...months].sort().reverse()) {
       for (const b of owner.keys()) {
-        if (force || needsRead(m, fetched.get(`${m}\u0000${b}`) ?? null, now)) units.push({ month: m, brand: b });
+        if (force || unchecked.has(`${m}\u0000${b}`) || needsRead(m, fetched.get(`${m}\u0000${b}`) ?? null, now)) units.push({ month: m, brand: b });
       }
     }
 
@@ -331,7 +422,7 @@ Deno.serve(async (req: Request) => {
       const { start, end } = monthWindow(u.month, now);
       if (start > end) continue; // a month that has not started
       try {
-        const got = await readBrand(o, start, end);
+        const got = await readBrand(o, start, end, rosters.get(u.brand), ORDER_PAGES_MONTH, deadline);
         if (!dryRun) await save(db, u.month, u.brand, o.source, got);
         done.push({ month: u.month, brand: u.brand, source: o.source, creators: got.rows.length, truncated: got.truncated });
       } catch (e) {
