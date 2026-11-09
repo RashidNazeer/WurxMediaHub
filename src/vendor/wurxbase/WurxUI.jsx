@@ -41,7 +41,7 @@ import { godGet, godMoney, godDateParts, colTemplate, colStyle,
   visibleCols } from './godSettings';
 import { generateContractPdf, defaultContractFields, CONTRACT_SECTIONS, renderContractPdf } from './contractPdf';
 import { BrandMonthCompare } from '@/routes/admin/collab-month-compare'; /* WURX-ADDED */
-import { CreatorHitRate, HitCriteriaPanel, HitRateCell, useAppliedCriteria, useHitDefaults, useHitRateByCreator } from '@/routes/admin/collab-hit-rate'; /* WURX-ADDED */
+import { CreatorHitRate, HitCriteriaPanel, HitRateCell, useAppliedBrand, useAppliedCriteria, useHitDefaults, useHitRateByCreator } from '@/routes/admin/collab-hit-rate'; /* WURX-ADDED */
 import { describe as describeHitCriteria } from '@/lib/admin/hit-criteria'; /* WURX-ADDED */
 import { mergeContract, getBrandContract, saveBrandContract,
   fetchBrandContracts } from './brandContract';
@@ -7421,6 +7421,10 @@ function CreatorsTab({ creators, allCreators, allTime, month, periodRange, eukaL
   /* re-read on the God Mode signal so column and format changes land
      without a reload */
   const god = useGod();
+  /* WURX-ADDED · the brands the Hit criteria panel can filter to */
+  const hitBrandNames = useMemo(() => [...new Set((allCreators || creators || []).map(c => String(c.brand || '').trim()).filter(Boolean))].sort(), [allCreators, creators]);
+  /* WURX-END */
+
   const uniqueCount = useMemo(() => {
     const set = new Set();
     filtered.forEach(c => set.add((c.name || '').trim().toLowerCase()));
@@ -7719,7 +7723,7 @@ function CreatorsTab({ creators, allCreators, allTime, month, periodRange, eukaL
 
       {/* WURX-ADDED · what counts as a hit. The Unique Creators list and every creator's hit-rate block read this same setting. */}
       <div style={{ marginTop: 12 }}>
-        <HitCriteriaPanel />
+        <HitCriteriaPanel brands={hitBrandNames} />
       </div>
       {/* WURX-END */}
 
@@ -9209,7 +9213,9 @@ function UniqueCreatorsModal({ rows, euka, onClose }) {
   const { byKey: hitByKey, loading: hitLoading, failed: hitFailed } = useHitRateByCreator();
   const hitCriteria = useAppliedCriteria();
   const hitDefaults = useHitDefaults();
-  const hitCriteriaText = (hitCriteria || hitDefaults) ? describeHitCriteria(hitCriteria || hitDefaults) : '';
+  const hitBrand = useAppliedBrand();
+  const hitBrands = useMemo(() => [...new Set(rows.map(c => String(c.brand || '').trim()).filter(Boolean))].sort(), [rows]);
+  const hitCriteriaText = ((hitCriteria || hitDefaults) ? describeHitCriteria(hitCriteria || hitDefaults) : '') + (hitBrand ? ' · brand: ' + hitBrand : '');
   const [hitsOnly, setHitsOnly] = useState(false);
   /* WURX-END */
 
@@ -9220,10 +9226,11 @@ function UniqueCreatorsModal({ rows, euka, onClose }) {
       if (!key) return;
       if (!map.has(key)) map.set(key, {
         key, name: '', handles: [], contact: '', email: '', category: '',
-        tier: '', l30: 0, first: '', last: '', rate: 0, hiredBy: '', deals: 0,
+        tier: '', l30: 0, first: '', last: '', rate: 0, hiredBy: '', deals: 0, brands: new Set(),
       });
       const p = map.get(key);
       p.deals += 1;
+      p.brands.add(String(c.brand || '').trim()); /* WURX-ADDED · so the brand filter can drop people with no deal on that brand */
 
       const nm = String(c.name || '').trim();
       if (nm.length > p.name.length) p.name = nm;
@@ -9290,7 +9297,8 @@ function UniqueCreatorsModal({ rows, euka, onClose }) {
     const byTier = !tier ? searched
       : searched.filter(p => (tier === 'none' ? !p.tier : p.tier === tier));
     /* WURX-ADDED · a list of hit performers drops everybody with no hit under the current criteria */
-    const list = hitsOnly ? byTier.filter(p => ((hitByKey.get(p.key) || {}).hits || 0) > 0) : byTier;
+    const byBrand = hitBrand ? byTier.filter(p => p.brands.has(hitBrand)) : byTier;
+    const list = hitsOnly ? byBrand.filter(p => ((hitByKey.get(p.key) || {}).hits || 0) > 0) : byBrand;
     /* WURX-END */
     if (!sort) return list;
 
@@ -9321,7 +9329,7 @@ function UniqueCreatorsModal({ rows, euka, onClose }) {
       const c = typeof A === 'number' ? A - B : String(A).localeCompare(String(B));
       return sort.dir === 'desc' ? -c : c;
     });
-  }, [searched, tier, sort, hitByKey, hitsOnly]);
+  }, [searched, tier, sort, hitByKey, hitsOnly, hitBrand]);
 
   /* Numbers and dates are most useful biggest-first, text A-Z · so each
      column starts on the direction people actually want, and a second
@@ -9437,7 +9445,7 @@ function UniqueCreatorsModal({ rows, euka, onClose }) {
           </div>
           {/* WURX-ADDED · what counts as a hit, and who is listed under it */}
           <div className="pc-uc-hitrow">
-            <HitCriteriaPanel />
+            <HitCriteriaPanel brands={hitBrands} />
             <label className="pc-uc-hitsonly" title="Show only people with at least one hit under the current criteria">
               <input type="checkbox" checked={hitsOnly} onChange={e => setHitsOnly(e.target.checked)} />
               Only creators with hits
