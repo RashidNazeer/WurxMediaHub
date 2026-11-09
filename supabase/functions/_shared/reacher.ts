@@ -46,6 +46,9 @@ const ALLOWED = new Set([
   /* Added 2026-11-06 for the monthly creator GMV. A read: creators ranked by GMV
      earned inside a date range, from daily performance data. */
   '/creators/performance',
+  /* Added 2026-11-09 for the creator hit rate. A read: each video's GMV and views EARNED INSIDE a
+     date range (not lifetime), optionally for one creator handle. */
+  '/videos/performance',
 ]);
 
 export function reacherKey(): string {
