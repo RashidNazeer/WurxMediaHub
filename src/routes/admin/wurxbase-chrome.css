@@ -584,3 +584,88 @@
 .wurxbase-root .footer-hover-zone {
   display: none !important;
 }
+
+/* ───────── Creator hit rate (collab-hit-rate.tsx) ─────────
+   Sits inside the per-creator video panel, between its title bar and the table. */
+.wurxbase-root .pc-hr { border-bottom: 1px solid var(--pc-divider); }
+.wurxbase-root .pc-hr-toggle {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 2px; background: none; border: 0;
+  color: var(--pc-text); font: inherit; font-size: 12.5px; font-weight: 800; text-align: left; cursor: pointer;
+}
+.wurxbase-root .pc-hr-chev { width: 12px; color: var(--pc-text-3); }
+.wurxbase-root .pc-hr-sum-per { margin-left: auto; font-weight: 700; color: var(--pc-text-2); font-variant-numeric: tabular-nums; }
+.wurxbase-root .pc-hr-body { padding: 2px 2px 14px; display: grid; gap: 10px; }
+.wurxbase-root .pc-hr-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.wurxbase-root .pc-hr-filters label { display: grid; gap: 3px; font-size: 10.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--pc-text-3); }
+.wurxbase-root .pc-hr-filters select,
+.wurxbase-root .pc-hr-filters input {
+  height: 30px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--pc-divider);
+  background: var(--wx-surface-1); color: var(--pc-text); font: inherit; font-size: 12.5px; font-weight: 600; text-transform: none; letter-spacing: 0;
+}
+.wurxbase-root .pc-hr-link { background: none; border: 0; padding: 4px 2px; color: var(--pc-accent); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; text-align: left; }
+.wurxbase-root .pc-hr-link:hover { text-decoration: underline; }
+.wurxbase-root .pc-hr-note { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--pc-text-2); }
+.wurxbase-root .pc-hr-err { color: var(--wx-danger); font-weight: 700; }
+.wurxbase-root .pc-hr-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.wurxbase-root .pc-hr-kpi { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--pc-divider); background: var(--wx-surface-1); }
+.wurxbase-root .pc-hr-kpi span { font-size: 10.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--pc-text-3); }
+.wurxbase-root .pc-hr-kpi b { font-size: 20px; font-weight: 800; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }
+.wurxbase-root .pc-hr-kpi i { font-style: normal; font-size: 11px; font-weight: 700; color: var(--pc-text-2); }
+.wurxbase-root .pc-hr-table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.wurxbase-root .pc-hr-table th { padding: 6px 8px; text-align: right; font-size: 10.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--pc-text-3); border-bottom: 1px solid var(--pc-divider); }
+.wurxbase-root .pc-hr-table td { padding: 7px 8px; text-align: right; font-weight: 700; border-bottom: 1px solid color-mix(in srgb, var(--wx-accent) 5%, transparent); }
+.wurxbase-root .pc-hr-table th:first-child, .wurxbase-root .pc-hr-table td:first-child { text-align: left; }
+.wurxbase-root .pc-hr-hits { display: grid; gap: 8px; }
+.wurxbase-root .pc-hr-hit { display: flex; gap: 12px; padding: 8px; border-radius: 12px; border: 1px solid var(--pc-divider); background: var(--wx-surface-1); }
+.wurxbase-root .pc-hr-thumb { flex: none; width: 52px; height: 72px; border-radius: 8px; overflow: hidden; display: grid; place-items: center; background: var(--wx-accent-soft); color: var(--pc-text-3); text-decoration: none; }
+.wurxbase-root .pc-hr-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.wurxbase-root .pc-hr-hit-main { min-width: 0; display: grid; gap: 5px; align-content: start; }
+.wurxbase-root .pc-hr-hit-top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 12px; font-weight: 700; }
+.wurxbase-root .pc-hr-hit-top a { color: var(--pc-accent); font-weight: 800; }
+.wurxbase-root .pc-hr-brand { color: var(--pc-text); }
+.wurxbase-root .pc-hr-date { color: var(--pc-text-2); }
+.wurxbase-root .pc-hr-hit-nums { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.wurxbase-root .pc-hr-hit-nums i { font-style: normal; font-weight: 700; font-size: 10.5px; letter-spacing: .4px; text-transform: uppercase; color: var(--pc-text-3); margin-right: 3px; }
+.wurxbase-root .pc-hr-reasons { display: flex; flex-wrap: wrap; gap: 6px; }
+.wurxbase-root .pc-hr-reason { padding: 2px 9px; border-radius: 999px; background: var(--wx-success-soft); color: var(--wx-success); font-size: 11px; font-weight: 800; }
+@media (max-width: 720px) { .wurxbase-root .pc-hr-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.wurxbase-root .pc-hr-table th, .wurxbase-root .pc-hr-table td { border-left: 0; border-right: 0; }
+.wurxbase-root .pc-hr-table td, .wurxbase-root .pc-hr-table td:first-child { color: var(--pc-text); }
+/* the Videos / Hit rate cells of the Unique Creators list */
+.wurxbase-root .pc-hr-cell { display: inline-grid; gap: 1px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.wurxbase-root .pc-hr-cell b { font-size: 12.5px; font-weight: 800; }
+.wurxbase-root .pc-hr-cell i { font-style: normal; font-size: 10.5px; font-weight: 700; color: var(--pc-text-2); }
+
+/* ───────── Hit criteria panel (HitCriteriaPanel in collab-hit-rate.tsx) ───────── */
+.wurxbase-root .pc-hc { border: 1px solid var(--pc-divider); border-radius: 14px; background: var(--wx-surface-1); }
+.wurxbase-root .pc-hc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 12px; }
+.wurxbase-root .pc-hc-title { font-size: 10.5px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--pc-text-3); }
+.wurxbase-root .pc-hc-chips { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 1; min-width: 0; font-size: 12px; font-weight: 700; color: var(--pc-text-2); }
+.wurxbase-root .pc-hc-chip { padding: 2px 9px; border-radius: 999px; background: var(--wx-accent-soft); color: var(--pc-text); font-weight: 800; font-variant-numeric: tabular-nums; }
+.wurxbase-root .pc-hc-or { font-weight: 700; color: var(--pc-text-3); font-size: 11px; }
+.wurxbase-root .pc-hc-tag { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--pc-divider); font-size: 10.5px; font-weight: 800; color: var(--pc-text-2); }
+.wurxbase-root .pc-hc-tag.custom { background: var(--wx-warning-soft); color: var(--pc-text); border-color: transparent; }
+.wurxbase-root .pc-hc-body { display: grid; gap: 8px; padding: 4px 12px 12px; border-top: 1px solid var(--pc-divider); }
+.wurxbase-root .pc-hc-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 6px 0; }
+.wurxbase-root .pc-hc-row.off .pc-hc-lbl, .wurxbase-root .pc-hc-row.off .pc-hc-input { opacity: .5; }
+.wurxbase-root .pc-hc-lbl { display: grid; gap: 1px; cursor: pointer; }
+.wurxbase-root .pc-hc-lbl b { font-size: 13px; font-weight: 800; }
+.wurxbase-root .pc-hc-lbl i { font-style: normal; font-size: 11px; font-weight: 600; color: var(--pc-text-2); }
+.wurxbase-root .pc-hc-switch { position: relative; width: 38px; height: 22px; padding: 0; border: 0; border-radius: 999px; background: var(--wx-border); cursor: pointer; transition: background .15s; }
+.wurxbase-root .pc-hc-switch span { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
+.wurxbase-root .pc-hc-switch[aria-checked="true"] { background: var(--pc-accent); }
+.wurxbase-root .pc-hc-switch[aria-checked="true"] span { transform: translateX(16px); }
+.wurxbase-root .pc-hc-input { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; color: var(--pc-text-2); }
+.wurxbase-root .pc-hc-input input { width: 110px; height: 32px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--pc-divider); background: var(--wx-surface-1); color: var(--pc-text); font: inherit; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+.wurxbase-root .pc-hc-input input[aria-invalid="true"] { border-color: var(--wx-danger); }
+.wurxbase-root .pc-hc-err { grid-column: 2 / -1; margin: 0; font-size: 11.5px; font-weight: 700; color: var(--wx-danger); }
+.wurxbase-root .pc-hc-actions { display: flex; align-items: center; gap: 14px; }
+.wurxbase-root .pc-hc-apply { height: 32px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--pc-accent); color: #fff; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; }
+.wurxbase-root .pc-hc-apply:disabled { opacity: .45; cursor: not-allowed; }
+.wurxbase-root .pc-hr-link:disabled { opacity: .45; cursor: not-allowed; text-decoration: none; }
+.wurxbase-root .pc-uc-hitrow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 16px; padding: 10px 0 2px; }
+.wurxbase-root .pc-uc-hitrow .pc-hc { flex: 1 1 420px; }
+.wurxbase-root .pc-uc-hitsonly { display: inline-flex; align-items: center; gap: 6px; height: 36px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.wurxbase-root .pc-uc-hitnote { align-self: center; font-size: 12px; font-weight: 700; color: var(--pc-text-2); }
+.wurxbase-root .pc-uc-hitnote.err { color: var(--wx-danger); }
+@media (max-width: 720px) { .wurxbase-root .pc-hc-row { grid-template-columns: auto minmax(0, 1fr); } .wurxbase-root .pc-hc-input { grid-column: 2; } }
