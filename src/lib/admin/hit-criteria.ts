@@ -156,6 +156,23 @@ export function setApplied(c: HitCriteria | null) {
   listeners.forEach((l) => l());
 }
 
+/* ───────────── the brand filter: which brand's videos the hit rate counts ─────────────
+   '' = every brand. It is an analysis choice, so it is NOT remembered across reloads (a stale
+   brand name left over from last week would silently narrow every number). It rides on the
+   same subscription as the criteria, so every list and block re-asks the database at once. */
+
+let brand = '';
+
+export const getBrand = (): string => brand;
+
+/** Count only this brand's videos ('' = all brands). */
+export function setBrand(b: string) {
+  const next = String(b ?? '').trim();
+  if (next === brand) return;
+  brand = next;
+  listeners.forEach((l) => l());
+}
+
 export function subscribe(l: () => void): () => void {
   listeners.add(l);
   return () => listeners.delete(l);
@@ -175,6 +192,7 @@ export const keyOf = (c: HitCriteria | null): string => (c ? JSON.stringify(KEYS
 /** Test hook: forget everything, as a fresh page load would. */
 export function _resetForTests() {
   applied = null;
+  brand = '';
   loaded = false;
   listeners.clear();
 }

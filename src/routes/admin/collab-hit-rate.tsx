@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getSupabase } from '@/lib/supabase';
 import {
@@ -11,9 +11,11 @@ import {
   describe,
   draftFrom,
   getApplied,
+  getBrand,
   keyOf,
   sameCriteria,
   setApplied,
+  setBrand,
   subscribe,
   validateDraft,
   wouldLeaveNone,
@@ -118,6 +120,9 @@ async function rpcAll<T>(fn: string, args: Record<string, unknown>, orderBy: str
 /** The criteria in force: null = the defaults. Re-renders every user when it changes. */
 export const useAppliedCriteria = (): HitCriteria | null => useSyncExternalStore(subscribe, getApplied, getApplied);
 
+/** The brand whose videos are being counted ('' = every brand). Shared like the criteria. */
+export const useAppliedBrand = (): string => useSyncExternalStore(subscribe, getBrand, getBrand);
+
 /** The factory settings, as the server holds them. */
 export function useHitDefaults(): HitCriteria | undefined {
   const q = useQuery({
@@ -147,8 +152,10 @@ function reasonLabel(r: string, c: HitCriteria | undefined) {
  * criteria) is always visible, so anyone reading a hit rate can see how it was calculated.
  * Edits are a draft until Apply; Apply writes the shared store, which re-asks the database.
  */
-export function HitCriteriaPanel({ className }: { className?: string }) {
+export function HitCriteriaPanel({ className, brands }: { className?: string; brands?: string[] }) {
   const applied = useAppliedCriteria();
+  const brand = useAppliedBrand();
+  const bodyId = useId();
   const defaults = useHitDefaults();
   const effective = applied ?? defaults;
   const [open, setOpen] = useState(false);
@@ -167,6 +174,11 @@ export function HitCriteriaPanel({ className }: { className?: string }) {
   const changed = !!(check?.ok && effective && !sameCriteria(check.criteria, effective));
   const canApply = !!(check?.ok && changed);
   const isDefault = applied === null;
+  // the choices, plus the one in force even if it is not in this list (so the select never lies)
+  const brandOptions = useMemo(
+    () => [...new Set([...(brands ?? []), ...(brand ? [brand] : [])].map((b) => b.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [brands, brand]
+  );
 
   const apply = () => {
     if (check?.ok) applyDraft(check.criteria, defaults);
@@ -195,17 +207,47 @@ export function HitCriteriaPanel({ className }: { className?: string }) {
             ))}
             <span className="pc-hc-or">any one qualifies</span>
             <span className={`pc-hc-tag${isDefault ? '' : ' custom'}`}>{isDefault ? 'Default' : 'Custom'}</span>
+            {brand && (
+              <span className="pc-hc-chip pc-hc-brandchip" title={`Only ${brand} videos are counted`}>
+                Brand: {brand}
+                <button type="button" aria-label="Show all brands" onClick={() => setBrand('')}>×</button>
+              </span>
+            )}
           </span>
         ) : (
           <span className="pc-hc-chips">Loading…</span>
         )}
-        <button type="button" className="pc-hr-link" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-          {open ? 'Close' : 'Edit'}
-        </button>
+        <span className="pc-hc-tools">
+          <label className="pc-hc-brand">
+            <span>Brand</span>
+            <select value={brand} onChange={(e) => setBrand(e.target.value)} aria-label="Count only one brand's videos">
+              <option value="">All brands</option>
+              {brandOptions.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className={`pc-hc-edit${open ? ' on' : ''}`}
+            aria-expanded={open}
+            aria-controls={bodyId}
+            onClick={() => setOpen((o) => !o)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4" />
+            </svg>
+            <span>{open ? 'Close' : 'Edit criteria'}</span>
+            <svg className="pc-hc-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+        </span>
       </div>
 
       {open && draft && (
         <form
+          id={bodyId}
           className="pc-hc-body"
           onSubmit={(e) => {
             e.preventDefault();
@@ -253,7 +295,7 @@ export function HitCriteriaPanel({ className }: { className?: string }) {
           </p>
           <div className="pc-hc-actions">
             <button type="submit" className="pc-hc-apply" disabled={!canApply}>Apply filters</button>
-            <button type="button" className="pc-hr-link" onClick={reset} disabled={isDefault && !changed}>Reset to default</button>
+            <button type="button" className="pc-hc-ghost" onClick={reset} disabled={isDefault && !changed}>Reset to default</button>
           </div>
         </form>
       )}
@@ -274,10 +316,15 @@ export type PersonHits = { videos: number; hits: number; rate: number | null; pe
  */
 export function useHitRateByCreator(): { byKey: Map<string, PersonHits>; loading: boolean; failed: boolean } {
   const applied = useAppliedCriteria();
+  const brand = useAppliedBrand();
   const q = useQuery({
-    queryKey: ['hit-rate', 'everyone', keyOf(applied)],
+    queryKey: ['hit-rate', 'everyone', keyOf(applied), brand],
     queryFn: async () => {
-      const rows = await rpcAll<Stat>('collab_creator_hit_stats', { p_overall_only: true, p_criteria: applied }, 'creator_key');
+      const rows = await rpcAll<Stat>(
+        'collab_creator_hit_stats',
+        { p_overall_only: true, p_criteria: applied, p_brand: brand || null },
+        'creator_key'
+      );
       return new Map(
         rows.map(
           (r) =>
@@ -316,7 +363,7 @@ export function HitRateCell({ hit }: { hit: PersonHits | undefined }) {
 
 export function CreatorHitRate({ name }: { name: string }) {
   const [open, setOpen] = useState(false);
-  const [brand, setBrand] = useState('');
+  const brand = useAppliedBrand();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [showHits, setShowHits] = useState(false);
@@ -397,17 +444,9 @@ export function CreatorHitRate({ name }: { name: string }) {
 
       {open && (
         <div className="pc-hr-body">
-          <HitCriteriaPanel />
+          {/* the brand filter lives in this panel, and is shared with the Creators tab and the people list */}
+          <HitCriteriaPanel brands={brands.data} />
           <div className="pc-hr-filters">
-            <label>
-              Brand
-              <select value={brand} onChange={(e) => setBrand(e.target.value)}>
-                <option value="">All brands</option>
-                {[...new Set(brands.data ?? [])].map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </select>
-            </label>
             <label>
               Posted from
               <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
@@ -418,7 +457,7 @@ export function CreatorHitRate({ name }: { name: string }) {
             </label>
             {filtered && (
               <button type="button" className="pc-hr-link" onClick={() => { setBrand(''); setFrom(''); setTo(''); }}>
-                Clear
+                Clear all
               </button>
             )}
           </div>
