@@ -65,6 +65,9 @@ type Stat = {
   metrics_from: string | null;
   metrics_to: string | null;
   hit_rank: number | null;
+  /** how many brands the creator has videos on, and the average of those brands' hit rates */
+  brand_count: number | null;
+  avg_brand_hit_rate: number | string | null;
 };
 
 type HitVideo = {
@@ -305,7 +308,21 @@ export function HitCriteriaPanel({ className, brands }: { className?: string; br
 
 /* ───────────────────────────── everyone, for the list ───────────────────────────── */
 
-export type PersonHits = { videos: number; hits: number; rate: number | null; perHit: number | null; rank: number | null };
+/**
+ * One person's headline numbers. `rate` is the figure to show: the AVERAGE of her brands' hit rates
+ * (Rashid, 2026-11-09: "calculate the hit rate for each brand and then take average"), which for
+ * somebody on one brand is simply that brand's rate. `pooled` is hit videos over all videos
+ * together, kept because the two can differ and the popup shows both.
+ */
+export type PersonHits = {
+  videos: number;
+  hits: number;
+  rate: number | null;
+  pooled: number | null;
+  brands: number;
+  perHit: number | null;
+  rank: number | null;
+};
 
 /**
  * EVERY PERSON'S TOTALS, for the Unique Creators list, keyed by the same lower-cased name that
@@ -330,7 +347,16 @@ export function useHitRateByCreator(): { byKey: Map<string, PersonHits>; loading
           (r) =>
             [
               r.creator_key,
-              { videos: r.total_videos, hits: r.hit_videos, rate: num(r.hit_rate), perHit: num(r.videos_per_hit), rank: r.hit_rank },
+              {
+                videos: r.total_videos,
+                hits: r.hit_videos,
+                // an older database without the average falls back to the pooled rate rather than showing nothing
+                rate: num(r.avg_brand_hit_rate) ?? num(r.hit_rate),
+                pooled: num(r.hit_rate),
+                brands: r.brand_count ?? 1,
+                perHit: num(r.videos_per_hit),
+                rank: r.hit_rank,
+              },
             ] as const
         )
       );
@@ -341,20 +367,22 @@ export function useHitRateByCreator(): { byKey: Map<string, PersonHits>; loading
 }
 const EMPTY = new Map<string, PersonHits>();
 
-/** "4.24%" with "7 of 165" under it: the rate never appears without its sample. */
+/**
+ * The rate with its sample under it, so a percentage never appears alone. One brand: "7 of 165".
+ * Several: "avg of 3 brands", and the hover spells out the pooled count behind it.
+ */
 export function HitRateCell({ hit }: { hit: PersonHits | undefined }) {
   if (!hit || hit.videos === 0) return <span className="pc-handle">-</span>;
+  const many = hit.brands > 1;
   return (
     <span
       className="pc-hr-cell"
-      title={`${hit.hits} hit video${hit.hits === 1 ? '' : 's'} out of ${hit.videos} published${
-        hit.perHit !== null ? ` · ${per(hit.perHit)} videos per hit` : ' · no hits yet'
-      }${hit.rank ? ` · rank ${hit.rank}` : ''}`}
+      title={`${many ? `Average of ${hit.brands} brands' hit rates. ` : ''}${hit.hits} hit video${hit.hits === 1 ? '' : 's'} out of ${hit.videos} published${
+        many && hit.pooled !== null ? ` (${pct(hit.pooled)} counted across all of them together)` : ''
+      }${hit.perHit !== null ? ` · ${per(hit.perHit)} videos per hit` : ' · no hits yet'}${hit.rank ? ` · rank ${hit.rank}` : ''}`}
     >
       <b>{pct(hit.rate)}</b>
-      <i>
-        {hit.hits} of {hit.videos}
-      </i>
+      <i>{many ? `avg of ${hit.brands} brands` : `${hit.hits} of ${hit.videos}`}</i>
     </span>
   );
 }
@@ -414,6 +442,9 @@ export function CreatorHitRate({ name }: { name: string }) {
   const total = overall?.total_videos ?? 0;
   const hitN = overall?.hit_videos ?? 0;
   const filtered = !!(brand || from || to);
+  // her headline rate: the average of her brands' rates (one brand = that brand's rate)
+  const headline = num(overall?.avg_brand_hit_rate) ?? num(overall?.hit_rate);
+  const brandsN = overall?.brand_count ?? byBrand.length;
   const summary = stats.isPending
     ? 'Hit rate…'
     : stats.isError
@@ -422,7 +453,7 @@ export function CreatorHitRate({ name }: { name: string }) {
         ? filtered
           ? 'Hit rate · no videos in this filter'
           : 'Hit rate · no published videos yet'
-        : `Hit rate ${pct(overall?.hit_rate)} · ${hitN} hit${hitN === 1 ? '' : 's'} of ${total} video${total === 1 ? '' : 's'} · ${brand || 'all brands'}`;
+        : `Hit rate ${pct(headline)}${brandsN > 1 ? ` (avg of ${brandsN} brands)` : ''} · ${hitN} hit${hitN === 1 ? '' : 's'} of ${total} video${total === 1 ? '' : 's'} · ${brand || 'all brands'}`;
 
   return (
     <div className="pc-hr" onClick={(e) => e.stopPropagation()} aria-busy={stats.isFetching}>
@@ -478,8 +509,8 @@ export function CreatorHitRate({ name }: { name: string }) {
                 <div className="pc-hr-kpi"><span>Hit videos</span><b>{hitN}</b></div>
                 <div className="pc-hr-kpi">
                   <span>Hit rate</span>
-                  <b>{total ? pct(overall?.hit_rate) : '–'}</b>
-                  {total > 0 && <i>of {total} video{total === 1 ? '' : 's'}</i>}
+                  <b>{total ? pct(headline) : '–'}</b>
+                  {total > 0 && <i>{brandsN > 1 ? `average of ${brandsN} brands` : `of ${total} video${total === 1 ? '' : 's'}`}</i>}
                 </div>
                 <div className="pc-hr-kpi">
                   <span>Videos per hit (observed)</span>
@@ -487,6 +518,12 @@ export function CreatorHitRate({ name }: { name: string }) {
                 </div>
               </div>
 
+              {brandsN > 1 && (
+                <p className="pc-hr-note">
+                  Her hit rate is worked out for each brand and averaged: {byBrand.map((r) => `${r.brand} ${pct(r.hit_rate)}`).join(', ')}. Counted across all{' '}
+                  {total} videos together it would be {pct(overall?.hit_rate)}.
+                </p>
+              )}
               {overall && overall.gmv_unverified_videos > 0 && (
                 <p className="pc-hr-note">
                   GMV could not be checked for <b>{overall.gmv_unverified_videos}</b> of {total} videos (brands or videos Euka does not hold). Those can

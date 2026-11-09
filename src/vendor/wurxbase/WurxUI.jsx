@@ -7421,6 +7421,9 @@ function CreatorsTab({ creators, allCreators, allTime, month, periodRange, eukaL
   /* re-read on the God Mode signal so column and format changes land
      without a reload */
   const god = useGod();
+  /* WURX-ADDED · every person's hit rate for the Hit rate column (average of their brands' rates) */
+  const { byKey: hitByPerson } = useHitRateByCreator();
+  /* WURX-END */
   /* WURX-ADDED · the brands the Hit criteria panel can filter to */
   const hitBrandNames = useMemo(() => [...new Set((allCreators || creators || []).map(c => String(c.brand || '').trim()).filter(Boolean))].sort(), [allCreators, creators]);
   /* WURX-END */
@@ -7951,6 +7954,7 @@ function CreatorsTab({ creators, allCreators, allTime, month, periodRange, eukaL
                           deals={wxDealsNow.get(wxPersonKey(c)) || 0}
                           dealsMonth={wxDealsMonth}
                           monthGmv={wxMonthGmv}
+                          hit={hitByPerson.get(String(c.name || '').trim().toLowerCase())}
                           onToggle={() => toggle(c.id)}
                           onOpen={() => setVideosCreatorId(c.id)}
                           onSetStatus={setStatus}
@@ -9563,7 +9567,7 @@ function KpiPill({ label, value, onClick, title }) {
 const cellCenter = { display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 0 };
 const cellEllipsis = { maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
-function CreatorsTabRow({ c, idx, selected, euka, deals, dealsMonth, monthGmv, onToggle, onOpen, onSetStatus }) {
+function CreatorsTabRow({ c, idx, selected, euka, deals, dealsMonth, monthGmv, hit, onToggle, onOpen, onSetStatus }) {
   const god = useGod();
   const amount = parseDealAmount(c.deal);
   const videoCount = parseDealVideos(c.deal);
@@ -9639,6 +9643,11 @@ function CreatorsTabRow({ c, idx, selected, euka, deals, dealsMonth, monthGmv, o
           </div>
         );
       })()}
+      {/* WURX-ADDED · this person's hit rate: the average of her brands' rates, "avg of N brands" under it when she has several */}
+      <div className="pc-cell" data-label="Hit rate" data-wx="hit-rate" style={{ ...cellCenter, ...colStyle("Hit rate", god) }}>
+        <HitRateCell hit={hit} />
+      </div>
+      {/* WURX-END */}
       <div className="pc-cell" data-label="Status" style={{ ...cellCenter, ...colStyle("Status", god) }} onClick={e => e.stopPropagation()}>
         <WurxStatusDropdown c={c} onChange={(patch) => onSetStatus(c.id, patch)} />
       </div>

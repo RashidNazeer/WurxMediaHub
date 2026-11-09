@@ -307,6 +307,34 @@ select pg_temp.chk('brand filter: ranking is among the creators who have that br
 select pg_temp.chk('the filtered stats agree with the filtered hit list (HR Strict on HR X has 3 hit videos)',
   (select count(*)::text from public.collab_creator_videos('HR Strict', 'HR X', null, null, null, true)), '3');
 
+-- a creator's headline rate is the AVERAGE of her brands' rates (Rashid, 2026-11-09)
+create or replace function pg_temp.avgline(p_key text, p_brand text, p_crit jsonb) returns text language sql as $$
+  select avg_brand_hit_rate || '/' || brand_count || '/' || hit_rate
+  from public.collab_creator_hit_stats(p_key, p_brand, null, null, true, p_crit) where creator_key = lower(p_key) $$;
+select pg_temp.chk('average: Sarah (3.33%, 2.86%, 5.00%) averages 3.73% over 3 brands; pooled is still 4.24%', pg_temp.avgline('HR Sarah', null, null), '3.73/3/4.24');
+select pg_temp.chk('average: Cara (3.33%, 2.86%) averages 3.10% over 2 brands; pooled is 3.08%', pg_temp.avgline('HR Cara', null, null), '3.10/2/3.08');
+select pg_temp.chk('average: one brand is exactly that brand''s rate (0% with no hits)', pg_temp.avgline('HR Nohit', null, null), '0.00/1/0.00');
+select pg_temp.chk('average: HR Strict (6.00% and 4.00%) averages 5.00%', pg_temp.avgline('HR Strict', null, null), '5.00/2/5.00');
+select pg_temp.chk('average follows the criteria: strict gives both brands 2.00%, so 2.00%', pg_temp.avgline('HR Strict', null, pg_temp.crit(2000, 2000, 500000)), '2.00/2/2.00');
+select pg_temp.chk('average follows the brand filter: Sarah on HR MDE alone is that brand''s 3.33% over 1 brand',
+  (select avg_brand_hit_rate || '/' || brand_count from public.collab_creator_hit_stats('HR Sarah', 'HR MDE', null, null, true) where creator_key = 'hr sarah'), '3.33/1');
+select pg_temp.chk('the per-brand rows are unchanged by it (they are the inputs)',
+  pg_temp.line('HR Sarah', 'HR Penetrex'), '35/1/2.86/35.00');
+
+-- a brand with no hits still counts in the average: 10 videos 1 hit (10%) and 40 videos 0 hits (0%)
+select pg_temp.mk('HR Mixed', 'HR M1', 7700000000000000000, 10);
+select pg_temp.mk('HR Mixed', 'HR M2', 7710000000000000000, 40);
+select pg_temp.metric(7700000000000000001, 1500, 0, 100);
+select pg_temp.chk('average: a zero-hit brand pulls the average down (10% and 0% -> 5.00%) while pooled is 2.00%', pg_temp.avgline('HR Mixed', null, null), '5.00/2/2.00');
+-- ...and the ranking follows the average, not the pooled rate: Mixed (avg 5.00, pooled 2.00) vs AvgY (one brand, 4.00)
+select pg_temp.mk('HR AvgY', 'HR M1', 7720000000000000000, 50);
+select pg_temp.metric(7720000000000000001, 1500, 0, 100);
+select pg_temp.metric(7720000000000000002, 1500, 0, 100);
+select pg_temp.chk('ranking uses the average: Mixed (5.00% avg, 2.00% pooled) ranks above AvgY (4.00% both)',
+  (select (m.hit_rank < y.hit_rank)::text
+   from public.collab_creator_hit_stats(null, null, null, null, true) m, public.collab_creator_hit_stats(null, null, null, null, true) y
+   where m.creator_key = 'hr mixed' and y.creator_key = 'hr avgy'), 'true');
+
 -- rankings follow the criteria: P has two high-view videos, Q has one big-GMV video
 select pg_temp.mk('HR RankP', 'HR R', 7300000000000000000, 10);
 select pg_temp.mk('HR RankQ', 'HR R', 7400000000000000000, 10);
