@@ -92,6 +92,9 @@ export const CREATOR_COLS = [
      their posted videos' GMV, not Euka's last-30-days figure for the account.
      Rashid, 2026-11-04. WURX-END */
   { id: 'brandgmv',  label: 'Brand GMV', w: '0.7fr'  },
+  /* WURX-ADDED · Rashid, 2026-11-09: each creator's hit rate (videos that became hits under the criteria
+     chosen on this screen). Somebody on several brands shows the AVERAGE of her brands' rates. WURX-END */
+  { id: 'hitrate',   label: 'Hit rate',  w: '0.84fr' },
   { id: 'status',    label: 'Status',    w: '0.96fr' },
   { id: 'hiredby',   label: 'Hired By',  w: '0.68fr' },
 ];
@@ -100,7 +103,7 @@ export const COL_BY_LABEL = {
   '#': 'num', 'Name': 'name', 'Contact': 'contact', 'TikTok': 'tiktok',
   'Followers': 'followers',
   'Category': 'category', 'Brand': 'brand', 'Onboarded': 'onboarded',
-  'Deal': 'deal', 'Rate/Vid': 'rate', 'L30 GMV': 'l30', 'Brand GMV': 'brandgmv',
+  'Deal': 'deal', 'Rate/Vid': 'rate', 'L30 GMV': 'l30', 'Brand GMV': 'brandgmv', 'Hit rate': 'hitrate',
   'Status': 'status', 'Hired By': 'hiredby',
 };
 

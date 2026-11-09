@@ -708,3 +708,4 @@
   .wurxbase-root.wurxbase-root .pc-vx-overlay { padding-top: 5.25rem; padding-bottom: 1.25rem; align-items: center; }
   .wurxbase-root.wurxbase-root .pc-vx-modal { height: min(calc(100dvh - 6.5rem), 940px); max-height: calc(100dvh - 6.5rem); }
 }
+.wurxbase-root .pc-hr-cell i { white-space: nowrap; }
