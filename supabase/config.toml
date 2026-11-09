@@ -507,3 +507,8 @@ verify_jwt = true
 # Called by pg_cron through pg_net, which carries no JWT, exactly like reacher-sync.
 # The function checks x-sync-secret or a staff session itself.
 verify_jwt = false
+
+[functions.collab-video-hits-sync]
+# Called by pg_cron through pg_net, which carries no JWT, like collab-gmv-sync.
+# The function checks x-sync-secret or a staff session itself.
+verify_jwt = false
