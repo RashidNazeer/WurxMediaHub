@@ -287,6 +287,26 @@ select pg_temp.chk('video list, default: 5 hits, and every row says why',
 select pg_temp.chk('a video that meets several enabled conditions is ONE row in the hit list',
   (select count(*) || '/' || max(cardinality(reasons)) from public.collab_creator_videos('HR Sarah', 'HR MDE', null, null, null, true) where item_id = '8100000000000000001'), '1/2');
 
+-- the brand filter and the criteria together (HR Strict: HR X has hits 1,2,3 of 50, HR Y has 1,2 of 50)
+create or replace function pg_temp.bline(p_key text, p_brand text, p_crit jsonb) returns text language sql as $$
+  select total_videos || '/' || hit_videos || '/' || hit_rate || '/' || coalesce(videos_per_hit::text, 'null')
+  from public.collab_creator_hit_stats(p_key, p_brand, null, null, true, p_crit) where creator_key = lower(p_key) $$;
+select pg_temp.chk('brand filter, default criteria: only HR X counts (50 videos, 3 hits)', pg_temp.bline('HR Strict', 'HR X', null), '50/3/6.00/16.67');
+select pg_temp.chk('brand filter, default criteria: only HR Y counts (50 videos, 2 hits)', pg_temp.bline('HR Strict', 'HR Y', null), '50/2/4.00/25.00');
+select pg_temp.chk('brand filter + strict criteria: HR X falls to 1 of 50', pg_temp.bline('HR Strict', 'HR X', pg_temp.crit(2000, 2000, 500000)), '50/1/2.00/50.00');
+select pg_temp.chk('brand filter + views-only at 500k: HR Y is 1 of 50',
+  pg_temp.bline('HR Strict', 'HR Y', '{"gmv30":{"on":false},"gmv90":{"on":false},"views":{"min":500000}}'), '50/1/2.00/50.00');
+select pg_temp.chk('brand filter drops creators with no videos on that brand from the whole list',
+  (select (bool_or(creator_key = 'hr strict') and not bool_or(creator_key = 'hr sarah'))::text from public.collab_creator_hit_stats(null, 'HR X', null, null, true)), 'true');
+select pg_temp.chk('brand filter: a brand nobody has returns an empty list, not an error',
+  (select count(*)::text from public.collab_creator_hit_stats(null, 'No Such Brand', null, null, true)), '0');
+select pg_temp.chk('brand filter is matched exactly, not by prefix',
+  (select count(*)::text from public.collab_creator_hit_stats('HR Strict', 'HR', null, null, true)), '0');
+select pg_temp.chk('brand filter: ranking is among the creators who have that brand (starts at 1)',
+  (select min(hit_rank)::text from public.collab_creator_hit_stats(null, 'HR X', null, null, true)), '1');
+select pg_temp.chk('the filtered stats agree with the filtered hit list (HR Strict on HR X has 3 hit videos)',
+  (select count(*)::text from public.collab_creator_videos('HR Strict', 'HR X', null, null, null, true)), '3');
+
 -- rankings follow the criteria: P has two high-view videos, Q has one big-GMV video
 select pg_temp.mk('HR RankP', 'HR R', 7300000000000000000, 10);
 select pg_temp.mk('HR RankQ', 'HR R', 7400000000000000000, 10);

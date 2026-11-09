@@ -13,6 +13,7 @@
 import {
   KEYS, parseAmount, validateDraft, wouldLeaveNone, draftFrom, sameCriteria, asCriteria,
   describe, chip, compact, applyDraft, setApplied, getApplied, subscribe, keyOf, payloadOf, _resetForTests,
+  getBrand, setBrand,
 } from '../../../src/lib/admin/hit-criteria.ts';
 
 let failed = 0;
@@ -139,6 +140,37 @@ eq('a chip', chip('gmv30', { on: true, min: 1500 }), 'GMV 30d ≥ $1.5K');
 eq('compact: exact below a thousand', compact(750), '750');
 eq('compact: millions', compact(2000000), '2M');
 ok('asCriteria accepts a well-formed value and rejects junk', asCriteria(DEFAULTS) !== null && asCriteria(null) === null && asCriteria({}) === null);
+
+console.log('\nTHE BRAND FILTER\n');
+const bs = makeStorage();
+fresh(bs);
+eq('no brand chosen = every brand', getBrand(), '');
+let bn = 0;
+const boff = subscribe(() => bn++);
+setBrand('Penetrex');
+eq('choosing a brand is remembered for the session', getBrand(), 'Penetrex');
+ok('and everything subscribed is told, so every list re-asks the database', bn === 1);
+setBrand('Penetrex');
+ok('choosing the same brand again does not trigger a pointless re-ask', bn === 1);
+setBrand('  Mineral Ice Extreme  ');
+eq('the name is trimmed, the way the database matches it', getBrand(), 'Mineral Ice Extreme');
+setBrand('');
+eq('clearing it goes back to every brand', getBrand(), '');
+ok('the brand filter and the criteria share one subscription', (() => {
+  const before = bn;
+  setApplied({ ...DEFAULTS, views: { on: true, min: 500000 } });
+  const told = bn > before;
+  setApplied(null);
+  return told;
+})());
+setBrand('Penetrex');
+ok('a brand choice is never written to storage (a stale brand would silently narrow every number)',
+  [...bs._m.keys()].every((k) => !/brand/i.test(k) && !/Penetrex/.test(bs._m.get(k))));
+setApplied(null);
+eq('Reset to default leaves the brand alone (it is a separate choice)', getBrand(), 'Penetrex');
+fresh(bs);
+eq('a reload forgets the brand', getBrand(), '');
+boff();
 
 console.log(failed ? `\n${failed} FAILED\n` : '\nAll passed.\n');
 process.exit(failed ? 1 : 0);
