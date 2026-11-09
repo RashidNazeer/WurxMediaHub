@@ -27,6 +27,7 @@
     "verify:month-gmv": "tsx scripts/verify/collabs/check-month-gmv.mjs",
     "verify:hit-criteria": "tsx scripts/verify/collabs/check-hit-criteria.mjs",
     "verify:hit-rate": "docker exec -i supabase_db_WurxMediaHub psql -U postgres -P pager=off -v ON_ERROR_STOP=1 < scripts/verify/creator-hit-rate.sql",
+    "verify:creator-category": "tsx scripts/verify/collabs/check-creator-category.mjs",
     "verify:browser": "node scripts/verify/verify-page.mjs",
     "verify:rls": "node scripts/verify/auth/check-rls.mjs",
     "verify:tiktok": "node scripts/verify/tiktok/check-tiktok.mjs",

@@ -31,6 +31,7 @@ import { useMonthGmv as wxUseMonthGmv } from '@/routes/admin/collab-month-gmv';
    src/routes/admin/collab-matrix-autofill.ts, src/lib/admin/matrix-autofill.ts. */
 import { useMatrixFigures as wxUseMatrixFigures } from '@/routes/admin/collab-matrix-autofill';
 import { applyFills as wxApplyFills } from '@/lib/admin/matrix-autofill';
+import { storedCategoryFor as wxStoredCategory } from '@/routes/admin/collab-creator-category'; /* WURX-ADDED */
 /* WURX-END */
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { can } from './access';
@@ -5723,6 +5724,24 @@ function CreatorEditModal({ mode, creator, defaultBrand, brands = [], directory 
     return arr.length ? arr : [''];
   });
 
+  /* WURX-ADDED · CATEGORY FROM EUKA. Adding a creator whose handle Euka has already been asked about
+     fills the empty Category at once; anybody else is filled by the sync shortly after saving.
+     Never over a category the person typed or cleared (`catTouched`). */
+  const catTouched = useRef(false);
+  useEffect(() => {
+    if (!isAdd || catTouched.current || (f.category || '').trim()) return;
+    const hs = tiktoks.map(t => String(t || '').trim()).filter(Boolean);
+    if (!hs.length) return;
+    let live = true;
+    const t = setTimeout(() => {
+      wxStoredCategory(hs).then(label => {
+        if (live && label && !catTouched.current) setF(p => ((p.category || '').trim() ? p : { ...p, category: label }));
+      }).catch(() => {});
+    }, 600);
+    return () => { live = false; clearTimeout(t); };
+  }, [isAdd, tiktoks, f.category]);
+  /* WURX-END */
+
   // Brand's promoting products · from budgets table for current month, OR product list inferred
   const brandProducts = useMemo(() => {
     const b = budgets.find(x => x.brand === f.brand);
@@ -6284,7 +6303,7 @@ function CreatorEditModal({ mode, creator, defaultBrand, brands = [], directory 
         {/* Category */}
         <div className="pc-field">
           <label>Category</label>
-          <input className="pc-input" list="wurx-catlist" placeholder="e.g. Beauty · Tech · Fitness" value={f.category} onChange={e => set('category', e.target.value)} />
+          <input className="pc-input" list="wurx-catlist" placeholder="e.g. Beauty · Tech · Fitness" value={f.category} onChange={e => { catTouched.current = true; set('category', e.target.value); }} />
           <datalist id="wurx-catlist">{categories.map(cat => <option key={cat} value={cat} />)}</datalist>
         </div>
 
