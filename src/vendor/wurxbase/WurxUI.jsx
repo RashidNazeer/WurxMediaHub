@@ -31,6 +31,7 @@ import { useMonthGmv as wxUseMonthGmv } from '@/routes/admin/collab-month-gmv';
    src/routes/admin/collab-matrix-autofill.ts, src/lib/admin/matrix-autofill.ts. */
 import { useMatrixFigures as wxUseMatrixFigures } from '@/routes/admin/collab-matrix-autofill';
 import { applyFills as wxApplyFills } from '@/lib/admin/matrix-autofill';
+import { storedCategoryFor as wxStoredCategory } from '@/routes/admin/collab-creator-category'; /* WURX-ADDED */
 /* WURX-END */
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { can } from './access';
@@ -40,6 +41,8 @@ import { godGet, godMoney, godDateParts, colTemplate, colStyle,
   visibleCols } from './godSettings';
 import { generateContractPdf, defaultContractFields, CONTRACT_SECTIONS, renderContractPdf } from './contractPdf';
 import { BrandMonthCompare } from '@/routes/admin/collab-month-compare'; /* WURX-ADDED */
+import { CreatorHitRate, HitCriteriaPanel, HitRateCell, useAppliedCriteria, useHitDefaults, useHitRateByCreator } from '@/routes/admin/collab-hit-rate'; /* WURX-ADDED */
+import { describe as describeHitCriteria } from '@/lib/admin/hit-criteria'; /* WURX-ADDED */
 import { mergeContract, getBrandContract, saveBrandContract,
   fetchBrandContracts } from './brandContract';
 import './paidcollabs.css';
@@ -5207,6 +5210,9 @@ function DrilldownVideosPanel({ c, euka, allTime, siblings, onUpdateCreator, onM
             Manage videos
           </button>
         </div>
+        {/* WURX-ADDED · this person's hit rate across every brand; computed in the database, see collab-hit-rate.tsx */}
+        {c.name && <CreatorHitRate name={c.name} />}
+        {/* WURX-END */}
         {rows.length === 0 ? (
           <div className="pc-vxp-empty">No videos posted yet for this collab.</div>
         ) : !isEuka ? (
@@ -5717,6 +5723,24 @@ function CreatorEditModal({ mode, creator, defaultBrand, brands = [], directory 
     if (c.tiktok_account_2) arr.push(c.tiktok_account_2);
     return arr.length ? arr : [''];
   });
+
+  /* WURX-ADDED · CATEGORY FROM EUKA. Adding a creator whose handle Euka has already been asked about
+     fills the empty Category at once; anybody else is filled by the sync shortly after saving.
+     Never over a category the person typed or cleared (`catTouched`). */
+  const catTouched = useRef(false);
+  useEffect(() => {
+    if (!isAdd || catTouched.current || (f.category || '').trim()) return;
+    const hs = tiktoks.map(t => String(t || '').trim()).filter(Boolean);
+    if (!hs.length) return;
+    let live = true;
+    const t = setTimeout(() => {
+      wxStoredCategory(hs).then(label => {
+        if (live && label && !catTouched.current) setF(p => ((p.category || '').trim() ? p : { ...p, category: label }));
+      }).catch(() => {});
+    }, 600);
+    return () => { live = false; clearTimeout(t); };
+  }, [isAdd, tiktoks, f.category]);
+  /* WURX-END */
 
   // Brand's promoting products · from budgets table for current month, OR product list inferred
   const brandProducts = useMemo(() => {
@@ -6279,7 +6303,7 @@ function CreatorEditModal({ mode, creator, defaultBrand, brands = [], directory 
         {/* Category */}
         <div className="pc-field">
           <label>Category</label>
-          <input className="pc-input" list="wurx-catlist" placeholder="e.g. Beauty · Tech · Fitness" value={f.category} onChange={e => set('category', e.target.value)} />
+          <input className="pc-input" list="wurx-catlist" placeholder="e.g. Beauty · Tech · Fitness" value={f.category} onChange={e => { catTouched.current = true; set('category', e.target.value); }} />
           <datalist id="wurx-catlist">{categories.map(cat => <option key={cat} value={cat} />)}</datalist>
         </div>
 
@@ -7000,6 +7024,10 @@ function CreatorVideosPopup({ creator: c, onUpdateCreator, onEdit, onClose }) {
           {saveError && <div className="pc-vx-save-err">{saveError}</div>}
         </header>
 
+        {/* WURX-ADDED · this person's hit rate across every brand; computed in the database, see collab-hit-rate.tsx */}
+        {c.name && <CreatorHitRate name={c.name} />}
+        {/* WURX-END */}
+
         {/* ── Bulk paste panel (collapsible) ── */}
         {bulkOpen && (
           <div className="pc-vx-bulk-wrap">
@@ -7688,6 +7716,12 @@ function CreatorsTab({ creators, allCreators, allTime, month, periodRange, eukaL
           )}
         </span>
       </div>
+
+      {/* WURX-ADDED · what counts as a hit. The Unique Creators list and every creator's hit-rate block read this same setting. */}
+      <div style={{ marginTop: 12 }}>
+        <HitCriteriaPanel />
+      </div>
+      {/* WURX-END */}
 
       {/* Toolbar · search + filter + count */}
       <div className="pc-toolbar" style={{ marginTop: 14 }}>
@@ -9169,6 +9203,15 @@ function UniqueCreatorsModal({ rows, euka, onClose }) {
      column header takes over from there */
   const [sort, setSort] = useState(null);
   const [tier, setTier] = useState(null);   // 'L3' | 'none' (no EUKA match) | null
+  /* WURX-ADDED · hit rate per person (videos that became hits / published videos), computed by the
+     database under the criteria the user has applied. `hitsOnly` turns this directory into a list of
+     hit performers: only people with at least one hit under those criteria. */
+  const { byKey: hitByKey, loading: hitLoading, failed: hitFailed } = useHitRateByCreator();
+  const hitCriteria = useAppliedCriteria();
+  const hitDefaults = useHitDefaults();
+  const hitCriteriaText = (hitCriteria || hitDefaults) ? describeHitCriteria(hitCriteria || hitDefaults) : '';
+  const [hitsOnly, setHitsOnly] = useState(false);
+  /* WURX-END */
 
   const people = useMemo(() => {
     const map = new Map();
@@ -9244,8 +9287,11 @@ function UniqueCreatorsModal({ rows, euka, onClose }) {
     [tierTally]);
 
   const shown = useMemo(() => {
-    const list = !tier ? searched
+    const byTier = !tier ? searched
       : searched.filter(p => (tier === 'none' ? !p.tier : p.tier === tier));
+    /* WURX-ADDED · a list of hit performers drops everybody with no hit under the current criteria */
+    const list = hitsOnly ? byTier.filter(p => ((hitByKey.get(p.key) || {}).hits || 0) > 0) : byTier;
+    /* WURX-END */
     if (!sort) return list;
 
     const get = {
@@ -9257,6 +9303,12 @@ function UniqueCreatorsModal({ rows, euka, onClose }) {
       rate:     p => p.rate || 0,
       l30:      p => p.l30 || 0,
       hiredBy:  p => (p.hiredBy || '').toLowerCase(),
+      /* WURX-ADDED · sample size sorts on its own, so nobody has to rank on the percentage alone */
+      videos:   p => (hitByKey.get(p.key) || {}).videos || 0,
+      /* rate first, then hit videos, then sample size: the same order the database ranks in, so one creator
+         is never ahead of another on a tie of percentages alone */
+      hitRate:  p => { const h = hitByKey.get(p.key) || {}; return (h.rate || 0) * 1e10 + (h.hits || 0) * 1e5 + Math.min(h.videos || 0, 99999); },
+      /* WURX-END */
     }[sort.key];
     if (!get) return list;
 
@@ -9269,12 +9321,12 @@ function UniqueCreatorsModal({ rows, euka, onClose }) {
       const c = typeof A === 'number' ? A - B : String(A).localeCompare(String(B));
       return sort.dir === 'desc' ? -c : c;
     });
-  }, [searched, tier, sort]);
+  }, [searched, tier, sort, hitByKey, hitsOnly]);
 
   /* Numbers and dates are most useful biggest-first, text A-Z · so each
      column starts on the direction people actually want, and a second
      click flips it. */
-  const NUMERIC = ['first', 'rate', 'l30'];
+  const NUMERIC = ['first', 'rate', 'l30', 'videos', 'hitRate'];
   const clickSort = (key) => setSort(prev => (
     prev && prev.key === key
       ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
@@ -9314,12 +9366,13 @@ function UniqueCreatorsModal({ rows, euka, onClose }) {
       const t = String(v == null ? '' : v);
       return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
     };
-    const head = ['Name', 'Username', 'Contact', 'Email', 'Category', 'Tier', 'Onboarded', 'Rate per video', 'L30 GMV', 'Hired By', 'Collabs'];
+    const head = ['Name', 'Username', 'Contact', 'Email', 'Category', 'Tier', 'Onboarded', 'Rate per video', 'L30 GMV', 'Hired By', 'Collabs', 'Videos', 'Hit videos', 'Hit rate %', 'Hit criteria']; /* WURX-ADDED · last four */
     const lines = [head.join(',')];
     target.forEach(p => lines.push([
       p.name, p.handles[0] ? '@' + p.handles[0] : '', p.contact, p.email,
       p.category, p.tier, p.first, p.rate || '', Math.round(p.l30) || '',
       p.hiredBy, p.deals,
+      (hitByKey.get(p.key) || {}).videos ?? '', (hitByKey.get(p.key) || {}).hits ?? '', (hitByKey.get(p.key) || {}).rate ?? '', hitCriteriaText, /* WURX-ADDED */
     ].map(esc).join(',')));
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
@@ -9329,7 +9382,7 @@ function UniqueCreatorsModal({ rows, euka, onClose }) {
     URL.revokeObjectURL(a.href);
   }
 
-  const GRID = '40px 46px 1.3fr 0.95fr 1.05fr 0.9fr 0.9fr 0.62fr 0.75fr 0.62fr';
+  const GRID = '40px 46px 1.3fr 0.95fr 1.05fr 0.9fr 0.9fr 0.62fr 0.75fr 0.62fr 0.55fr 0.7fr'; /* WURX-ADDED · two columns on the end: Videos, Hit rate */
 
   return (
     <div className="pc-uc-root" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -9382,6 +9435,17 @@ function UniqueCreatorsModal({ rows, euka, onClose }) {
               <button className="pc-uc-reset" onClick={() => { setTier(null); setSort(null); }}>Reset</button>
             )}
           </div>
+          {/* WURX-ADDED · what counts as a hit, and who is listed under it */}
+          <div className="pc-uc-hitrow">
+            <HitCriteriaPanel />
+            <label className="pc-uc-hitsonly" title="Show only people with at least one hit under the current criteria">
+              <input type="checkbox" checked={hitsOnly} onChange={e => setHitsOnly(e.target.checked)} />
+              Only creators with hits
+            </label>
+            {hitLoading && <span className="pc-uc-hitnote" role="status">Recalculating hit rates…</span>}
+            {hitFailed && <span className="pc-uc-hitnote err" role="alert">Hit rates are unavailable right now.</span>}
+          </div>
+          {/* WURX-END */}
         </div>
 
         <div className="pc-uc-scroll">
@@ -9396,6 +9460,10 @@ function UniqueCreatorsModal({ rows, euka, onClose }) {
             <Th k="rate"     sort={sort} on={clickSort} title="Rate from their most recent deal">Rate/Vid</Th>
             <Th k="l30"      sort={sort} on={clickSort}>L30 GMV</Th>
             <Th k="hiredBy"  sort={sort} on={clickSort}>Hired By</Th>
+            {/* WURX-ADDED */}
+            <Th k="videos"   sort={sort} on={clickSort} title="Distinct published TikTok videos across every brand (the sample behind the hit rate)">Videos</Th>
+            <Th k="hitRate"  sort={sort} on={clickSort} title="Hit videos / published videos. A hit has $1K GMV in 30 or 90 days, or 250K views. Read it beside the video count.">Hit rate</Th>
+            {/* WURX-END */}
           </div>
           {shown.length === 0 ? (
             <div className="pc-uc-empty">
@@ -9430,6 +9498,10 @@ function UniqueCreatorsModal({ rows, euka, onClose }) {
               <div>{p.rate > 0 ? <span className="pc-money">{fmt$Round(p.rate)}</span> : <span className="pc-handle">-</span>}</div>
               <div>{p.l30 > 0 ? <span className="pc-metric pc-metric-gmv">{fmt$Exact(Math.round(p.l30))}</span> : <span className="pc-handle">-</span>}</div>
               <div><HiredByTag who={p.hiredBy} /></div>
+              {/* WURX-ADDED */}
+              <div>{(hitByKey.get(p.key) || {}).videos ? <span className="pc-metric">{hitByKey.get(p.key).videos}</span> : <span className="pc-handle">-</span>}</div>
+              <div><HitRateCell hit={hitByKey.get(p.key)} /></div>
+              {/* WURX-END */}
             </div>
           ))}
         </div>

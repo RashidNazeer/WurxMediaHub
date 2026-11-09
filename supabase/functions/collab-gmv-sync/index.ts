@@ -34,6 +34,14 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.1
 import { z } from 'npm:zod@4.4.3';
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { EUKA_V0, EUKA_V1, eukaKeys, type EukaAuth } from '../_shared/euka-accounts.ts';
+import {
+  categoriesForHandle,
+  dueHandles,
+  labelFrom,
+  planWrites,
+  type RosterRow,
+  type StoredCategory,
+} from '../_shared/creator-category.ts';
 import { read as reacherRead, reacherKey, shops as reacherShops } from '../_shared/reacher.ts';
 import {
   EUKA_CAP,
@@ -49,6 +57,7 @@ import {
   rangeWindow,
   recentMonths,
   rosterHandle,
+  sumCreatives,
   sumOrders,
   type CreatorGmv,
   type Roster,
@@ -71,6 +80,11 @@ const Body = z.object({
    * reader (not only staff) may ask, because it only reads.
    */
   range: z.object({ from: z.string(), to: z.string() }).optional(),
+  /**
+   * Fill the Category column from Euka instead of reading GMV: look up a few creators Euka has not
+   * been asked about, then write what is known into rows whose Category is blank. Staff or the cron.
+   */
+  categories: z.boolean().optional(),
   budgetMs: z.number().int().min(5_000).max(140_000).optional(),
 });
 
@@ -78,6 +92,7 @@ type Db = SupabaseClient;
 
 const MONTHS_BACK = 14; // the Performance sheet reaches back about a year
 const REACHER_MAX_PAGES = 60;
+const AD_PAGES = 60; // 6,000 creatives that spent in one brand-month
 const ORDER_PAGES_MONTH = 80; // 8,000 orders for one brand-month is more than any brand here sells
 const ORDER_PAGES_RANGE = 30; // a live range must answer in seconds, so it reads fewer // 6,000 creators for one brand-month is far past anything real
 
@@ -166,6 +181,35 @@ async function readEuka(
   }
 }
 
+/**
+ * Every GMV Max creative that spent in the dates, with the creator's handle, summed per creator.
+ * `read` is false when a page cap or the clock stopped it: a partial sum is a lower bound, so the
+ * caller then stores nothing and the screen keeps using what it had.
+ */
+async function readEukaAds(
+  brand: { id: string; auth: EukaAuth },
+  start: string,
+  end: string,
+  until: number,
+): Promise<{ rows: CreatorGmv[]; read: boolean }> {
+  const pages: unknown[] = [];
+  for (let page = 1; page <= AD_PAGES; page++) {
+    if (Date.now() > until) return { rows: [], read: false };
+    const q = new URLSearchParams({
+      brandId: brand.id, startDate: start, endDate: end, compare: 'none',
+      sortBy: 'cost', sortDirection: 'desc', minCost: '0.01', page: String(page), pageSize: '100',
+    });
+    const r = await fetch(`${EUKA_V1}/gmv-max/creatives?${q}`, { headers: brand.auth, signal: AbortSignal.timeout(60_000) });
+    /* TikTok Ads not connected for the brand is an ANSWER (nothing to read), not a failure */
+    if (r.status === 404 || r.status === 400) return { rows: [], read: false };
+    if (!r.ok) throw new Error(`euka creatives ${r.status} ${(await r.text()).slice(0, 160)}`);
+    const j = await r.json();
+    pages.push(j);
+    if (!(j as { hasMore?: boolean }).hasMore) return { rows: sumCreatives(pages), read: true };
+  }
+  return { rows: [], read: false };
+}
+
 async function readReacher(shopId: number, start: string, end: string) {
   const pages: unknown[] = [];
   for (let page = 1; page <= REACHER_MAX_PAGES; page++) {
@@ -192,10 +236,12 @@ async function save(
   brand: string,
   source: Platform,
   got: { rows: CreatorGmv[]; truncated: boolean; floor: number | null },
+  ad?: { rows: CreatorGmv[]; read: boolean },
 ) {
   const t0 = new Date().toISOString();
   const meta = await db.from('collab_brand_month_gmv').upsert({
     month, brand, source, creators: got.rows.length, truncated: got.truncated, floor_gmv: got.floor, fetched_at: t0, orders_checked: true,
+    ...(ad ? { ad_checked: true, ad_read: ad.read } : {}),
   }, { onConflict: 'month,brand' });
   if (meta.error) throw new Error(meta.error.message);
 
@@ -209,6 +255,17 @@ async function save(
   /* creators the platform no longer lists for that month (a correction) */
   const del = await db.from('collab_creator_month_gmv').delete().eq('month', month).eq('brand', brand).lt('fetched_at', t0);
   if (del.error) throw new Error(del.error.message);
+
+  /* the ad spend per creator, when it was read completely */
+  if (ad && ad.read) {
+    for (let i = 0; i < ad.rows.length; i += 500) {
+      const chunk = ad.rows.slice(i, i + 500).map((r) => ({ month, brand, handle: r.handle, cost: r.gmv, fetched_at: t0 }));
+      const { error } = await db.from('collab_creator_month_ad').upsert(chunk, { onConflict: 'month,brand,handle' });
+      if (error) throw new Error(error.message);
+    }
+    const d2 = await db.from('collab_creator_month_ad').delete().eq('month', month).eq('brand', brand).lt('fetched_at', t0);
+    if (d2.error) throw new Error(d2.error.message);
+  }
 }
 
 type Owner = { source: Platform; euka?: { id: string; auth: EukaAuth }; shopId?: number };
@@ -278,6 +335,103 @@ async function pool<T, R>(items: T[], n: number, fn: (x: T) => Promise<R>): Prom
   return out;
 }
 
+const CATEGORY_BATCH = 8; // Euka rations fresh market-intelligence lookups; 8 every 10 minutes fills the roster in hours
+
+/**
+ * THE CATEGORY COLUMN, FROM EUKA (see `_shared/creator-category.ts` for the rules).
+ * Writes known labels first, so a creator added for a handle already looked up is filled at once,
+ * then looks up a few new handles and writes those.
+ */
+async function runCategories(db: Db, deadline: number, dryRun: boolean) {
+  const key = eukaKeys()[0];
+  if (!key) throw new Error('No EUKA key is set on this project');
+  const auth: EukaAuth = { Authorization: `Bearer ${key}` };
+
+  const roster: RosterRow[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db.schema('wurxbase').from('creators')
+      .select('id, category, tiktok_account, tiktok_account_2').order('id').range(from, from + 999);
+    if (error) throw new Error(error.message);
+    roster.push(...((data ?? []) as RosterRow[]));
+    if (!data || data.length < 1000) break;
+  }
+
+  const stored = new Map<string, StoredCategory>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db.from('euka_creator_categories')
+      .select('handle, categories, written, found, checked_at').order('handle').range(from, from + 999);
+    if (error) throw new Error(error.message);
+    for (const r of data ?? []) {
+      stored.set(r.handle, {
+        label: labelFrom(r.categories), written: r.written, found: r.found, checkedAt: new Date(r.checked_at).getTime(),
+      });
+    }
+    if (!data || data.length < 1000) break;
+  }
+
+  /* write what is known into rows that may take it; remember the label written */
+  const apply = async () => {
+    const plan = planWrites(roster, stored);
+    if (!dryRun) {
+      const byLabel = new Map<string, number[]>();
+      for (const w of plan) byLabel.set(w.category, [...(byLabel.get(w.category) ?? []), w.id]);
+      for (const [category, ids] of byLabel) {
+        for (let i = 0; i < ids.length; i += 200) {
+          const { error } = await db.schema('wurxbase').from('creators').update({ category }).in('id', ids.slice(i, i + 200));
+          if (error) throw new Error(error.message);
+        }
+      }
+      const byHandle = new Map(plan.map((w) => [w.handle, w.category]));
+      for (const [handle, written] of byHandle) {
+        await db.from('euka_creator_categories').update({ written }).eq('handle', handle);
+        const s = stored.get(handle);
+        if (s) s.written = written;
+      }
+      for (const w of plan) {
+        const r = roster.find((x) => x.id === w.id);
+        if (r) r.category = w.category;
+      }
+    }
+    return plan.length;
+  };
+
+  let written = await apply();
+  let found = 0, missed = 0, failed = 0, looked = 0, inARow = 0;
+  const why = new Set<string>();
+  for (const handle of dueHandles(roster, stored, Date.now(), CATEGORY_BATCH)) {
+    if (Date.now() > deadline - 10_000) break;
+    looked++;
+    try {
+      const cats = await categoriesForHandle(auth, handle);
+      if (!dryRun) {
+        const { error } = await db.from('euka_creator_categories').upsert({
+          handle, categories: cats ?? [], found: cats !== null, last_error: null, checked_at: new Date().toISOString(),
+        });
+        if (error) throw new Error(error.message);
+      }
+      stored.set(handle, { label: labelFrom(cats), written: stored.get(handle)?.written ?? null, found: cats !== null, checkedAt: Date.now() });
+      if (cats && labelFrom(cats)) found++; else missed++;
+      inARow = 0;
+    } catch (e) {
+      failed++;
+      inARow++;
+      const msg = String((e as Error).message).slice(0, 80);
+      why.add(`@${handle}: ${msg}`);
+      /* recorded and put back in line for about a day, so one bad handle cannot block the queue */
+      if (!dryRun) {
+        await db.from('euka_creator_categories').upsert({
+          handle, categories: [], found: false, last_error: msg, checked_at: new Date(Date.now() - 29 * 86_400_000).toISOString(),
+        });
+      }
+      stored.set(handle, { label: '', written: stored.get(handle)?.written ?? null, found: false, checkedAt: Date.now() - 29 * 86_400_000 });
+      if (inARow >= 2) break;
+    }
+    await new Promise((res) => setTimeout(res, 1_200));
+  }
+  written += await apply();
+  return { rows: roster.length, looked, found, missed, failed, written, ...(why.size ? { why: [...why].slice(0, 3) } : {}) };
+}
+
 /* A range somebody asked for is answered once and remembered for ten minutes, so a team
    looking at the same dates does not spend a call per brand per screen. */
 const RANGE_TTL = 10 * 60_000;
@@ -340,6 +494,14 @@ Deno.serve(async (req: Request) => {
     }
   }
 
+  if (parsed.data.categories) {
+    try {
+      return json({ categories: await runCategories(db, deadline, dryRun === true), ms: Date.now() - started }, 200, req);
+    } catch (e) {
+      return json({ error: String((e as Error).message).slice(0, 300) }, 502, req);
+    }
+  }
+
   if (eukaKeys().length === 0 && !reacherKey()) {
     return json({ error: 'Neither a EUKA key nor REACHER_API_KEY is set on this project' }, 500, req);
   }
@@ -394,7 +556,7 @@ Deno.serve(async (req: Request) => {
     /* what has been read, and when */
     const { data: have, error: haveErr } = await db
       .from('collab_brand_month_gmv')
-      .select('month, brand, fetched_at, truncated, orders_checked')
+      .select('month, brand, fetched_at, truncated, orders_checked, source, ad_checked')
       .in('month', months);
     if (haveErr) throw new Error(haveErr.message);
     const fetched = new Map<string, Date>();
@@ -403,6 +565,8 @@ Deno.serve(async (req: Request) => {
       fetched.set(`${h.month}\u0000${h.brand}`, new Date(h.fetched_at));
       /* a list cut at 50 that was stored before the orders were read: read it once more */
       if (h.truncated && !h.orders_checked) unchecked.add(`${h.month}\u0000${h.brand}`);
+      /* an Euka brand-month whose ad spend was never asked for: ask once */
+      if (h.source === 'euka' && !h.ad_checked) unchecked.add(`${h.month}\u0000${h.brand}`);
     }
 
     /* newest month first, so a fresh install fills this month before last year */
@@ -423,7 +587,12 @@ Deno.serve(async (req: Request) => {
       if (start > end) continue; // a month that has not started
       try {
         const got = await readBrand(o, start, end, rosters.get(u.brand), ORDER_PAGES_MONTH, deadline);
-        if (!dryRun) await save(db, u.month, u.brand, o.source, got);
+        /* Euka brands also get the month's ad spend per creator; a failure there must not lose the GMV */
+        let ad: { rows: CreatorGmv[]; read: boolean } | undefined;
+        if (o.source === 'euka') {
+          try { ad = await readEukaAds(o.euka!, start, end, deadline); } catch { ad = { rows: [], read: false }; }
+        }
+        if (!dryRun) await save(db, u.month, u.brand, o.source, got, ad);
         done.push({ month: u.month, brand: u.brand, source: o.source, creators: got.rows.length, truncated: got.truncated });
       } catch (e) {
         failed.push({ month: u.month, brand: u.brand, error: String((e as Error).message).slice(0, 200) });

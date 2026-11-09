@@ -18,6 +18,7 @@ import {
   linkHandle,
   linkVideoId,
   rosterHandle,
+  sumCreatives,
   sumOrders,
   fromEuka,
   fromReacher,
@@ -215,6 +216,22 @@ section('9. EXACT FIGURES BELOW EUKA\'S TOP 50, FROM THE ORDERS');
   ok(sumOrders([{ orders: [{ skus: [{ creatorUsername: 'A', price: 10, quantity: 3 }, { creatorUsername: 'a', price: -5, quantity: 1 }] }] }], roster).get('a') === 30, 'quantity multiplies the price, and a negative line is never GMV');
   ok(rosterHandle('https://www.tiktok.com/@Some.Name/') === 'some.name' && rosterHandle(' @X ') === 'x', 'roster handles are cleaned like the screen\'s');
   ok(linkHandle('https://www.tiktok.com/@Erin/video/123') === 'erin' && linkVideoId('https://www.tiktok.com/@e/video/123?x=1') === '123', 'a video link gives its handle and id');
+}
+
+section('10. AD SPEND PER CREATOR FOR A MONTH, FROM EUKA CREATIVES');
+{
+  /* erinragancooper at Penetrex, October 2026, as Euka listed it on 6 Nov: 19 creatives that spent
+     (some of them the same video in a second campaign) and a few that spent nothing */
+  const costs = [1404.7, 232.57, 151.22, 131.78, 36.37, 25.16, 18.01, 11.4, 9.4, 8.24, 8.09, 3.12, 0.99, 0.71, 0.55, 0.2, 0.17, 0.09, 0.03, 0, 0, 0];
+  const page = { rows: costs.map((c, i) => ({ itemId: String(i), creatorHandle: 'erinragancooper', metrics: { cost: c } })), hasMore: false };
+  const rows = sumCreatives([page, { rows: [{ creatorHandle: '@MamaAub2', metrics: { cost: 12.5 } }, { creatorHandle: 'mamaaub2', metrics: { cost: 7.25 } }, { creatorHandle: '', metrics: { cost: 99 } }, { creatorHandle: 'nobody', metrics: { cost: 0 } }, { creatorHandle: 'bad', metrics: { cost: 'x' } }] }]);
+  const by = new Map(rows.map((r) => [r.handle, r.gmv]));
+  ok(by.get('erinragancooper') === 2042.8, 'October ad spend is the sum of the cost of her creatives: $2,042.80 (our stale copy said $1,930.30)', String(by.get('erinragancooper')));
+  ok(by.get('mamaaub2') === 19.75, 'a handle listed twice, in two spellings, is added up');
+  ok(rows.length === 2, 'a row with no handle, no cost or a bad cost is left out');
+  let threw = false;
+  try { sumCreatives([{ nope: 1 }]); } catch { threw = true; }
+  ok(threw, 'a page with no rows is an error, never "nothing was spent"');
 }
 
 section('6. ANY RANGE OF DAYS');

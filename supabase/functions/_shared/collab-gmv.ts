@@ -244,3 +244,32 @@ export function completeWithOrders(
   }
   return { rows, truncated: false, floor: null };
 }
+
+/* ───────────────────────── a creator's ad spend for a month, from Euka ─────────────────────────
+ *
+ * Rashid, 2026-11-06: the Performance sheet's October ad spend was wrong. It was added up from our
+ * own copy of Euka's per-video GMV Max reports, and that copy stopped refreshing on 27 October (the
+ * per-campaign report calls started answering 404), so October was missing its last days. Euka lists
+ * every GMV Max creative for any dates, with the creator's handle and what it cost, so the month's
+ * ad spend per creator is read from there directly, the same way the month's GMV is.
+ */
+
+/**
+ * Add the cost of Euka's GMV Max creative rows per creator. A video that runs in two campaigns is
+ * two rows and both count (the spend is real in each). Rows with no handle are left out: there is
+ * nobody to put them against. Rounded to the cent once, at the end.
+ */
+export function sumCreatives(pages: unknown[]): CreatorGmv[] {
+  const by = new Map<string, number>();
+  for (const p of pages) {
+    const rows = (p as { rows?: unknown })?.rows;
+    if (!Array.isArray(rows)) throw new Error('euka: a creatives page had no rows list');
+    for (const r of rows as { creatorHandle?: unknown; metrics?: { cost?: unknown } }[]) {
+      const h = cleanHandle(r?.creatorHandle);
+      const cost = Number(r?.metrics?.cost);
+      if (!h || !Number.isFinite(cost) || cost <= 0) continue;
+      by.set(h, (by.get(h) ?? 0) + cost);
+    }
+  }
+  return [...by.entries()].map(([handle, gmv]) => ({ handle, gmv: Math.round(gmv * 100) / 100 }));
+}
