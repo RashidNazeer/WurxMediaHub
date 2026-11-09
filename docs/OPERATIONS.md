@@ -2359,3 +2359,26 @@ the others) expires **2027-10-27**. The Supabase token has no expiry.
   70 characters of CreatorHub's legacy JWT secret on 2026-10-27; only that revoke closes it fully (CreatorHub already signs every new login
   with an ES256 key). **Mask `jwt_secret` and anything secret-like in every printout.**
 * The Audit values, and the TikTok values if TikTok returns. When revoking old Euka keys, revoke only the old MAIN key, never Nutra's (same key, in use). Deleting the old project: see PARKED 45, not before 2026-11-10.
+
+## Creator hit rate: where each video's GMV comes from (2026-11-09)
+
+The hit rate needs each video's GMV for the last 30 and 90 days plus its lifetime views. The stored
+video rows only carry one lifetime `revenue`, so these come from the platforms into
+`collab_video_metrics`. A video's verdict is never stored; it is computed from this table under the
+criteria the user chose (see `20261109120000_creator_hit_rate.sql`).
+
+| Source | How it is read | Refreshed |
+|---|---|---|
+| **Euka** | `collab-video-hits-sync`: `/videos/search` (commerceWindow + lifetime), explicit video ids, 100 a call | automatically, cron `collab-video-hits-cycle` every 20 min; a video is re-read once its figures are 20 h old |
+| **Reacher** | the same function: `/videos/performance` (GMV and views in a date range) and `/videos/list` (lifetime), asked **per creator handle**, about 10 s a creator | automatically, same cron, resumes where it stopped |
+| **Cruva** (Pure Daily Care, Aqua Sonic, JOYMODE) | **by hand**: `scripts/ops/cruva-load-video-metrics.mjs` from CSV exports made through the Cruva connector | **not scheduled**: see below |
+
+A brand is read from Euka if Euka has it, otherwise Reacher, never both. Brands on neither show
+"GMV could not be checked" and can only qualify on views. Run the function with
+`{"dryRun":true,"brands":["X"]}` to see what it would store; the response names every `unmapped` brand.
+
+**Why Cruva is manual.** `CRUVA_API` only reaches `/community/campaigns/*`; every data endpoint needs
+the interactive OAuth login the connector holds (see "Cruva, what is already known" above). A scheduled
+function has no way to log in. Cruva rows keep the date their windows end on, which the Hit rate block
+shows ("GMV windows end ..."), so a stale snapshot is visible. To make it automatic, Cruva has to issue
+a key that reaches `search_videos`; the sync can then read it the way it reads Reacher.
