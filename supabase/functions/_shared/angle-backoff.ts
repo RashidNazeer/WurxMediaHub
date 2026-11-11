@@ -155,3 +155,66 @@ export function describeDetail(detail: unknown): string | null {
   }
   return null;
 }
+
+/* ── Who goes next, and links that can never work ───────────────────────── */
+
+/**
+ * Whether a stored link is a raw file on TikTok's CDN rather than a post.
+ *
+ * Those links are signed and expire within hours (the query string carries the
+ * expiry), so by the time the queue reaches one it can only answer 403. No
+ * cookie or address changes that. It is a fact about the stored link, so it is
+ * decided without asking the audit machine, and the video is failed up front
+ * instead of being retried every cycle at the head of the queue.
+ */
+export function isExpiringLink(url: string | null | undefined): boolean {
+  return /tiktokcdn[a-z0-9.-]*\.com/i.test(String(url ?? ''));
+}
+
+export const EXPIRING_LINK_NOTE =
+  'PERMANENT: this is a raw TikTok file link, which expires within hours and can no longer be fetched. ' +
+  'It needs the post link (tiktok.com/@creator/video/...) or an uploaded file.';
+
+const keyOf = (b: { brand: string; month: string }) => `${b.brand}|${b.month}`;
+
+/**
+ * The brands whose latest batches failed for the environment, so the next batch
+ * should try somebody else first.
+ *
+ * WHY. The worker used to start from the oldest queued video's brand every
+ * time. When that brand's videos could not be fetched, every cycle sent the
+ * same five to the same wall, and every other brand waited behind them for as
+ * long as the failure lasted (a day and a half, on the day this was written).
+ *
+ * `finished` is the most recently finished batches, newest first. Only the run
+ * of environmental failures at the head counts, and only inside `windowMs`: the
+ * first batch that did anything else ends it, as with `cooldownLeft`.
+ */
+export function brandsToAvoid(
+  finished: Array<{ brand: string; month: string; finished_at: string | null; error: string | null }>,
+  now = Date.now(),
+  windowMs = MAX_OFFLINE_MS,
+): Set<string> {
+  const out = new Set<string>();
+  for (const b of finished) {
+    if (!isEnvError(b.error)) break;
+    const at = Date.parse(b.finished_at ?? '');
+    if (!Number.isFinite(at) || now - at > windowMs) break;
+    out.add(keyOf(b));
+  }
+  return out;
+}
+
+/**
+ * The brand and month to batch next: the first in line that is not being
+ * avoided, else the first in line. `heads` is the queued videos' brand and
+ * month in queue order (oldest first), repeats allowed. Never returns null
+ * while anything is queued, so a queue with one brand still drains.
+ */
+export function chooseHead<T extends { brand: string; month: string }>(
+  heads: T[],
+  avoid: Set<string>,
+): T | null {
+  if (!heads.length) return null;
+  return heads.find((h) => !avoid.has(keyOf(h))) ?? heads[0]!;
+}
