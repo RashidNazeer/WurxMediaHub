@@ -46,10 +46,13 @@ import {
 } from '../_shared/audit-api.ts';
 import { filePlacements } from '../_shared/angle-store.ts';
 import {
+  brandsToAvoid,
   chargesAttempt,
+  chooseHead,
   cooldownLeft,
   envError,
   environmentalFailure,
+  EXPIRING_LINK_NOTE,
   MAX_OFFLINE_MS,
 } from '../_shared/angle-backoff.ts';
 
@@ -180,13 +183,38 @@ async function briefsFor(db: SupabaseClient, brand: string): Promise<BriefRef[]>
 
 /** Make the next batch out of queued videos, if there are any. */
 async function makeBatch(db: SupabaseClient): Promise<Batch | null> {
-  const { data: next } = await db
+  /* Raw TikTok file links expire within hours and can never be fetched again.
+     Fail them here, once, rather than retrying them at the head of the queue. */
+  await db.from('collab_angle_videos')
+    .update({ status: 'failed', batch_id: null, last_error: EXPIRING_LINK_NOTE })
+    .eq('status', 'queued')
+    .ilike('video_url', '%tiktokcdn%');
+
+  /* The oldest queued video decides whose turn it is (the Queue screen's
+     "next" moves a brand to the front by its dates), except that a brand whose
+     last batches failed for the environment steps aside while another brand is
+     waiting. Otherwise one brand that cannot be fetched holds up every other. */
+  const { data: waiting } = await db
     .from('collab_angle_videos')
     .select('brand, month')
     .eq('status', 'queued')
     .order('created_at', { ascending: true })
-    .limit(1);
-  const head = (next ?? [])[0] as { brand: string; month: string } | undefined;
+    .limit(300);
+  const { data: lately } = await db
+    .from('collab_angle_batches')
+    .select('brand, month, finished_at, error')
+    .not('finished_at', 'is', null)
+    .order('finished_at', { ascending: false })
+    .limit(10);
+  const head = chooseHead(
+    (waiting ?? []) as Array<{ brand: string; month: string }>,
+    brandsToAvoid((lately ?? []) as Array<{
+      brand: string;
+      month: string;
+      finished_at: string | null;
+      error: string | null;
+    }>),
+  );
   if (!head) return null;
 
   const { data: rows } = await db

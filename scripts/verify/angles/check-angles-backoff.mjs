@@ -17,7 +17,10 @@ import { join } from 'node:path';
 import {
   BASE_COOLDOWN_MS,
   MAX_COOLDOWN_MS,
+  brandsToAvoid,
   causeOf,
+  chooseHead,
+  isExpiringLink,
   chargesAttempt,
   cooldownLeft,
   cooldownMs,
@@ -176,6 +179,43 @@ check('audit-api reads a list detail', /describeDetail\(detail\?\.detail\)/.test
 check('the worker writes only statuses the table allows',
   [...worker.matchAll(/status: [^'\n]*'([a-z_]+)'/g)].every((m) =>
     ['queued', 'sent', 'filed', 'skipped', 'failed', 'needs_review'].includes(m[1])));
+
+
+console.log('\n8. WHO GOES NEXT, AND LINKS THAT CAN NEVER WORK');
+const NOW = Date.parse('2026-11-11T15:00:00Z');
+const ago = (m) => new Date(NOW - m * MIN).toISOString();
+const ENVERR = 'ENV: IngestError: no video could be downloaded';
+const q = (brand, month = '2026-10') => ({ brand, month });
+check('a raw tiktokcdn file link is an expiring link',
+  isExpiringLink('https://v16m.tiktokcdn-us.com/5225256505336e36/video/tos/useast8/x/o4iYA8h/'));
+check('a post link is not', !isExpiringLink('https://www.tiktok.com/@vsternau/video/7697004768316755214'));
+check('empty and missing links are not', !isExpiringLink('') && !isExpiringLink(null) && !isExpiringLink(undefined));
+const failedIrwin = [{ brand: 'Irwin', month: '2026-10', finished_at: ago(20), error: ENVERR }];
+check('a brand whose last batch failed for the environment is avoided',
+  brandsToAvoid(failedIrwin, NOW).has('Irwin|2026-10'));
+check('the next brand is chosen instead',
+  chooseHead([q('Irwin'), q('Irwin'), q('Penetrex', '2026-11')], brandsToAvoid(failedIrwin, NOW))?.brand === 'Penetrex');
+check('with nothing avoided the oldest goes first',
+  chooseHead([q('Irwin'), q('Penetrex')], new Set())?.brand === 'Irwin');
+check('a lone brand still drains, even while avoided',
+  chooseHead([q('Irwin'), q('Irwin')], brandsToAvoid(failedIrwin, NOW))?.brand === 'Irwin');
+check('an empty queue chooses nothing', chooseHead([], new Set()) === null);
+check('a batch that worked ends the run of avoided brands',
+  brandsToAvoid([
+    { brand: 'Penetrex', month: '2026-11', finished_at: ago(10), error: null },
+    { brand: 'Irwin', month: '2026-10', finished_at: ago(70), error: ENVERR },
+  ], NOW).size === 0);
+check('a failure older than six hours is forgotten',
+  brandsToAvoid([{ brand: 'Irwin', month: '2026-10', finished_at: ago(7 * 60), error: ENVERR }], NOW).size === 0);
+check('several brands failing in a row are all avoided',
+  brandsToAvoid([
+    { brand: 'Penetrex', month: '2026-11', finished_at: ago(5), error: ENVERR },
+    { brand: 'Irwin', month: '2026-10', finished_at: ago(65), error: ENVERR },
+  ], NOW).size === 2);
+check('the same brand in another month is not avoided', !brandsToAvoid(failedIrwin, NOW).has('Irwin|2026-11'));
+check('the worker uses the rotation and fails expiring links up front',
+  /chooseHead\(/.test(worker) && /brandsToAvoid\(/.test(worker) &&
+  /ilike\('video_url', '%tiktokcdn%'\)/.test(worker) && /EXPIRING_LINK_NOTE/.test(worker));
 
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) {

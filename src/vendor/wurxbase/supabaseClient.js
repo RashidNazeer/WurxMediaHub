@@ -327,9 +327,12 @@ export async function fetchReacherUnrostered() {
 
 /* WURX-ADDED · run the Reacher sync for Irwin Naturals from the screen, the way
    the EUKA videos button runs Euka's. Staff only, checked inside the function. */
-export async function runReacherSync() {
+export async function runReacherSync(brand) {
   try {
-    const { data, error } = await getSupabase().functions.invoke('reacher-sync', { body: {} });
+    /* WURX-ADDED · 2026-11-11: the sync now covers every brand Reacher holds, so the button names the
+       brand on screen rather than running them all. Run from Biostime's page it used to run Irwin's. */
+    const name = String(brand || '').trim();
+    const { data, error } = await getSupabase().functions.invoke('reacher-sync', { body: name ? { brands: [name] } : {} });
     if (error) return { ok: false, message: error.message || 'Reacher sync failed' };
     if (!data || data.error) return { ok: false, message: (data && data.error) || 'Reacher sync failed' };
     return { ok: true, ...data };

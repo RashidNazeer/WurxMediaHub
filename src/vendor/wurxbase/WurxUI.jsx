@@ -3318,7 +3318,7 @@ function BrandDrilldown({ brand, creators, brandCreators, allCreators, budgets, 
       setTimeout(() => setVidSync({ state: 'idle', msg: '', detail: '' }), detail ? 22000 : 7000);
     };
     setVidSync({ state: 'busy', msg: 'Asking Reacher…' });
-    const res = await runReacherSync();
+    const res = await runReacherSync(brand.brand); /* WURX-ADDED · this brand only */
     if (!res.ok) { flash('err', 'Reacher sync failed', res.message); return; }
     const bits = [];
     if (res.videosFiled) bits.push(`+${res.videosFiled} video${res.videosFiled === 1 ? '' : 's'}`);

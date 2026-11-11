@@ -115,6 +115,7 @@
     "verify:angle-products": "node scripts/verify/angles/check-angle-products.mjs",
     "verify:brand-search": "node scripts/verify/brands/check-brand-search.mjs",
     "verify:reacher": "node scripts/verify/euka/check-reacher.mjs",
+    "verify:reacher-targets": "tsx scripts/verify/euka/check-reacher-targets.mjs",
     "verify:product-picker": "node scripts/verify/brands/check-product-picker.mjs",
     "verify:drawer": "node scripts/verify/brands/check-onboard-drawer.mjs",
     "verify:product-images": "node scripts/verify/brands/check-product-images.mjs",
