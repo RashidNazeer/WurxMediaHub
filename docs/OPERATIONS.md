@@ -2382,3 +2382,22 @@ the interactive OAuth login the connector holds (see "Cruva, what is already kno
 function has no way to log in. Cruva rows keep the date their windows end on, which the Hit rate block
 shows ("GMV windows end ..."), so a stale snapshot is visible. To make it automatic, Cruva has to issue
 a key that reaches `search_videos`; the sync can then read it the way it reads Reacher.
+
+## Reacher video sync: every Reacher brand, not only Irwin (2026-11-11)
+
+`reacher-sync` (cron `reacher-cycle`, every 15 minutes) used to read Irwin Naturals and nothing else. Biostime is a
+Reacher shop and is **not** an Euka brand (it is not in Euka's brand list; the line above saying Euka is Biostime's
+source is out of date), so no video was ever filed for it after 29 October. The sync now reads **every Paid Collabs brand
+that Reacher holds and Euka does not** (`supabase/functions/reacher-sync/targets.ts`; Euka wins a brand both hold).
+
+| | Irwin Naturals | every other Reacher brand (Biostime today) |
+|---|---|---|
+| How it is read | the shop's whole video list in the window, as before | one creator at a time, for the creators on our roster, a rotating batch of 15 per run (`handlesPerRun`) |
+| Videos filed, refreshed, thumbnails, "deal complete -> Payment Pending", moved to the right month row | yes | yes |
+| Ad spend written to `euka_ad_video_month` | yes (when a campaign exists) | **no**: videos only. Biostime has 6 GMV Max campaigns and its ad spend comes from Euka; writing Reacher's too would count it twice |
+| "Reacher videos not on the roster" table | yes | no (a creator-by-creator read cannot see the rest of the shop) |
+
+Run it by hand: `{"dryRun":true,"brands":["Biostime"],"handlesPerRun":300}` (reads, writes nothing, reports how many videos
+it would add). The brand page's "Reacher videos" button now syncs the brand on screen. Everything the rules at the top of the
+function say (add never replace, a typed row is never touched, numbers only grow) applies to every brand. Check with
+`pnpm verify:reacher-targets` (offline).

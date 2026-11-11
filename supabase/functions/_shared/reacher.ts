@@ -147,10 +147,14 @@ export type ReacherVideo = {
  * which is the good kind of refusal; asking for a page past the end returns an
  * empty page rather than an error, so the loop stops on `total_pages`.
  */
-export async function videos(shopId: number, from: string, to: string, cap = 2000): Promise<ReacherVideo[]> {
+export async function videos(shopId: number, from: string, to: string, cap = 2000, creatorHandle?: string): Promise<ReacherVideo[]> {
   const out: ReacherVideo[] = [];
   for (let page = 1; page <= 50; page++) {
-    const j = await read('/videos/list', shopId, { page, page_size: 100, start_date: from, end_date: to });
+    const j = await read('/videos/list', shopId, {
+      page, page_size: 100, start_date: from, end_date: to,
+      /* One creator's videos on the shop, for a shop too big to list whole. */
+      ...(creatorHandle ? { creator_handle: creatorHandle } : {}),
+    });
     const rows = (j.data ?? []) as ReacherVideo[];
     out.push(...rows);
     const pag = (j.pagination ?? {}) as { total_pages?: number };

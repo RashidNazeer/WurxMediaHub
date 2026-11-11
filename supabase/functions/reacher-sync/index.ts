@@ -1,7 +1,14 @@
 /**
  * reacher-sync
  * ---------------------------------------------------------------------------
- * Irwin Naturals, and only Irwin Naturals, from Reacher into Paid Collabs.
+ * Every Paid Collabs brand that Reacher holds and Euka does not, from Reacher into Paid Collabs.
+ * (Until 2026-11-11 this was Irwin Naturals and nothing else; Biostime, also a Reacher shop,
+ * had no video filed after 29 October. See ./targets.ts for which brands and how each is read.)
+ *
+ * The rules below were written about Irwin and still describe every brand. Two differences for
+ * the others: their videos are read one creator at a time (a whole-shop list is too big), and
+ * AD SPEND IS NOT WRITTEN for them, only for Irwin (Biostime's comes from Euka, and writing
+ * Reacher's as well would count it twice).
  *
  * Rashid, 2026-09-23: "there is one brand we have Irwin Naturals, for that
  * brand we have Reacher api not euka ... we need same operations as we are
@@ -42,27 +49,55 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.1
 import { z } from 'npm:zod@4.4.3';
 import { corsHeaders, json } from '../_shared/cors.ts';
 import {
-  IRWIN,
   campaignCount,
-  findShop,
   handleOf,
   reacherKey,
+  shops as reacherShops,
   videoId,
   videoSpend,
   videos,
+  type ReacherShop,
   type ReacherVideo,
 } from '../_shared/reacher.ts';
+import { EUKA_V0, eukaKeys } from '../_shared/euka-accounts.ts';
+import { pickTargets, rotate, type Mode } from './targets.ts';
 
 /** The brand these figures belong to, on our side. Nothing else is touched. */
 const BRAND = 'Irwin Naturals';
 
 const Body = z.object({
   dryRun: z.boolean().optional(),
+  /** Only these Paid Collabs brands (as named there). Default: every brand Reacher holds and Euka does not. */
+  brands: z.array(z.string().trim().min(1).max(120)).max(50).optional(),
+  /** Creators read per run for a brand read creator by creator. Default 15; raise it for a manual backfill. */
+  handlesPerRun: z.number().int().min(1).max(300).optional(),
   /** Defaults to the last 120 days, which covers a brand that started in August. */
   from: z.string().trim().max(20).optional(),
   to: z.string().trim().max(20).optional(),
   budgetMs: z.number().int().min(5_000).max(140_000).optional(),
 });
+
+const R_GAP_MS = 700; // Reacher allows about 60 reads a minute
+const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+/** Euka's brand names (any key), so a brand Euka holds is left to Euka. */
+async function eukaBrandNames(): Promise<{ name: string }[]> {
+  const out: { name: string }[] = [];
+  for (const k of eukaKeys()) {
+    try {
+      const r = await fetch(EUKA_V0 + '/brands', { headers: { Authorization: 'Bearer ' + k }, signal: AbortSignal.timeout(30_000) });
+      if (!r.ok) continue;
+      const list = await r.json();
+      for (const b of Array.isArray(list) ? list : []) {
+        const name = String(b?.name ?? '').trim();
+        if (name) out.push({ name });
+      }
+    } catch {
+      /* an account that does not answer is skipped: its brands would then be read from Reacher if Reacher has them */
+    }
+  }
+  return out;
+}
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -187,7 +222,15 @@ Deno.serve(async (req: Request) => {
     ? parsed.data.from!
     : iso(new Date(Date.parse(`${to}T00:00:00Z`) - 120 * 86_400_000));
 
+  const deadline = started + (parsed.data.budgetMs ?? 100_000);
+  const cycle = Math.floor(Date.now() / 900_000); // moves a creator-by-creator brand's window along each 15 minutes
+  const handlesPerRun = parsed.data.handlesPerRun ?? 15;
+
+  /** One brand, from one Reacher shop. Irwin ('shop' mode) behaves exactly as it always has. */
+  const syncBrand = async (BRAND: string, shop: ReacherShop, mode: Mode) => {
+  const started = Date.now();
   const summary = {
+    brand: BRAND, mode, handlesRead: 0, handlesTotal: 0,
     shop: '', shopId: 0, from, to, dryRun,
     videosSeen: 0, videosFiled: 0, creatorsMatched: 0,
     /* Filed videos whose figures moved on this run, and the money that
@@ -209,15 +252,10 @@ Deno.serve(async (req: Request) => {
   };
 
   try {
-    const shop = await findShop(IRWIN);
     summary.shop = shop.shop_name;
     summary.shopId = shop.shop_id;
 
-    /* ── 1. every video Reacher holds for this shop ───────────────────── */
-    const vids = await videos(shop.shop_id, from, to);
-    summary.videosSeen = vids.length;
-
-    /* ── 2. our Irwin rows, and only ours ─────────────────────────────── */
+    /* ── 1. our rows for this brand, and only ours ────────────────────── */
     const rows: {
       id: number; name: string | null; hiring_date: string | null;
       tiktok_account: string | null; tiktok_account_2: string | null;
@@ -256,6 +294,24 @@ Deno.serve(async (req: Request) => {
         rowsFor.set(h, list);
       }
     }
+
+    /* ── 2. the videos Reacher holds ───────────────────────────────────
+       'shop': every video the shop holds in the window, in one list (Irwin).
+       'handles': one creator at a time, for the creators on OUR roster, a rotating
+       batch per run, because a big shop's whole list is cut off before it reaches ours. */
+    let vids: ReacherVideo[] = [];
+    if (mode === 'shop') {
+      vids = await videos(shop.shop_id, from, to);
+    } else {
+      summary.handlesTotal = rowFor.size;
+      for (const h of rotate([...rowFor.keys()], handlesPerRun, cycle)) {
+        if (Date.now() > deadline - 12_000) break;
+        vids.push(...(await videos(shop.shop_id, from, to, 500, h)));
+        summary.handlesRead++;
+        await sleep(R_GAP_MS);
+      }
+    }
+    summary.videosSeen = vids.length;
 
     /*
      * ═══ THE LATEST FIGURES, BY VIDEO ═══════════════════════════════════
@@ -311,7 +367,7 @@ Deno.serve(async (req: Request) => {
     const unrostered: Record<string, unknown>[] = [];
     const unrosteredHandles = new Set<string>();
     let unrosteredGmv = 0;
-    for (const [key, v] of latest) {
+    for (const [key, v] of mode === 'shop' ? latest : []) {
       const h = handleOf(v.creator_handle);
       const url = String(v.video_url || v.tiktok_url || '').trim();
       if (!h || !url || rowFor.has(h)) continue;
@@ -493,7 +549,7 @@ Deno.serve(async (req: Request) => {
     }
 
     /* ── 2b. the videos nobody on the roster owns ──────────────────────── */
-    if (!dryRun) {
+    if (!dryRun && mode === 'shop') {
       for (let i = 0; i < unrostered.length; i += 500) {
         const { error } = await db.from('reacher_unrostered_videos')
           .upsert(unrostered.slice(i, i + 500), { onConflict: 'video_key' });
@@ -510,8 +566,8 @@ Deno.serve(async (req: Request) => {
     }
 
     /* ── 3. per-video ad spend, if there is any ───────────────────────── */
-    summary.campaigns = await campaignCount(shop.shop_id);
-    if (summary.campaigns > 0) {
+    summary.campaigns = mode === 'shop' ? await campaignCount(shop.shop_id) : 0;
+    if (mode === 'shop' && summary.campaigns > 0) {
       const { rows: spend, currency } = await videoSpend(shop.shop_id, from, to);
       summary.spendRows = spend.length;
       const out = spend.map((s) => {
@@ -538,6 +594,8 @@ Deno.serve(async (req: Request) => {
         if (error) throw new Error(`writing ad figures: ${error.message}`);
       }
       summary.spendWritten = dryRun ? 0 : out.length;
+    } else if (mode !== 'shop') {
+      summary.note = "Videos only: this brand's ad spend is not read from Reacher.";
     } else {
       summary.note = 'No GMV Max campaign is connected on this Reacher shop, so there is no ad spend to read. Ad spend and ROI stay as a dash rather than a zero.';
     }
@@ -557,7 +615,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    return json({ ...summary, ms: Date.now() - started }, 200, req);
+    return { ...summary, ms: Date.now() - started };
   } catch (e) {
     const note = String((e as Error).message).slice(0, 400);
     /* A failed run is RECORDED. An empty log and a broken sync look identical
@@ -565,7 +623,7 @@ Deno.serve(async (req: Request) => {
     if (!dryRun) {
       await db.from('reacher_sync_runs').insert({
         shop_id: summary.shopId || 0,
-        shop_name: summary.shop || IRWIN,
+        shop_name: summary.shop || BRAND,
         videos_seen: summary.videosSeen,
         videos_filed: 0,
         creators_matched: 0,
@@ -576,6 +634,54 @@ Deno.serve(async (req: Request) => {
         ms: Date.now() - started,
       }).then(() => {}, () => {});
     }
-    return json({ error: note, ...summary }, 500, req);
+    return { error: note, ...summary, ms: Date.now() - started };
   }
+  };
+
+  /* ── which brands, and one read per brand ─────────────────────────── */
+  let selection: ReturnType<typeof pickTargets>;
+  const byId = new Map<number, ReacherShop>();
+  try {
+    const rs = await reacherShops();
+    for (const x of rs) byId.set(x.shop_id, x);
+    const euka = eukaKeys().length ? await eukaBrandNames() : [];
+    const ours: string[] = [];
+    for (let page = 0; ; page += 1000) {
+      const { data, error } = await db.schema('wurxbase').from('creators').select('brand').order('id').range(page, page + 999);
+      if (error) throw new Error('reading brands: ' + error.message);
+      ours.push(...(data ?? []).map((r: { brand?: string | null }) => String(r.brand ?? '')));
+      if (!data || data.length < 1000) break;
+    }
+    selection = pickTargets(
+      ours,
+      euka,
+      rs.map((x) => ({ name: x.shop_name, id: x.shop_id })),
+      parsed.data.brands ? new Set(parsed.data.brands.map((b) => b.trim())) : null,
+    );
+  } catch (e) {
+    return json({ error: String((e as Error).message).slice(0, 400) }, 500, req);
+  }
+
+  const results: Record<string, unknown>[] = [];
+  for (const t of selection.targets) {
+    if (Date.now() > deadline - 15_000) break;
+    results.push(await syncBrand(t.brand, byId.get(t.shop.id)!, t.mode));
+  }
+
+  const sum = (k: string) => results.reduce((n, r) => n + (Number(r[k]) || 0), 0);
+  const failed = results.filter((r) => r.error);
+  /* One brand asked for and it failed: report it the way this function always reported a failure. */
+  if (results.length === 1 && failed.length === 1) return json(results[0], 500, req);
+  return json({
+    /* A single brand's own figures stay at the top level, so callers written for Irwin read the same fields. */
+    ...(results.length === 1 ? results[0] : {}),
+    dryRun,
+    videosFiled: sum('videosFiled'),
+    creatorsMatched: sum('creatorsMatched'),
+    spendWritten: sum('spendWritten'),
+    note: results.length === 1 ? (results[0]!.note ?? '') : '',
+    brands: results,
+    skipped: { euka: selection.euka, neither: selection.neither },
+    ms: Date.now() - started,
+  }, 200, req);
 });
