@@ -22,6 +22,7 @@ import {
   chooseHead,
   isExpiringLink,
   chargesAttempt,
+  skipsWhenSpent,
   cooldownLeft,
   cooldownMs,
   describeDetail,
@@ -69,8 +70,13 @@ check('a LONE video with module_failed IS charged, so it cannot block the queue 
   chargesAttempt('module_failed', 1));
 check('a lone video that will not download is charged',
   chargesAttempt('could not download this link', 1));
-check('five downloads refused together: NOT charged',
-  !chargesAttempt('could not download this link', 5));
+check('five downloads refused together: charged, so a post TikTok will not serve cannot loop for ever',
+  chargesAttempt('could not download this link', 5));
+check('a download refusal that runs out of attempts is skipped, not left failed',
+  skipsWhenSpent('IngestError: no video could be downloaded. TikTok often refuses anonymous requests'));
+check('a model failure that runs out of attempts is NOT auto-skipped', !skipsWhenSpent('module_failed'));
+check('the worker skips a spent download failure',
+  /skipsWhenSpent\(why\)/.test(readFileSync(new URL('../../../supabase/functions/collab-angles-sync/index.ts', import.meta.url), 'utf8')));
 check('a video-specific reason is charged in a batch of five',
   chargesAttempt('video is 0 seconds long', 5));
 
