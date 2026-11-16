@@ -12,9 +12,8 @@ previous sessions. If something here is wrong, fix it here first.
 | GitHub repo       | `RashidNazeer/WurxMediaHub` (private)                                                                 |
 | Branches          | `main` = prod, `dev` = daily work. **Everything goes to `dev` only** until Rashid says "make it live" |
 | Vercel team id    | `team_OL5SlbHFgyYvmXYyScEUmDo0`                                                                       |
-| Vercel projects   | `wurxmediahub` (main), `wurxmediahubdev` (dev)                                                        |
-| Dev URL           | https://wurxmediahubdev.vercel.app                                                                    |
-| Prod URL          | https://wurxmediahub.vercel.app                                                                       |
+| Vercel project    | `prism` (the only site; `wurxmediahub` and `wurxmediahubdev` were retired 2026-11-17)                 |
+| Site URL          | https://prismwurx.vercel.app (the only address; use it for every link and redirect URI)               |
 | Supabase dev ref  | `qinxwfdwvpkzfhcijuqw` (CreatorHub, org Prism, ap-southeast-1; moved 2026-10-27, see "The Hub moved to CreatorHub" below) |
 | Supabase OLD dev  | `npznoiotslruqovorrec` (`wurxmediahub-dev`, org WurxMedia): RETIRED, only ever paused, never deleted |
 | Supabase prod ref | `isqepjioowzqoyhlusqo`                                                                                |
@@ -464,19 +463,16 @@ Two things that have already cost time:
 
 ## 5. Deploying
 
-Push to `dev`. Vercel builds automatically, roughly 25 seconds. Each project has
-an Ignored Build Step so it only builds its own branch.
-
-`wurxmediahubdev.vercel.app` is pinned to the `dev` branch through the domains
-API, because Vercel's public API does not expose the "Production Branch"
-setting. Vercel's dashboard therefore labels those builds "Preview". That is
-expected.
+The only site is https://prismwurx.vercel.app (Vercel project `prism`, built from the
+`Prism` repo's `main`). Merge to `main` on the `prism` remote and Vercel builds automatically,
+roughly 25 seconds. `wurxmediahub.vercel.app` and `wurxmediahubdev.vercel.app` were retired on
+2026-11-17: nothing is deployed to them and nothing should point at them.
 
 Watch a deploy:
 
 ```powershell
 $h = @{ Authorization = "Bearer $env:VERCEL_TOKEN" }
-Invoke-RestMethod -Headers $h -Uri "https://api.vercel.com/v6/deployments?app=wurxmediahubdev&teamId=team_OL5SlbHFgyYvmXYyScEUmDo0&limit=1"
+Invoke-RestMethod -Headers $h -Uri "https://api.vercel.com/v6/deployments?app=prism&teamId=team_OL5SlbHFgyYvmXYyScEUmDo0&limit=1"
 ```
 
 ## 6. Accounts
@@ -573,9 +569,8 @@ both environments; only the redirect URI differs. Secrets live as Supabase
 function secrets on each project, never in the repo:
 `TIKTOK_APP_ID`, `TIKTOK_APP_SECRET`, `TIKTOK_REDIRECT_URI`.
 
-Dev callback `https://wurxmediahubdev.vercel.app/oauth/tiktok/callback`,
-prod `https://wurxmediahub.vercel.app/oauth/tiktok/callback`. **Prod has none of
-these secrets set yet**, deliberately: prod is frozen.
+The callback is `https://prismwurx.vercel.app/oauth/tiktok/callback` (the only site since 2026-11-17).
+`TIKTOK_REDIRECT_URI` and the redirect URI registered in the TikTok developer portal must both be exactly that.
 
 ```bash
 pnpm verify:tiktok       # 37 checks, no browser, needs SUPABASE_SERVICE_KEY
@@ -1069,12 +1064,12 @@ Explanations go here instead.
 pipeline including config validation:
 
 ```bash
-vercel link --token $VERCEL_TOKEN --scope wurxmedia-6695s-projects --project wurxmediahubdev --yes
+vercel link --token $VERCEL_TOKEN --scope wurxmedia-6695s-projects --project prism --yes
 vercel build --token $VERCEL_TOKEN --yes      # "Build completed successfully."
 ```
 
 **And check the deployment reached READY, not just that the push succeeded.**
-A green `git push` says nothing about the build. `vercel ls wurxmediahubdev`
+A green `git push` says nothing about the build. `vercel ls prism`
 shows the state; a run with duration `?` never built at all.
 
 **When a git deploy comes back `BLOCKED` (`TEAM_ACCESS_REQUIRED`)**, Vercel
@@ -1087,19 +1082,17 @@ the token belongs to the team owner. The commit author is not checked:
 ```bash
 # 1. export EXACTLY the pushed commit, so nothing local rides along
 git archive <sha> | tar -x -C <scratch>/deploy-<sha>
-cp .vercel/project.json <scratch>/deploy-<sha>/.vercel/   # projectName MUST be wurxmediahubdev
-# 2. a PREVIEW of the dev project — never --prod (the dev project's production
-#    branch is main, and --prod is not what the dev URL serves)
+cp .vercel/project.json <scratch>/deploy-<sha>/.vercel/   # projectName MUST be prism
+# 2. a PREVIEW of the project — never --prod unless Rashid asked for a production release
 cd <scratch>/deploy-<sha> && vercel deploy --yes --token $VERCEL_TOKEN
-# 3. wurxmediahubdev.vercel.app is a dev-BRANCH domain, so a CLI deploy is not
-#    attached to it automatically. Point it by hand:
-vercel alias set <deployment-host> wurxmediahubdev.vercel.app --token $VERCEL_TOKEN --scope wurxmedia-6695s-projects
+# 3. a CLI deploy is not attached to prismwurx.vercel.app automatically. Point it by hand:
+vercel alias set <deployment-host> prismwurx.vercel.app --token $VERCEL_TOKEN --scope wurxmedia-6695s-projects
 ```
 
 **Scripting it, two traps (2026-09-16):** the deployment URL is NOT the last
 line of stdout. That line is `}` from a JSON dump, and the URL is on the
 `Preview  https://…` line on stderr. Take the host from that line. Also,
-`.vercel/project.json` is pretty-printed (`"projectName": "wurxmediahubdev"`,
+`.vercel/project.json` is pretty-printed (`"projectName": "prism"`,
 with a space), so a grep for `"projectName":"` finds nothing and stops an
 `&&` chain without a word. Load tokens in Git Bash with
 `set -a; . <(tr -d '\r' < C:/Users/RA_shid/.wurx/cli-secrets.env); set +a`.
@@ -1380,8 +1373,8 @@ Invoke-RestMethod -Uri "https://api.supabase.com/v1/projects/$ref/config/auth" -
 $body = @{
   hook_custom_access_token_enabled = $true
   hook_custom_access_token_uri     = 'pg-functions://postgres/public/custom_access_token_hook'
-  site_url                         = 'https://wurxmediahub.vercel.app'
-  uri_allow_list                   = 'https://wurxmediahub.vercel.app/**'
+  site_url                         = 'https://prismwurx.vercel.app'
+  uri_allow_list                   = 'https://prismwurx.vercel.app/**'
 } | ConvertTo-Json
 Invoke-RestMethod -Method Patch -Uri "https://api.supabase.com/v1/projects/$ref/config/auth" -Headers $h -Body $body
 ```
@@ -1674,8 +1667,7 @@ whose JWT is not the service role, so `collab_share_create` raises "Only an
 admin can create a client link" — the gate working, not a fault. The tool uses
 supabase-js with the service key, which `is_service_role()` recognises.
 
-The client's address is `https://wurxmediahubdev.vercel.app/share/collabs/<token>`
-(production once it goes live). **The link is the credential: 192 random bits.**
+The client's address is `https://prismwurx.vercel.app/share/collabs/<token>`. **The link is the credential: 192 random bits.**
 Since 2026-09-18 it is stored as well as its SHA-256, so the owner's screen can
 copy it again (DECISIONS says why). Links minted before that have no stored
 address; the screen's **Give it a new address** issues one and kills the old
@@ -1740,7 +1732,7 @@ Only Rashid can send it. Everything technical is done and live.
 
 **Prerequisites, both checked before he opens the portal:**
 - The website is live on production — done, `d3f1555`, `verify:site` 86/86
-  against `wurxmediahub.vercel.app` itself.
+  against the live site itself (now `prismwurx.vercel.app`).
 - **`support@wurxmedia.com` must exist and be read.** Both legal pages send
   people there and a reviewer may test it. He said on 2026-09-22 he would
   create it. The Contact page uses `rajil@wurxmedia.com`, which wurxmedia.com
@@ -1750,10 +1742,10 @@ Only Rashid can send it. Everything technical is done and live.
 
 | field | what to do |
 | --- | --- |
-| App icon | upload `https://wurxmediahub.vercel.app/tiktok-app-icon.png` (1024×1024) |
-| Website URL | `https://wurxmediahub.vercel.app/` — the root, now a real site, NOT `/tiktok` as the 27 note said |
-| Terms URL | `https://wurxmediahub.vercel.app/terms`, unchanged |
-| Privacy URL | `https://wurxmediahub.vercel.app/privacy`, unchanged |
+| App icon | upload `https://prismwurx.vercel.app/tiktok-app-icon.png` (1024×1024) |
+| Website URL | `https://prismwurx.vercel.app/` — the root, now a real site, NOT `/tiktok` as the 27 note said |
+| Terms URL | `https://prismwurx.vercel.app/terms`, unchanged |
+| Privacy URL | `https://prismwurx.vercel.app/privacy`, unchanged |
 | Products | Login Kit only. Change nothing |
 | Scopes | `user.info.basic` + `video.list` only. Change nothing |
 | Description, scope explanation | **leave exactly as they are** — the second rejection did not mention them, so they passed. Editing text that passed only creates new risk |
@@ -2303,10 +2295,9 @@ signs in on the new project with its original password (the bcrypt hash survived
 
 | site | Vercel project | repo | database |
 | --- | --- | --- | --- |
-| wurxmediahubdev.vercel.app | `wurxmediahubdev` | WurxMediaHub, branch `dev` | **CreatorHub** (switched 2026-10-27) |
 | prismwurx.vercel.app | `prism` | the separate **Prism** repo, `main` | **CreatorHub** (switched 2026-10-27 by redeploying its last production build with the new settings; no code and no repo change). Proven by reading its live code and by a real sign-in. |
 | prism.wurxmedia.com | `prism-wurxmedia` | none (CLI deploys) | the old Prism project, already paused |
-| wurxmediahub.vercel.app | `wurxmediahub` | WurxMediaHub, `main` | prod, paused |
+| ~~wurxmediahubdev.vercel.app~~, ~~wurxmediahub.vercel.app~~ | `wurxmediahubdev`, `wurxmediahub` | WurxMediaHub | **RETIRED 2026-11-17**: no longer used |
 
 **The Prism repo has drifted from the Hub repo.** `prismwurx` was built from the Prism repo at commit 9dbdc1a, so it lacks the Hub commits
 398a372 (the app-side `app_settings` fix) and 1af0014. That does not re-open the loop on CreatorHub: migration 20261028090000 (a trigger that
@@ -2334,7 +2325,7 @@ remote is not configured on this laptop, so only `origin` was pushed. Do not pus
 so they cannot be copied from one project to another. On CreatorHub: the 4 `*_SYNC_SECRET` values were generated fresh and set in
 BOTH the function secrets and the vault; `REACHER_API_KEY` was copied from `.env.local` (matched by fingerprint). **Euka (2026-10-27):** `EUKA_API_KEY` is set on CreatorHub from a NEW "all brands" key Rashid created. It sees 12 of the 13 stores (everything except
 NUTRAHARMONY STORE, which has its OWN Euka account) and the function reports `eukaAccountsUnavailable: 0`. `euka-ads-cycle` is ACTIVE; its first run
-processed 5 units, 3 ok and 2 failed, both NUTRAHARMONY ("no Euka key we hold owns this store any more"). Nutra's own key was added the same day as `EUKA_API_KEYS` (it is the SAME key the old project had, not rotated, and it is in use); together the two keys cover **all 13** stores. **TikTok ads app (2026-10-28):** `TIKTOK_APP_ID`, `TIKTOK_APP_SECRET` and `TIKTOK_REDIRECT_URI` (the app's own page, `https://wurxmediahubdev.vercel.app/oauth/tiktok/callback`, which the move did not change)
+processed 5 units, 3 ok and 2 failed, both NUTRAHARMONY ("no Euka key we hold owns this store any more"). Nutra's own key was added the same day as `EUKA_API_KEYS` (it is the SAME key the old project had, not rotated, and it is in use); together the two keys cover **all 13** stores. **TikTok ads app (2026-10-28):** `TIKTOK_APP_ID`, `TIKTOK_APP_SECRET` and `TIKTOK_REDIRECT_URI` (the app's own page, now `https://prismwurx.vercel.app/oauth/tiktok/callback`)
 are set on CreatorHub; the ID and secret are the SAME values the old project used (matched by fingerprint). Rashid keeps them in the project `.env.local` as `TIKTOK_ADS_APP_ID` / `TIKTOK_ADS_APP_SECRET`.
 `tiktok-nightly` is ACTIVE. **Not set:** the four `TIKTOK_CREATOR_*` values (creator sign-in with TikTok, not needed for now) and `AUDIT_API_URL` / `AUDIT_API_KEY`.
 Until the Audit values exist `collab-angles-cycle` is INACTIVE on CreatorHub, or it would fail every few minutes. Vault `*_url`

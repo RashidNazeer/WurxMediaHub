@@ -29,7 +29,7 @@ const URL_ = process.env.ALLOW_PROD === 'yes' ? env.VITE_SUPABASE_URL : assertDe
 if (!process.env.SUPABASE_SERVICE_KEY) throw new Error('SUPABASE_SERVICE_KEY must be set');
 const svc = createClient(URL_, process.env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
 
-const SITE = process.env.SITE_URL || 'https://wurxmediahubdev.vercel.app';
+const SITE = process.env.SITE_URL || 'https://prismwurx.vercel.app';
 const [cmd, ...rest] = process.argv.slice(2);
 
 if (cmd === 'list') {

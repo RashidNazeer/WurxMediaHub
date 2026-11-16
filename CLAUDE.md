@@ -220,12 +220,16 @@ the browser. Route-level code splitting. Sensible `staleTime` per resource.
 
 ## Environments
 
-`dev` branch → wurxmediahubdev.vercel.app → Supabase `CreatorHub` (`qinxwfdwvpkzfhcijuqw`, org Prism, moved 2026-10-27; the old `wurxmediahub-dev` is retired, see OPERATIONS)
-`main` branch → wurxmediahub.vercel.app → Supabase `wurxmediahub-prod`
-
-**PRISM has its own home: prismwurx.vercel.app**, and Rashid asked that it not
-be tied to the wurxmediahub domains. It is a separate Vercel project; confirm
-which branch it builds before assuming a push will appear there.
+**There is one site: https://prismwurx.vercel.app** → Supabase `CreatorHub`
+(`qinxwfdwvpkzfhcijuqw`, org Prism, moved 2026-10-27; the old `wurxmediahub-dev`
+is retired, see OPERATIONS). It is the `prism` Vercel project, built from the
+`Prism` repo's `main`. Rashid retired `wurxmediahub.vercel.app` and
+`wurxmediahubdev.vercel.app` on 2026-11-17: do not point anything at them, and
+use `prismwurx.vercel.app` for every link, redirect URI, share link and
+verification run.
+The `RashidNazeer/WurxMediaHub` repo (remote `origin`) is a **backup only**; the
+only deployment is prismwurx.vercel.app. Supabase Auth's Site URL and redirect
+allow-list were switched to prismwurx.vercel.app on 2026-11-17.
 
 **Two remotes.** `origin` is `RashidNazeer/WurxMediaHub`, `prism` is
 `RashidNazeer/Prism`, and both carry every branch. Push to BOTH, or they drift.

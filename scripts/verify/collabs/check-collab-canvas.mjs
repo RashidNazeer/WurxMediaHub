@@ -31,7 +31,7 @@
  * them apart gets switched off within a week.
  *
  * Proven to fail before it was trusted: run it with
- * BASE_URL=https://wurxmediahubdev.vercel.app against any build before
+ * BASE_URL=<a deployed address> against any build before
  * 2026-09-01 and it reports 40 failures.
  */
 const { launchBrowser } = await import('../../lib/browser.mjs');
