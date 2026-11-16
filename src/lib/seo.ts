@@ -17,8 +17,8 @@
  * Google renders the page and reads the tag it finds after React has run.
  */
 
-/** The addresses the real, public site answers on. Dev is deliberately absent. */
-const PUBLIC_HOSTS = ['wurxmediahub.vercel.app', 'wurxmediahub.com', 'www.wurxmediahub.com'];
+/** The one address the real, public site answers on. Every other address (a preview, localhost) is deliberately absent. */
+const PUBLIC_HOSTS = ['prismwurx.vercel.app'];
 
 function robotsTag(): HTMLMetaElement {
   let tag = document.querySelector<HTMLMetaElement>('meta[name="robots"]');

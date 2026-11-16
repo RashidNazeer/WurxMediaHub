@@ -20,7 +20,7 @@ address; those are in `ops-local/OPERATIONS.md` (git-ignored).
 | First real run | Batch 1 (5 videos) **succeeded in about 14 minutes** and its angles were filed (`filed` 47 -> 52) |
 | Queue | **167 videos queued** at 19:28 UTC, so batches of 5 keep coming back to back. Batch 2 was in phase 2 with no retries |
 | Database | **CreatorHub** (`qinxwfdwvpkzfhcijuqw`), the **dev** DB, primary "for now" (owner's decision) |
-| Code you work in | this repo (`RashidNazeer`) **is Prism's code**; same code is pushed to `wurxmediahubdev` |
+| Code you work in | this repo (`RashidNazeer`) **is Prism's code**; same code is pushed to the `Prism` repo and served at https://prismwurx.vercel.app (the only site) |
 | Backend source | `audit-backend/` here is a read-only snapshot; the source of truth is `C:\Users\Umar Wurx\Wurx Stuff\Wurx Stuff\creative project` |
 
 **Verified, not assumed** (by hash, by log, or by watching it happen): the key

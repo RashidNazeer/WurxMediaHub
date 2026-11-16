@@ -157,7 +157,7 @@ try {
    * opened at the production address with every request served by the build
    * under test, which is the only way to see what the live site would say.
    */
-  const LIVE = 'https://wurxmediahub.vercel.app';
+  const LIVE = 'https://prismwurx.vercel.app';
   const live = new URL(BASE).host === new URL(LIVE).host;
   const here = await page.evaluate(() => {
     const m = document.querySelector('meta[name="robots"]');
@@ -232,7 +232,7 @@ if (sitemap) {
   const extra = listed.filter((p) => !wanted.includes(p));
   check(missing.length === 0 && extra.length === 0, 'the sitemap lists every public page and nothing else',
     [missing.length ? `missing ${missing.join(', ')}` : '', extra.length ? `should not be there: ${extra.join(', ')}` : ''].filter(Boolean).join(' · ') || `${listed.length} pages`);
-  check(!/wurxmediahubdev/.test(sitemap), 'the sitemap points at the live site, not dev');
+  check(!/wurxmediahub/.test(sitemap), 'the sitemap points at prismwurx.vercel.app, not a retired address');
 }
 
 /* ── the icon, the other field TikTok named ─────────────────────────────── */

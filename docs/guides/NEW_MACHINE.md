@@ -222,18 +222,15 @@ Every push goes to both. As of 2026-10-13 all branches are byte-identical on
 both, with `main`, `dev` and `feature/prism-phase-1-tokens` all on the same
 commit.
 
-### Three deployed sites, each built from ONE branch
+### One deployed site
 
-| Site                         | Branch              | Database         |
-| ---------------------------- | ------------------- | ---------------- |
-| `prismwurx.vercel.app`       | a non-`main` branch | dev (live)       |
-| `wurxmediahubdev.vercel.app` | `dev`               | dev (live)       |
-| `wurxmediahub.vercel.app`    | `main`              | **prod, PAUSED** |
+| Site                         | Built from                 | Database   |
+| ---------------------------- | -------------------------- | ---------- |
+| `prismwurx.vercel.app`       | the `Prism` repo, `main`   | dev (live) |
 
-This is the question that comes up most: _"why does it look old / why is it
-broken?"_ The answer is almost always **which branch that site builds from**,
-not the code. On 2026-10-12 `main` was brought up to the same commit as `dev`,
-so all three now serve PRISM.
+`wurxmediahub.vercel.app` and `wurxmediahubdev.vercel.app` were retired on
+2026-11-17 and are no longer used. If a page looks old or broken, check which
+commit `prismwurx.vercel.app` last built, not the code.
 
 ### Two Supabase projects
 
@@ -243,18 +240,11 @@ so all three now serve PRISM.
 | `wurxmediahub-dev`  | `npznoiotslruqovorrec` | RETIRED 2026-10-27 (org WurxMedia went over its free quota). Only ever paused, never deleted. |
 | `wurxmediahub-prod` | `isqepjioowzqoyhlusqo` | **INACTIVE / paused**               |
 
-**There is only one dev database and both PRISM sites share it.** `prismwurx`
-and `wurxmediahubdev` are the same data. There is no separate "Prism database".
-If the two are ever meant to stop sharing, that is real work: a new project, all
-93 migrations, every Edge Function, new keys and seed data.
-
-**Production is a live trap right now.** `wurxmediahub.vercel.app` serves the
-PRISM frontend against a paused database with no migrations applied and no Edge
-Functions deployed. It will look correct and fail on every data call: no
-sign-in, no GMV, no brands. Rashid was told this twice and asked for it anyway,
-so it is a known state, not a bug to re-report. Bringing prod up means: resume
-the project, apply all migrations in order, deploy every Edge Function,
-regenerate types, then smoke-test.
+**There is only one database, `CreatorHub`, and one site, prismwurx.vercel.app.**
+There is no separate "Prism database". The old `wurxmediahub-prod` project is
+paused and nothing uses it; bringing it up would be real work: resume the
+project, apply all migrations in order, deploy every Edge Function, regenerate
+types, then smoke-test.
 
 ### Database changes
 
