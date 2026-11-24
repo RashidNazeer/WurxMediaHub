@@ -2330,7 +2330,11 @@ function BrandsTab({ creators, allCreators, budgets, refetchBudgets, month, allT
   useEffect(() => { patchUIState({ brandsDrill: drillBrandName }); }, [drillBrandName]);
   const [notesBrand, setNotesBrand] = useState(null);
   const [showNewBrand, setShowNewBrand] = useState(false);
-  const canAddBrand = !!(isSuper || perms?.canAdd || perms?.canEdit);
+  /* WURX-ADDED 2026-11-24 · A TL cannot add a brand: the database only lets them
+     write to the brands assigned to them, so the button could only ever fail.
+     `canAddBrand: false` arrives from the floor in wurxbase-identity.ts. Left
+     undefined for every other role, so nothing else changes. WURX-END */
+  const canAddBrand = !!(isSuper || perms?.canAdd || perms?.canEdit) && perms?.canAddBrand !== false;
   // Sortable columns · persisted so the preferred order survives refresh
   const [sortKey, setSortKey] = useState(() => loadUIState().brandsSortKey || 'allocated');
   const [sortDir, setSortDir] = useState(() => loadUIState().brandsSortDir || 'desc');

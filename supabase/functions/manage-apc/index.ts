@@ -1,9 +1,18 @@
 /**
  * manage-apc
  * ---------------------------------------------------------------------------
- * Create and manage APC viewer accounts: a brand's account manager who signs
- * in with credentials Rashid shares and can READ the brands assigned to them,
- * and nothing else.
+ * Create and manage the accounts the owners hand credentials to. THREE kinds,
+ * told apart by `profiles.role`:
+ *
+ *   apc_viewer  a brand's account manager. READS the brands assigned to them
+ *               through brand-scoped views, and nothing else.
+ *   team_lead   TL. Full Paid Collabs access, read AND write, for the brands
+ *               assigned to them. Brand-scoped by row level security.
+ *   ops_lead    OL. Complete admin access to every brand: STAFF, like Ads
+ *               Manager. No brands are assigned; they have them all.
+ *
+ * (Not `affiliate_team_lead` / `operations_lead`: those are older, read-only
+ * roles with their own logins. This function never touches them.)
  *
  * Same shape as `manage-brand`:
  *   1. Verify the access token with the auth server.
@@ -26,6 +35,12 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 
 const Brands = z.array(z.string().trim().min(1).max(200)).min(1, 'Assign at least one brand').max(100);
 
+/** The roles this function creates and manages. */
+const Role = z.enum(['apc_viewer', 'team_lead', 'ops_lead']);
+type ManagedRole = z.infer<typeof Role>;
+/** The roles that are limited to assigned brands. ops_lead has every brand. */
+const BRAND_SCOPED: ManagedRole[] = ['apc_viewer', 'team_lead'];
+
 /** Platform brands (public.brands) whose contests the APC may read. Optional. */
 const PlatformIds = z.array(z.uuid()).max(100).default([]);
 
@@ -36,8 +51,17 @@ const Body = z.discriminatedUnion('action', [
     action: z.literal('create'),
     email: z.string().trim().toLowerCase().email().max(254),
     displayName: z.string().trim().min(1, 'A name is needed').max(120),
-    brands: Brands,
+    role: Role.default('apc_viewer'),
+    /** Required for apc_viewer and team_lead (checked below); ignored for ops_lead. */
+    brands: z.array(z.string().trim().min(1).max(200)).max(100).default([]),
     platformBrandIds: PlatformIds,
+  }),
+  z.object({
+    action: z.literal('set_role'),
+    userId: z.uuid(),
+    role: Role,
+    /** Needed only when the person has no brands yet and is becoming brand-scoped. */
+    brands: z.array(z.string().trim().min(1).max(200)).max(100).default([]),
   }),
   z.object({
     action: z.literal('set_brands'),
@@ -145,15 +169,20 @@ Deno.serve(async (req) => {
     return [...seen].sort((a, b) => a.localeCompare(b));
   };
 
-  /** The target must be an APC viewer. This function never touches anyone else. */
+  /** The target must be one of the three roles this function manages. It never
+   *  touches anyone else (an admin, an Ads Manager, or the older read-only roles). */
   const loadApc = async (userId: string) => {
     const { data } = await admin
       .from('profiles')
       .select('id, email, display_name, role, is_active')
       .eq('id', userId)
       .single();
-    return data && data.role === 'apc_viewer' ? data : null;
+    return data && (Role.options as string[]).includes(data.role) ? data : null;
   };
+
+  /** OL is a staff-level login, so minting one or turning one off is the owner's
+   *  call, not ops'. Everything else here stays admin or ops. */
+  const touchesOl = (...roles: (string | undefined)[]) => roles.includes('ops_lead');
 
   /** Every platform brand, so contest access is picked by id, never typed. */
   const platformBrands = async (): Promise<{ id: string; name: string }[]> => {
@@ -196,8 +225,8 @@ Deno.serve(async (req) => {
     if (input.action === 'list') {
       const { data: people, error } = await admin
         .from('profiles')
-        .select('id, email, display_name, is_active, created_at')
-        .eq('role', 'apc_viewer')
+        .select('id, email, display_name, role, is_active, created_at')
+        .in('role', Role.options)
         .order('created_at', { ascending: false });
       if (error) throw error;
       const { data: links, error: linkErr } = await wb().from('apc_brand_access').select('user_id, brand');
@@ -220,10 +249,15 @@ Deno.serve(async (req) => {
     }
 
     if (input.action === 'create') {
+      if (touchesOl(input.role) && actor.role !== 'admin') {
+        return reply({ error: 'Only an admin can create an OL account' }, 403);
+      }
+      const scoped = BRAND_SCOPED.includes(input.role);
+      if (scoped && input.brands.length === 0) return reply({ error: 'Assign at least one brand' }, 400);
       const known = new Set(await knownBrands());
-      const unknown = input.brands.filter((b) => !known.has(b));
+      const unknown = (scoped ? input.brands : []).filter((b) => !known.has(b));
       if (unknown.length) return reply({ error: `Unknown brand: ${unknown[0]}` }, 400);
-      if (await unknownPlatform(input.platformBrandIds)) {
+      if (scoped && (await unknownPlatform(input.platformBrandIds))) {
         return reply({ error: 'Unknown platform brand' }, 400);
       }
 
@@ -240,34 +274,82 @@ Deno.serve(async (req) => {
       }
       const uid = made.user.id;
 
-      // The sign-up trigger made a default (applicant) profile. Make it an APC
-      // viewer. If anything below fails, remove the account: a half-made APC
-      // with the wrong role is worse than none.
+      // The sign-up trigger made a default (applicant) profile. Give it the
+      // requested role. If anything below fails, remove the account: a half-made
+      // account with the wrong role is worse than none.
       const { error: roleErr } = await admin
         .from('profiles')
-        .update({ role: 'apc_viewer', display_name: input.displayName })
+        .update({ role: input.role, display_name: input.displayName })
         .eq('id', uid);
       try {
         if (roleErr) throw roleErr;
-        await setBrands(uid, input.brands);
-        await setPlatformBrands(uid, input.platformBrandIds);
+        if (scoped) {
+          await setBrands(uid, input.brands);
+          await setPlatformBrands(uid, input.platformBrandIds);
+        }
       } catch (e) {
         await admin.auth.admin.deleteUser(uid);
         throw e;
       }
       await audit('apc.create', uid, {
         email: input.email,
-        brands: input.brands,
-        platformBrandIds: input.platformBrandIds,
+        role: input.role,
+        brands: scoped ? input.brands : [],
+        platformBrandIds: scoped ? input.platformBrandIds : [],
       });
       return reply({ userId: uid, email: input.email, password });
     }
 
-    // Everything below acts on an existing APC viewer, and only on one.
+    // Everything below acts on an existing APC / TL / OL account, and only on one.
     const target = await loadApc(input.userId);
-    if (!target) return reply({ error: 'That is not an APC account' }, 404);
+    if (!target) return reply({ error: 'That is not an APC, TL or OL account' }, 404);
+    // Turning an OL's login off, resetting it, or re-roling it is staff-level too.
+    if (touchesOl(target.role) && actor.role !== 'admin') {
+      return reply({ error: 'Only an admin can manage an OL account' }, 403);
+    }
+
+    if (input.action === 'set_role') {
+      if (touchesOl(input.role) && actor.role !== 'admin') {
+        return reply({ error: 'Only an admin can make someone an OL' }, 403);
+      }
+      if (target.role === input.role) return reply({ ok: true, role: input.role });
+      const scoped = BRAND_SCOPED.includes(input.role);
+      if (scoped) {
+        // Moving APC <-> TL keeps the brands they already have. Anyone arriving
+        // from OL has none, so brands must come with the request.
+        const { count, error: cErr } = await wb()
+          .from('apc_brand_access')
+          .select('brand', { count: 'exact', head: true })
+          .eq('user_id', target.id);
+        if (cErr) throw cErr;
+        if (!count && input.brands.length === 0) {
+          return reply({ error: 'Assign at least one brand first' }, 400);
+        }
+        if (input.brands.length) {
+          const known = new Set(await knownBrands());
+          const unknown = input.brands.filter((b) => !known.has(b));
+          if (unknown.length) return reply({ error: `Unknown brand: ${unknown[0]}` }, 400);
+          await setBrands(target.id, input.brands);
+        }
+      }
+      const { error: roleErr } = await admin.from('profiles').update({ role: input.role }).eq('id', target.id);
+      if (roleErr) throw roleErr;
+      if (!scoped) {
+        // OL has every brand: clear the assignments so nothing stale is left.
+        await wb().from('apc_brand_access').delete().eq('user_id', target.id);
+        await admin.from('apc_platform_brand_access').delete().eq('user_id', target.id);
+      }
+      // The role travels in the sign-in token, which can be an hour stale. Sign
+      // them out everywhere so the next sign-in carries the new one.
+      await admin.auth.admin.signOut(target.id, 'global').catch(() => undefined);
+      await audit('apc.set_role', target.id, { from: target.role, to: input.role });
+      return reply({ ok: true, role: input.role });
+    }
 
     if (input.action === 'set_brands') {
+      if (!BRAND_SCOPED.includes(target.role as ManagedRole)) {
+        return reply({ error: 'An OL has every brand; there is nothing to assign' }, 400);
+      }
       const known = new Set(await knownBrands());
       const unknown = input.brands.filter((b) => !known.has(b));
       if (unknown.length) return reply({ error: `Unknown brand: ${unknown[0]}` }, 400);

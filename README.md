@@ -94,13 +94,11 @@ by environment, never `supabase login`. Details: `docs/OPERATIONS.md` section 4.
 
 | Branch | Site | Database |
 | --- | --- | --- |
-| `dev` | wurxmediahubdev.vercel.app | Supabase `CreatorHub` (`qinxwfdwvpkzfhcijuqw`) |
-| `main` | wurxmediahub.vercel.app | `wurxmediahub-prod` (`isqepjioowzqoyhlusqo`), currently paused |
-| `main` of the separate `Prism` repo | prismwurx.vercel.app | `CreatorHub` (shared with `dev`) |
+| `main` of the `Prism` repo | https://prismwurx.vercel.app (the only site) | Supabase `CreatorHub` (`qinxwfdwvpkzfhcijuqw`) |
 
-All day-to-day work happens on `dev`. `main` moves only on an explicit instruction from the
-product owner, and production never receives test data. There are two remotes, `origin`
-(`WurxMediaHub`) and `prism` (`Prism`); see `CLAUDE.md`.
+`wurxmediahub.vercel.app` and `wurxmediahubdev.vercel.app` were retired on 2026-11-17 and are no
+longer used. `main` moves only on an explicit instruction from the product owner. There are two
+remotes, `origin` (`WurxMediaHub`) and `prism` (`Prism`); see `CLAUDE.md`.
 
 ## Repository map
 

@@ -23,9 +23,7 @@ Creator rail today (`src/lib/nav.ts`): Home, Earn, Leaderboards, My content, Bra
 
 | Site | Vercel project | Built from | Database | State |
 | --- | --- | --- | --- | --- |
-| wurxmediahubdev.vercel.app | `wurxmediahubdev` | `WurxMediaHub` repo, branch `dev` | CreatorHub | live; the daily-work site |
-| prismwurx.vercel.app | `prism` | the separate `Prism` repo, `main` | CreatorHub (switched 2026-10-27) | live; the working PRISM site. Since 2026-10-29 both repos' `main` and `dev` are pushed together and sit on the same commit |
-| wurxmediahub.vercel.app | `wurxmediahub` | `WurxMediaHub` repo, `main` | `wurxmediahub-prod` (**paused**) | serves the PRISM frontend against a paused database: every data call fails. A known state, not a bug to re-report |
+| **prismwurx.vercel.app** | `prism` | the separate `Prism` repo, `main` | CreatorHub (switched 2026-10-27) | **the only site, live.** `wurxmediahub.vercel.app` and `wurxmediahubdev.vercel.app` were retired 2026-11-17; nothing may point at them |
 | prism.wurxmedia.com | `prism-wurxmedia` | none (CLI deploys) | the old Prism project, already paused | not in use |
 
 | Supabase project | Ref | Status |

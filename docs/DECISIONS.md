@@ -2,6 +2,11 @@
 
 Dated one-liners. Why, not just what. Newest at the bottom.
 
+> **Addresses (2026-11-17):** `wurxmediahub.vercel.app` and `wurxmediahubdev.vercel.app` are retired.
+> The only site is **https://prismwurx.vercel.app**. Entries below that name the old addresses are dated
+> records of what was true when they were written; read them as `prismwurx.vercel.app` for anything you
+> still have to do.
+
 ---
 
 - 2026-07-28: Stack locked by Rashid, React + Vite + TS strict, Tailwind +
@@ -2771,4 +2776,4 @@ machine does not have.
 **Proof without a browser** (a browser robot must never be pointed at the WurxBase screens, rule 33 in PARKED.md): `pnpm verify:settings-sync` models the row, three sessions and the database broadcast. The OLD behaviour never settles (5,000 writes in 5,000 steps and still going), the NEW one writes nothing back after loading, a real edit is exactly one write, key order from the database does not matter, an old-format list is converted once, and the database rule alone also ends the loop for the old code.
 
 **How to look for this again:** `supabase inspect db calls --linked` (and `outliers`, `db-stats`) from the project folder, read-only, names the statements that dominate; take two snapshots a minute apart to see a rate. See OPERATIONS.md "Where is the Supabase quota going".
-
+- 2026-11-17: **One address only.** `wurxmediahub.vercel.app` and `wurxmediahubdev.vercel.app` are retired, on Rashid's instruction. Everything (links, TikTok redirect URIs and portal URLs, the sitemap, the search-engine host list in `src/lib/seo.ts`, share links, verify scripts) points at https://prismwurx.vercel.app. Earlier entries keep the old names because they record what was true then.

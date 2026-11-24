@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useAuth, isCollabsOnlyRole, isStaffRole } from '@/lib/auth/auth-context';
+import { useAuth, isCollabsOnlyRole, isStaffRole, isTeamLead } from '@/lib/auth/auth-context';
 import { useProfile } from '@/lib/auth/useProfile';
 import {
   WURXBASE_TABS,
@@ -129,7 +129,9 @@ export function useWurxbaseIdentity(): WurxbaseIdentity {
    * money, and nothing on screen would say so. Our own role is the authority
    * for them, and the floor below is applied last so no override can lift it.
    */
-  const collabsOnly = isCollabsOnlyRole(profile?.role);
+  /* A TL is on the same footing: our role is the authority. Their lookup is not
+     even attempted (`enabled` above), because `app_users` is closed to them. */
+  const collabsOnly = isCollabsOnlyRole(profile?.role) || isTeamLead(profile?.role);
   const role = collabsOnly ? derivedRole : ((data?.role as WurxBaseRole) || derivedRole);
   const customPerms = {
     ...(collabsOnly ? {} : ((data?.custom_perms as Record<string, boolean>) || {})),

@@ -58,7 +58,7 @@ import {
   MAX_OFFLINE_MS,
 } from '../_shared/angle-backoff.ts';
 
-const STAFF = ['ops', 'admin', 'ads_manager'];
+const STAFF = ['ops', 'admin', 'ads_manager', 'ops_lead'];
 const BATCH_SIZE = 5;
 const LEASE_MS = 3 * 60_000;
 const MAX_ATTEMPTS = 3;

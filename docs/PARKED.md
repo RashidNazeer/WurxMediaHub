@@ -5,6 +5,11 @@ nothing here is done.
 
 **When Rashid asks "what's pending?", answer from this file.**
 
+> **Addresses (2026-11-17):** `wurxmediahub.vercel.app` and `wurxmediahubdev.vercel.app` are retired.
+> The only site is **https://prismwurx.vercel.app**. Entries below that name the old addresses are dated
+> records of what was true when they were written; read them as `prismwurx.vercel.app` for anything you
+> still have to do.
+
 Rules:
 
 - Every item says what it is, why it was parked, who is blocking it, and the
@@ -985,7 +990,7 @@ site live on production (done) and `support@wurxmedia.com` existing (his).
    wurxmedia.com publishes, so that one is already real.
 3. The public pages go onto `main` on their own, as `5888faa` did.
 4. He resubmits in TikTok's portal with the icon `public/tiktok-app-icon.png`
-   and the Website URL `https://wurxmediahub.vercel.app/`.
+   and the Website URL `https://prismwurx.vercel.app/`.
 
 **If they reject the vercel.app address itself**, the fallback is option B: the
 same pages on `creators.wurxmedia.com`, which needs a DNS record and moves the
@@ -1051,7 +1056,7 @@ note in `router.tsx`).
      production. It gets its own pages (for creators, for brands, how it works,
      about, FAQ and contact) beside `/tiktok`, `/terms` and `/privacy`, with
      one nav, one footer and the dog face in the tab. Submit
-     `https://wurxmediahub.vercel.app/`. The redirect URIs and the Terms and
+     `https://prismwurx.vercel.app/`. The redirect URIs and the Terms and
      Privacy URLs stay exactly as they are.
    - **B:** the same site, on an official subdomain such as
      `creators.wurxmedia.com`. This is the strongest "official" signal, but it
@@ -1207,7 +1212,7 @@ A push to `main` would almost certainly be blocked the same way.
 
 **Until then:** use the CLI route in OPERATIONS (Vercel section). Export the
 sha with `git archive`, `vercel deploy` a preview of the dev project, then
-`vercel alias set` it to wurxmediahubdev.vercel.app. That is how dev went live
+`vercel alias set` it to prismwurx.vercel.app. That is how dev went live
 at `aab0cf0` on 2026-09-15.
 
 ---
@@ -1300,7 +1305,7 @@ console errors, "private workspace" absent from all three pages.
 ### STILL TO DO — the submission itself, which only Rashid can send
 
 The site is ready. Nobody has resubmitted anything. When he does, use the
-copy below, and change the Website URL to **https://wurxmediahub.vercel.app/tiktok**.
+copy below, and change the Website URL to **https://prismwurx.vercel.app/tiktok**.
 
 ### What he was asked, and has not yet answered
 
@@ -1323,9 +1328,9 @@ copy below, and change the Website URL to **https://wurxmediahub.vercel.app/tikt
 | Public description (115) | A creator platform for TikTok Shop brands. Creators see their own sales, commission and video results in one place. |
 | Products | Login Kit, and only Login Kit |
 | Scopes | `user.info.basic`, `video.list`, and only those two |
-| Platform | Web, `https://wurxmediahub.vercel.app/` |
-| Terms URL | `https://wurxmediahub.vercel.app/terms` |
-| Privacy URL | `https://wurxmediahub.vercel.app/privacy` |
+| Platform | Web, `https://prismwurx.vercel.app/` |
+| Terms URL | `https://prismwurx.vercel.app/terms` |
+| Privacy URL | `https://prismwurx.vercel.app/privacy` |
 | Redirect URIs | prod AND dev callbacks, both already on the APP's own list |
 | Reason box (101) | First submission. Requesting Login Kit and video.list so creators can see stats for their own videos. |
 
@@ -2046,7 +2051,7 @@ redirect is derivable, so neither needed asking. Outstanding:
   that the nightly cron reads. Setting one without the other fixes nothing.
 
 **And the prod callback must be added on TIKTOK'S side**,
-`https://wurxmediahub.vercel.app/oauth/tiktok/callback`, in the ads app's
+`https://prismwurx.vercel.app/oauth/tiktok/callback`, in the ads app's
 allowed redirect list, or the round trip is refused.
 
 **Then an admin connects on prod once.** Same app, no new review: the OAuth

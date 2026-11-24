@@ -591,7 +591,7 @@ export const router = createBrowserRouter([
      * list were widened by mistake tomorrow, they would reach a screen whose
      * every query returns nothing.
      */
-    Component: () => <RequireAuth allow={[...STAFF_ROLES, ...COLLABS_ONLY_ROLES]} />,
+    Component: () => <RequireAuth allow={[...STAFF_ROLES, ...COLLABS_ONLY_ROLES, 'team_lead']} />,
     children: [
       {
         /* A FALLBACK, OR THE FIRST LOAD IS A BLANK SCREEN.
@@ -623,7 +623,7 @@ export const router = createBrowserRouter([
      * ONLY apc_viewer. The guard picks the screen; the views behind it
      * (`wurxbase.apc_*`, `public.apc_contests`) are what limit the data.
      */
-    Component: () => <RequireAuth allow={['apc_viewer']} />,
+    Component: () => <RequireAuth allow={['apc_viewer', 'team_lead']} />,
     children: [
       {
         HydrateFallback: RouteFallback,

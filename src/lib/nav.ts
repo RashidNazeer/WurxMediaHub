@@ -22,7 +22,7 @@ import {
   Users,
   Video,
 } from 'lucide-react';
-import { isCollabsOnlyRole, isStaffRole } from '@/lib/auth/auth-context';
+import { isBrandAssignedRole, isCollabsOnlyRole, isStaffRole } from '@/lib/auth/auth-context';
 import type { AppRole } from '@/lib/auth/auth-context';
 import { wurxbaseTabsFor } from '@/lib/wurxbase-identity';
 
@@ -257,11 +257,11 @@ const ADMIN: NavGroup[] = [
         description: 'Read-only links you can send a client',
       },
       {
-        label: 'APC accounts',
+        label: 'APC / TL / OL logins',
         icon: UserCog,
         to: '/admin/apc-accounts',
         owners: true,
-        description: 'View-only logins for a brand’s account manager',
+        description: 'Logins for APCs (view only), TLs (their brands, full access) and OLs (every brand)',
       },
     ],
   },
@@ -410,7 +410,7 @@ export function navForRole(role: AppRole | undefined, collabTabs?: string[]): Na
    */
   /* An APC viewer: their own Dashboard and Contests, then Paid Collabs. Rows
      only; what they can read is decided by the brand-scoped views. */
-  if (role === 'apc_viewer') {
+  if (isBrandAssignedRole(role)) {
     const collabs = ADMIN.filter((g) => g.label === COLLABS_GROUP).map((g) => ({
       ...g,
       items: g.items.filter((i) => i.to?.startsWith('/admin/collabs')),

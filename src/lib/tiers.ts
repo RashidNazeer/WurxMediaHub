@@ -22,10 +22,14 @@ export const ROLE_LABEL: Record<AppRole, string> = {
   /* Spelled out rather than abbreviated: "ATL" means nothing to somebody
      reading an audit row. The first two are read-only Paid Collabs roles;
      Ads Manager is full staff since 2026-09-15. */
-  affiliate_team_lead: 'Affiliate Team Lead',
-  operations_lead: 'Operations Lead',
+  affiliate_team_lead: 'Affiliate Team Lead (view only)',
+  operations_lead: 'Operations Lead (view only)',
   ads_manager: 'Ads Manager',
   apc_viewer: 'APC (view only)',
+  /* TL and OL, 2026-11-24. The two read-only roles above keep their old names
+     with "(view only)" so nobody mixes them up with these. */
+  team_lead: 'TL (Team Lead)',
+  ops_lead: 'OL (Operations Lead)',
 };
 
 export const TIER_LABEL: Record<CreatorTier, string> = {
