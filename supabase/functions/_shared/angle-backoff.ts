@@ -82,8 +82,23 @@ export function isEnvironmental(reason: string | null | undefined, nVideos: numb
 
 /** Whether an unplaced video should be charged an attempt. */
 export function chargesAttempt(reason: string | null | undefined, nVideos: number): boolean {
+  /* A download that fails is charged to the video even when the whole batch
+     failed. Treating it as "the environment, not the video" meant a post TikTok
+     will not serve to us was retried for ever at the head of the queue, and the
+     worker kept pausing for it. Three strikes now end it (see `skipsWhenSpent`),
+     while a dead model quota is still never charged. */
+  if (causeOf(reason) === 'source') return true;
   return !isEnvironmental(reason, nVideos);
 }
+
+/** A video that ran out of attempts because its link could not be fetched is
+ *  skipped (the queue moves on, the row says why), not left `failed`. */
+export const skipsWhenSpent = (reason: string | null | undefined): boolean =>
+  causeOf(reason) === 'source';
+
+export const SKIPPED_NOTE =
+  'SKIPPED automatically: TikTok would not serve this post to the audit server on 3 tries. ' +
+  'Set status back to queued to try again.';
 
 /**
  * The reason to record on a batch when it failed wholesale for an
