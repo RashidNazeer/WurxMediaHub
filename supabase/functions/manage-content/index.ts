@@ -221,7 +221,7 @@ Deno.serve(async (req) => {
 
   // ------------------------------------------------------------- the gate --
   // Ads Manager is staff since 2026-09-15, the same as ops. Mirrors is_staff().
-  const isStaff = actor.role === 'admin' || actor.role === 'ops' || actor.role === 'ads_manager';
+  const isStaff = actor.role === 'admin' || actor.role === 'ops' || actor.role === 'ads_manager' || actor.role === 'ops_lead';
   const isCreator = actor.role === 'creator';
   const needsStaff = input.action === 'content.review';
   const anyone = input.action === 'content.refresh';

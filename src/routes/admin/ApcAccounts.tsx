@@ -2,21 +2,25 @@ import { useState } from 'react';
 import { Check, Copy, KeyRound, Plus, UserCheck, UserX } from 'lucide-react';
 import { FilterBar } from '@/components/layout/FilterBar';
 import { Button } from '@/components/ui/Button';
-import { Input, Label } from '@/components/ui/Field';
+import { Input, Label, Select } from '@/components/ui/Field';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth/auth-context';
 import {
   useApcAccounts,
   useApcActions,
   useApcBrandChoices,
   type ApcAccount,
+  type ManagedRole,
 } from '@/lib/admin/useApcAccounts';
 
 /**
- * APC ACCOUNTS: logins for a brand's account manager, view only.
+ * APC, TL AND OL LOGINS. Three kinds of account, told apart by a badge on every row.
  *
- * Rashid, 2026-11-05: an APC "will only be able to see the data, no edit access
- * at all", sees only the brands assigned to them, and never a creator's contact
- * number or payment details.
+ *   APC  view only, assigned brands, never a creator's contact or payment details
+ *        (Rashid, 2026-11-05: "no edit access at all").
+ *   TL   full Paid Collabs access, read and write, for the assigned brands only.
+ *   OL   complete admin access to every brand. A staff-level login, so only an
+ *        admin can create or change one.
  *
  * THIS SCREEN ONLY MANAGES ACCOUNTS. What an APC can actually read is decided in
  * the database (migration 20261105090100): brand-scoped views with the private
@@ -28,6 +32,31 @@ import {
  */
 
 type Shown = { email: string; password: string; what: 'created' | 'reset' };
+
+/** What each role is, in the words the owners use. */
+const ROLE_INFO: Record<ManagedRole, { badge: string; title: string; what: string; scoped: boolean; tone: string }> = {
+  apc_viewer: {
+    badge: 'APC',
+    title: 'APC (view only)',
+    what: 'Sees only their assigned brands, never creators’ contact or payment details, and cannot change anything.',
+    scoped: true,
+    tone: 'bg-surface-2 text-muted',
+  },
+  team_lead: {
+    badge: 'TL',
+    title: 'TL (Team Lead)',
+    what: 'Full access to Paid Collabs for their assigned brands only: they can read everything and make changes there. Other brands stay closed.',
+    scoped: true,
+    tone: 'bg-accent-soft text-accent',
+  },
+  ops_lead: {
+    badge: 'OL',
+    title: 'OL (Operations Lead)',
+    what: 'Complete admin access to every brand, like the operations team. No brands to pick.',
+    scoped: false,
+    tone: 'bg-success-soft text-success',
+  },
+};
 
 type Choice = { id: string; label: string };
 
@@ -115,8 +144,14 @@ export function ApcAccounts() {
   const platformName = (id: string) =>
     platformChoices.find((b) => b.id === id)?.label ?? 'Unknown brand';
   const actions = useApcActions();
+  const { claims } = useAuth();
+  /* Only an admin can make or change an OL; the Edge Function enforces it, this
+     just keeps the option out of everyone else's way. */
+  const isAdmin = claims?.role === 'admin';
+  const roleChoices: ManagedRole[] = isAdmin ? ['apc_viewer', 'team_lead', 'ops_lead'] : ['apc_viewer', 'team_lead'];
 
   const [creating, setCreating] = useState(false);
+  const [role, setRole] = useState<ManagedRole>('apc_viewer');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [brands, setBrands] = useState<string[]>([]);
@@ -133,13 +168,15 @@ export function ApcAccounts() {
     setProblem('');
     if (!name.trim()) return setProblem('Add their name');
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setProblem('That email does not look right');
-    if (brands.length === 0) return setProblem('Assign at least one brand');
+    const scoped = ROLE_INFO[role].scoped;
+    if (scoped && brands.length === 0) return setProblem('Assign at least one brand');
     try {
       const r = await actions.create.mutateAsync({
         email: email.trim(),
         displayName: name.trim(),
-        brands,
-        platformBrandIds: platformIds,
+        role,
+        brands: scoped ? brands : [],
+        platformBrandIds: scoped ? platformIds : [],
       });
       setShown({ email: r.email, password: r.password, what: 'created' });
       setCreating(false);
@@ -147,6 +184,28 @@ export function ApcAccounts() {
       setEmail('');
       setBrands([]);
       setPlatformIds([]);
+      setRole('apc_viewer');
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  const changeRole = async (a: ApcAccount, next: ManagedRole) => {
+    if (next === a.role) return;
+    setProblem('');
+    const from = ROLE_INFO[a.role].badge;
+    const to = ROLE_INFO[next].badge;
+    const note =
+      next === 'ops_lead'
+        ? 'They will get admin access to EVERY brand.'
+        : a.role === 'ops_lead'
+          ? 'They will lose access to every brand and keep only the brands you assign.'
+          : next === 'team_lead'
+            ? 'They keep their brands and gain the ability to make changes in them.'
+            : 'They keep their brands but can only view them.';
+    if (!window.confirm(`Change ${a.display_name || a.email} from ${from} to ${to}? ${note} They will be signed out and must sign in again.`)) return;
+    try {
+      await actions.setRole.mutateAsync({ userId: a.id, role: next, brands: next === 'ops_lead' ? [] : a.brands });
     } catch (e) {
       fail(e);
     }
@@ -201,13 +260,13 @@ export function ApcAccounts() {
             }}
           >
             <Plus size={15} aria-hidden />
-            New APC
+            New login
           </Button>
         }
       >
         <p className="text-muted text-[0.875rem]">
-          View-only logins. Each APC sees only their assigned brands, never creators' contact or
-          payment details, and cannot change anything.
+          <strong>APC</strong> views assigned brands only. <strong>TL</strong> has full access to
+          assigned brands. <strong>OL</strong> has full admin access to every brand.
         </p>
       </FilterBar>
 
@@ -221,7 +280,27 @@ export function ApcAccounts() {
 
       {creating && (
         <div className="wx-neo-raised mt-4 rounded-xl p-5">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <fieldset>
+            <legend className="mb-2 block text-[0.875rem] font-semibold">What kind of login</legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {roleChoices.map((r) => (
+                <label
+                  key={r}
+                  className={cn(
+                    'flex cursor-pointer flex-col gap-1 rounded-md p-3',
+                    role === r ? 'wx-neo-raised' : 'wx-neo-inset'
+                  )}
+                >
+                  <span className="flex items-center gap-2 font-bold">
+                    <input type="radio" name="apc-role" checked={role === r} onChange={() => setRole(r)} />
+                    {ROLE_INFO[r].title}
+                  </span>
+                  <span className="text-muted text-[0.8125rem]">{ROLE_INFO[r].what}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="apc-name">Name</Label>
               <Input id="apc-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
@@ -237,23 +316,33 @@ export function ApcAccounts() {
               />
             </div>
           </div>
-          <div className="mt-4">
-            <Label htmlFor="apc-brands">Paid Collabs brands they can see</Label>
-            {choiceQuery.isPending ? (
-              <p className="text-muted mt-2 text-[0.875rem]">Loading brands…</p>
-            ) : (
-              <BrandPicker label="brands" choices={collabChoices} value={brands} onChange={setBrands} />
-            )}
-          </div>
-          <div className="mt-4">
-            <Label htmlFor="apc-platform">Contest brands they can see (optional)</Label>
-            <BrandPicker
-              label="contest brands"
-              choices={platformChoices}
-              value={platformIds}
-              onChange={setPlatformIds}
-            />
-          </div>
+          {ROLE_INFO[role].scoped ? (
+            <>
+              <div className="mt-4">
+                <Label htmlFor="apc-brands">
+                  {role === 'team_lead' ? 'Paid Collabs brands they work on' : 'Paid Collabs brands they can see'}
+                </Label>
+                {choiceQuery.isPending ? (
+                  <p className="text-muted mt-2 text-[0.875rem]">Loading brands…</p>
+                ) : (
+                  <BrandPicker label="brands" choices={collabChoices} value={brands} onChange={setBrands} />
+                )}
+              </div>
+              <div className="mt-4">
+                <Label htmlFor="apc-platform">Contest brands they can see (optional)</Label>
+                <BrandPicker
+                  label="contest brands"
+                  choices={platformChoices}
+                  value={platformIds}
+                  onChange={setPlatformIds}
+                />
+              </div>
+            </>
+          ) : (
+            <p className="text-muted mt-4 text-[0.875rem]">
+              An OL works on every brand, so there is nothing to pick.
+            </p>
+          )}
           <div className="mt-4 flex gap-2">
             <Button size="sm" onClick={() => void create()} disabled={actions.create.isPending}>
               {actions.create.isPending ? 'Creating…' : 'Create and generate password'}
@@ -269,13 +358,13 @@ export function ApcAccounts() {
         {accounts.isPending && <li className="text-muted">Loading…</li>}
         {accounts.isError && (
           <li role="alert" className="text-danger">
-            Could not load APC accounts.
+            Could not load the logins.
           </li>
         )}
         {accounts.isSuccess && list.length === 0 && (
           <li className="wx-neo-raised rounded-xl px-6 py-14 text-center">
-            <p className="font-bold">No APC accounts yet</p>
-            <p className="text-muted mt-1 text-[0.875rem]">Create one to give someone view-only access to their brands.</p>
+            <p className="font-bold">No logins yet</p>
+            <p className="text-muted mt-1 text-[0.875rem]">Create one for an APC, a TL or an OL.</p>
           </li>
         )}
         {list.map((a) => (
@@ -287,6 +376,15 @@ export function ApcAccounts() {
                   <span
                     className={cn(
                       'rounded-full px-2 py-0.5 text-[0.6875rem] font-extrabold tracking-wider uppercase',
+                      ROLE_INFO[a.role].tone
+                    )}
+                    title={ROLE_INFO[a.role].title}
+                  >
+                    {ROLE_INFO[a.role].badge}
+                  </span>
+                  <span
+                    className={cn(
+                      'rounded-full px-2 py-0.5 text-[0.6875rem] font-extrabold tracking-wider uppercase',
                       a.is_active ? 'bg-success-soft text-success' : 'bg-surface-2 text-muted'
                     )}
                   >
@@ -295,19 +393,37 @@ export function ApcAccounts() {
                 </p>
                 <p className="text-muted text-[0.875rem]">{a.email}</p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    setEditing(editing === a.id ? null : a.id);
-                    setEditBrands(a.brands);
-                    setEditPlatform(a.platformBrandIds);
-                    setProblem('');
-                  }}
-                >
-                  Brands
-                </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                {(a.role !== 'ops_lead' || isAdmin) && (
+                  <div className="w-44">
+                    <Select
+                      aria-label={`Role for ${a.display_name || a.email}`}
+                      value={a.role}
+                      onChange={(e) => void changeRole(a, e.target.value as ManagedRole)}
+                      className="h-10 pointer-coarse:h-11"
+                    >
+                      {roleChoices.map((r) => (
+                        <option key={r} value={r}>
+                          {ROLE_INFO[r].badge}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
+                {ROLE_INFO[a.role].scoped && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setEditing(editing === a.id ? null : a.id);
+                      setEditBrands(a.brands);
+                      setEditPlatform(a.platformBrandIds);
+                      setProblem('');
+                    }}
+                  >
+                    Brands
+                  </Button>
+                )}
                 <Button size="sm" variant="secondary" onClick={() => void reset(a)}>
                   <KeyRound size={15} aria-hidden />
                   Reset password
@@ -342,7 +458,11 @@ export function ApcAccounts() {
               </div>
             ) : (
               <p className="text-muted mt-3 text-[0.875rem]">
-                {a.brands.length ? a.brands.join(' · ') : 'No brands assigned'}
+                {!ROLE_INFO[a.role].scoped
+                  ? 'Every brand'
+                  : a.brands.length
+                    ? a.brands.join(' · ')
+                    : 'No brands assigned'}
                 {a.platformBrandIds.length > 0 &&
                   ` · Contests: ${a.platformBrandIds.map(platformName).join(', ')}`}
               </p>

@@ -480,7 +480,7 @@ Deno.serve(async (req: Request) => {
     const { data: who } = await db.auth.getUser(token);
     if (!who?.user) return json({ error: 'Not allowed' }, 401, req);
     const { data: profile } = await db.from('profiles').select('role, is_active').eq('id', who.user.id).single();
-    const staff = !!profile?.is_active && ['ops', 'admin', 'ads_manager'].includes(profile.role);
+    const staff = !!profile?.is_active && ['ops', 'admin', 'ads_manager', 'ops_lead'].includes(profile.role);
     if (!staff) {
       /* a reader may only ask a range question, which writes nothing */
       if (!range) return json({ error: 'Not allowed' }, 403, req);

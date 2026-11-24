@@ -53,7 +53,7 @@ import { filedVideoIds } from '../_shared/angle-store.ts';
 import { cooldownLeft, isEnvError, ENV_MARK } from '../_shared/angle-backoff.ts';
 import { briefExportUrl, parseBriefUrl } from '../_shared/brief-url.ts';
 
-const STAFF = ['ops', 'admin', 'ads_manager'];
+const STAFF = ['ops', 'admin', 'ads_manager', 'ops_lead'];
 const MONTH = /^\d{4}-\d{2}$/;
 
 const Body = z.discriminatedUnion('action', [

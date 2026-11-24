@@ -254,6 +254,7 @@ Deno.serve(async (req) => {
     'affiliate_team_lead',
     'operations_lead',
     'ads_manager',
+    'ops_lead',
   ];
   if (!profile?.is_active || !EUKA_ROLES.includes(profile.role)) {
     return json({ error: 'Not allowed' }, 403, req);

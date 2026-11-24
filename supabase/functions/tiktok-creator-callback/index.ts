@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
     .eq('id', creatorId)
     .maybeSingle();
   if (!actor?.is_active
-    || !['applicant', 'creator', 'ops', 'admin', 'ads_manager'].includes(String(actor.role))) {
+    || !['applicant', 'creator', 'ops', 'admin', 'ads_manager', 'ops_lead'].includes(String(actor.role))) {
     return reply({ error: 'That account cannot connect a TikTok account.' }, 403);
   }
 

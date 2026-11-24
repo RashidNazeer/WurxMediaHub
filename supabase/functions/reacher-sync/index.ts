@@ -198,7 +198,7 @@ Deno.serve(async (req: Request) => {
     const { data: who } = await db.auth.getUser(token);
     if (!who?.user) return json({ error: 'Not allowed' }, 401, req);
     const { data: profile } = await db.from('profiles').select('role, is_active').eq('id', who.user.id).single();
-    if (!profile?.is_active || !['ops', 'admin', 'ads_manager'].includes(profile.role)) {
+    if (!profile?.is_active || !['ops', 'admin', 'ads_manager', 'ops_lead'].includes(profile.role)) {
       return json({ error: 'Not allowed' }, 403, req);
     }
   }

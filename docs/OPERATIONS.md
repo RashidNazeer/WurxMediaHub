@@ -2392,3 +2392,27 @@ Run it by hand: `{"dryRun":true,"brands":["Biostime"],"handlesPerRun":300}` (rea
 it would add). The brand page's "Reacher videos" button now syncs the brand on screen. Everything the rules at the top of the
 function say (add never replace, a typed row is never touched, numbers only grow) applies to every brand. Check with
 `pnpm verify:reacher-targets` (offline).
+
+## APC, TL and OL logins (2026-11-24)
+
+Three kinds of login are made from **Admin > APC / TL / OL logins** (`/admin/apc-accounts`), all by the `manage-apc` Edge Function. A password is generated, shown once, and must be changed at first sign-in. The role is a badge on every row, and a row's role can be changed from its dropdown (the person is signed out so the new role is in their next token).
+
+| | APC | TL (`team_lead`) | OL (`ops_lead`) |
+|---|---|---|---|
+| Brands | assigned ones | assigned ones | **every brand** |
+| Paid Collabs | read only, through brand-scoped views, **no** WhatsApp / email / PayPal / Zelle / comments | **read and write** on the base tables, contact columns included, for assigned brands only | everything, like Ads Manager (their `superadmin`) |
+| Rest of the admin app | none | none (Dashboard and Contests for their brands, like an APC) | all of it: **staff** (`is_staff()`) |
+| Brand Hub, hit rate, GMV, ad spend | brand-scoped | brand-scoped | all |
+| Who may create or change one | admin or ops | admin or ops | **admin only** (it is a staff-level login) |
+
+**They are NEW roles.** The older `affiliate_team_lead` / `operations_lead` ("Affiliate Team Lead (view only)", "Operations Lead (view only)") keep their read-only meaning and their logins; nothing about them changed. `team_lead` / `ops_lead` were added in `20261124090000_tl_ol_role_enum.sql` (labels only) and given meaning in `20261124090100_tl_ol_access.sql`.
+
+**TL is brand-scoped in the database, not on screen.** `wurxbase.tl_brands()` (security definer, reads `profiles.role` and `is_active`, never the token) feeds `_tl` policies on `wurxbase.creators` and `brand_monthly_budgets` (select, insert, update; update has `WITH CHECK` so a row cannot be moved to another brand), on `activity_logs` (a TL's own audit entries, and the angle/contract rows of their brands) and read-only policies on the figures behind the screens (`collab_video_metrics`, `euka_ad_video_month/day` by the videos in their brands, and the brand-keyed GMV, ad, brief and photo tables). It shares `wurxbase.apc_brand_access` with APCs, so moving someone APC <-> TL keeps their brands.
+
+**Deliberately closed to a TL:** `app_users`, `audit_logs`, `join_requests`, `revoked_sessions`, `app_settings`, spark codes, the sync-run tables, hard DELETE on creators and budgets, and the `euka` and `collab-products` Edge Functions (they carry other brands' data). In the app a TL's Paid Collabs role is their `admin` with a permanent floor (`TEAM_LEAD_FLOOR` in `wurxbase-identity.ts`): no add/rename/delete brand, no God Mode, users, access grants, logs, SQL Quest, and no Discovery (it is the outreach pipeline across all creators). Exporting and printing are allowed: they are built from rows the database already limited. To let a TL delete, add a DELETE policy and drop `canDelete` from the floor; it was withheld on purpose.
+
+**OL** is staff exactly where Ads Manager is: `is_staff()`, `assert_active_staff`, `is_approved_creator`, `refresh_content_preview`, `review_application`, and the staff lists in the Edge Functions. Not an owner: client share links, backups, and creating accounts stay with `admin` / `ops`.
+
+**Moving someone's role** needs a fresh sign-in (the role rides in the access token). `profiles.role` can only be changed by the service role or an `admin`, so do it through the screen or `manage-apc` `set_role`.
+
+Check with `pnpm verify:tl-ol` (70 checks, local database only, rolls back). The APC suite (`scripts/verify/apc-viewer-security.sql`) must stay at 0 failures too.

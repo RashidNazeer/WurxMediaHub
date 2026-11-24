@@ -13,10 +13,14 @@ import { getSupabase } from '@/lib/supabase';
  * here stores it; the screen shows it and it is gone on the next render.
  */
 
+/** The three kinds of login this screen manages. */
+export type ManagedRole = 'apc_viewer' | 'team_lead' | 'ops_lead';
+
 export type ApcAccount = {
   id: string;
   email: string;
   display_name: string | null;
+  role: ManagedRole;
   is_active: boolean;
   created_at: string;
   brands: string[];
@@ -74,10 +78,16 @@ export function useApcActions() {
       mutationFn: (v: {
         email: string;
         displayName: string;
+        role: ManagedRole;
         brands: string[];
         platformBrandIds: string[];
       }) =>
         call<Credentials>({ action: 'create', ...v }),
+      onSuccess: done,
+    }),
+    setRole: useMutation({
+      mutationFn: (v: { userId: string; role: ManagedRole; brands?: string[] }) =>
+        call<{ ok: true; role: ManagedRole }>({ action: 'set_role', ...v }),
       onSuccess: done,
     }),
     setBrands: useMutation({
