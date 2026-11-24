@@ -48,6 +48,8 @@ import { filePlacements } from '../_shared/angle-store.ts';
 import {
   brandsToAvoid,
   chargesAttempt,
+  skipsWhenSpent,
+  SKIPPED_NOTE,
   chooseHead,
   cooldownLeft,
   envError,
@@ -119,11 +121,14 @@ async function requeueVideos(
 ) {
   for (const row of rows) {
     const attempts = Number(row.attempts ?? 0) + (charge(row.id) ? 1 : 0);
+    const why = row.reason ?? reason;
+    const spent = attempts >= MAX_ATTEMPTS;
+    const skip = spent && skipsWhenSpent(why);
     await db.from('collab_angle_videos').update({
-      status: attempts >= MAX_ATTEMPTS ? 'failed' : 'queued',
+      status: skip ? 'skipped' : spent ? 'failed' : 'queued',
       attempts,
       batch_id: null,
-      last_error: (row.reason ?? reason).slice(0, 500),
+      last_error: skip ? `${SKIPPED_NOTE} Last error: ${why}`.slice(0, 500) : why.slice(0, 500),
     }).eq('id', row.id);
   }
 }
