@@ -1,5 +1,5 @@
 import { defaultFor } from '@/vendor/wurxbase/access';
-import { isCollabsOnlyRole, type AppRole } from '@/lib/auth/auth-context';
+import { isCollabsOnlyRole, isTeamLead, type AppRole } from '@/lib/auth/auth-context';
 
 /**
  * WHO OUR ADMIN IS INSIDE PAID COLLABS.
@@ -58,6 +58,13 @@ const ROLE_MAP: Record<AppRole, WurxBaseRole> = {
   ads_manager: 'superadmin',
   /* Never their `apc`, which can edit. Ours is view only. */
   apc_viewer: 'viewer',
+  /* TL: their `admin`, NOT `superadmin`. God Mode, user management and the
+     workspace settings affect every brand, and a TL works on some. What `admin`
+     still carries is held in by TEAM_LEAD_FLOOR below; the brands are held in
+     by the database (wurxbase.tl_brands()). */
+  team_lead: 'admin',
+  /* OL: complete admin access, like Ads Manager. */
+  ops_lead: 'superadmin',
 };
 
 /**
@@ -82,7 +89,40 @@ const NEVER_FOR_COLLABS_ONLY: Record<string, boolean> = {
   canPrintReport: false,
 };
 
+/**
+ * What a TL can never hold, whatever anything else says.
+ *
+ * Their `admin` role grants all of these, and none of them is about one brand:
+ * adding, renaming or deleting brands and editing contracts-for-everyone change
+ * the workspace; managing users, granting access, God Mode, the audit logs and
+ * SQL Quest are the owners' keys. The database would refuse the brand writes
+ * anyway (a TL has no policy on them), so this is the screen being honest about
+ * it rather than the boundary.
+ *
+ * Discovery is the outreach pipeline across ALL creators, not a brand's: it
+ * lives in tables a TL cannot read, so the tab and its two actions are off.
+ *
+ * Exporting and printing are NOT withheld: they are built from the rows the TL
+ * can already see, which the database has limited to their brands.
+ */
+const TEAM_LEAD_FLOOR: Record<string, boolean> = {
+  canAddBrand: false,
+  canRenameBrand: false,
+  canDeleteBrand: false,
+  canManageUsers: false,
+  canGrantAccess: false,
+  canSeeLogs: false,
+  canGodMode: false,
+  canSqlQuest: false,
+  canManageTeam: false,
+  canDelete: false,
+  tabDiscovery: false,
+  canMarkDiscovery: false,
+  canEditOutreach: false,
+};
+
 export function forcedPermsFor(role: AppRole | undefined): Record<string, boolean> {
+  if (isTeamLead(role)) return { ...TEAM_LEAD_FLOOR };
   return isCollabsOnlyRole(role) ? { ...NEVER_FOR_COLLABS_ONLY } : {};
 }
 

@@ -46,10 +46,11 @@ export function RequireAuth({ allow }: { allow?: readonly AppRole[] }) {
     return <Navigate to={HOME_FOR_ROLE[claims.role]} replace />;
   }
 
-  /* An APC viewer on a password somebody else chose must pick their own first.
-     Only that role: nobody else is ever given a generated password. */
+  /* Anyone on a password somebody else chose must pick their own first. Only
+     the accounts the owners create from the APC / TL / OL screen are given a
+     generated password: nobody else ever is. */
   if (
-    claims?.role === 'apc_viewer' &&
+    (claims?.role === 'apc_viewer' || claims?.role === 'team_lead' || claims?.role === 'ops_lead') &&
     user?.user_metadata?.must_change_password === true &&
     !changed
   ) {

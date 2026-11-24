@@ -30,6 +30,18 @@ export const ROLES = [
      NOT in `is_collabs_viewer()`: it reads through brand-scoped views that
      leave the contact and payment columns out. See 20261105090100. */
   'apc_viewer',
+  /* TL and OL, added 2026-11-24. Named `team_lead` / `ops_lead`, NOT the two
+     read-only `affiliate_team_lead` / `operations_lead` above: those have real
+     logins on them and keep their read-only meaning.
+
+     team_lead  TL: full Paid Collabs access (read AND write) for the brands
+                assigned in `wurxbase.apc_brand_access`, and no other brand.
+                Brand-scoped by row level security. Not staff, and not in
+                `is_collabs_viewer()`. See `isTeamLead` and 20261124090100.
+     ops_lead   OL: complete admin access to every brand. Staff, like
+                Ads Manager. See STAFF_ROLES. */
+  'team_lead',
+  'ops_lead',
 ] as const;
 export type AppRole = (typeof ROLES)[number];
 
@@ -46,7 +58,7 @@ export type AppRole = (typeof ROLES)[number];
  * what is allowed. If the two ever disagree somebody gets a screen whose every
  * query comes back empty, or a button that answers "Not allowed".
  */
-export const STAFF_ROLES = ['ops', 'admin', 'ads_manager'] as const satisfies readonly AppRole[];
+export const STAFF_ROLES = ['ops', 'admin', 'ads_manager', 'ops_lead'] as const satisfies readonly AppRole[];
 
 export const isStaffRole = (r: AppRole | null | undefined): boolean =>
   Boolean(r) && (STAFF_ROLES as readonly string[]).includes(r as string);
@@ -70,6 +82,19 @@ export const COLLABS_ONLY_ROLES = [
 
 export const isCollabsOnlyRole = (r: AppRole | null | undefined): boolean =>
   Boolean(r) && (COLLABS_ONLY_ROLES as readonly string[]).includes(r as string);
+
+/**
+ * TL. Works in Paid Collabs like an admin, but only on the brands assigned to
+ * them, and writes there. Deliberately NOT in COLLABS_ONLY_ROLES (that list
+ * means "cannot change anything") and NOT in STAFF_ROLES (that means "every
+ * brand"). The database is what limits the brands; this decides what renders.
+ */
+export const isTeamLead = (r: AppRole | null | undefined): boolean => r === 'team_lead';
+
+/** The accounts the owners create and assign brands to (APC and TL). Both sign
+ *  in on a generated password and must change it first. */
+export const isBrandAssignedRole = (r: AppRole | null | undefined): boolean =>
+  r === 'apc_viewer' || r === 'team_lead';
 
 /* What each is CALLED on screen lives in `src/lib/tiers.ts` with every other
    role label, not here. One list. */
@@ -157,6 +182,10 @@ export const HOME_FOR_ROLE: Record<AppRole, string> = {
   affiliate_team_lead: '/admin/collabs/brands',
   operations_lead: '/admin/collabs/brands',
   apc_viewer: '/admin/apc',
+  /* TL lands on the same brand dashboard an APC does. */
+  team_lead: '/admin/apc',
+  /* Staff, like Ads Manager. */
+  ops_lead: '/admin',
 };
 
 const isRole = (v: unknown): v is AppRole =>

@@ -4892,7 +4892,10 @@ export type Database = {
         | 'admin'
         | 'affiliate_team_lead'
         | 'operations_lead'
-        | 'ads_manager';
+        | 'ads_manager'
+        | 'apc_viewer'
+        | 'team_lead'
+        | 'ops_lead';
       application_status: 'pending' | 'approved' | 'rejected';
       content_status: 'submitted' | 'approved' | 'needs_another_take';
       contest_deliverable_type: 'gmv' | 'video_count';
@@ -5046,6 +5049,9 @@ export const Constants = {
         'affiliate_team_lead',
         'operations_lead',
         'ads_manager',
+        'apc_viewer',
+        'team_lead',
+        'ops_lead',
       ],
       application_status: ['pending', 'approved', 'rejected'],
       content_status: ['submitted', 'approved', 'needs_another_take'],

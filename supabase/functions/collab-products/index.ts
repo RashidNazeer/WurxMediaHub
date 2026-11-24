@@ -158,7 +158,7 @@ async function handle(req: Request): Promise<Response> {
   /* The same list the `euka` proxy admits: staff plus the three read-only Paid
      Collabs roles, who use the same screens. A creator must never reach this —
      it describes other brands' catalogues. */
-  const ROLES = ['admin', 'ops', 'affiliate_team_lead', 'operations_lead', 'ads_manager'];
+  const ROLES = ['admin', 'ops', 'affiliate_team_lead', 'operations_lead', 'ads_manager', 'ops_lead'];
   if (!profile?.is_active || !ROLES.includes(profile.role))
     return json({ error: 'Not allowed' }, 403, req);
 

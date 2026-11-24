@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
    * legitimate, and the connection is theirs either way.
    */
   if (!actor.is_active) return reply({ error: 'Not allowed' }, 403);
-  if (!['applicant', 'creator', 'ops', 'admin', 'ads_manager'].includes(actor.role)) {
+  if (!['applicant', 'creator', 'ops', 'admin', 'ads_manager', 'ops_lead'].includes(actor.role)) {
     return reply({ error: 'Not allowed' }, 403);
   }
 

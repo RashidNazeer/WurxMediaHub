@@ -317,7 +317,7 @@ Deno.serve(async (req) => {
   if (actorErr || !actor) return reply({ error: 'Not allowed' }, 403);
 
   // Ads Manager is staff since 2026-09-15, the same as ops. Mirrors is_staff().
-  const isStaff = actor.role === 'admin' || actor.role === 'ops' || actor.role === 'ads_manager';
+  const isStaff = actor.role === 'admin' || actor.role === 'ops' || actor.role === 'ads_manager' || actor.role === 'ops_lead';
   if (!isStaff || !actor.is_active) {
     // A real account reaching for something it is not entitled to. Kept.
     await admin.from('audit_log').insert({
