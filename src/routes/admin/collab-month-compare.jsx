@@ -26,8 +26,9 @@
  * NOTHING IS INVENTED. A month with no creators shows dashes, not zeros, and a
  * change against a month of nothing is "new", not "+∞%".
  */
-import { useEffect, useMemo, useState } from 'react';
-import { eukaJson } from '@/vendor/wurxbase/supabaseClient';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { getSupabase } from '@/lib/supabase';
 
 export const prevMonthKey = (month) => {
   const m = /^(\d{4})-(\d{2})$/.exec(String(month || ''));
@@ -292,14 +293,14 @@ function Column({ title, sub, tone, people, Face, gmvMonth, nowMonth }) {
                 className="wx-cmp-fig"
                 title={`${gmvMonth} contract with this brand: ${p.fig.delivered} of ${p.fig.videos} videos delivered, ${
                   p.fig.gmv > 0 ? `${usd(p.fig.gmv)} GMV` : 'no GMV reported'
-                }. Videos posted so far in ${nowMonth}: ${p.now.gmv > 0 ? `${usd(p.now.gmv)} GMV from ${p.now.videos}` : 'none with GMV'}.`}
+                }. Made for this brand so far in ${nowMonth}: ${p.now.gmv > 0 ? `${usd(p.now.gmv)} GMV` : 'none reported'}.`}
               >
                 <b>{p.fig.videos > 0 ? `${p.fig.delivered}/${p.fig.videos}` : '–'}</b>
                 {/* GMV made so far for this brand in the month they are listed under,
                     so the team can see what a creator earned us before re-onboarding
                     them. No GMV reported is a dash, never $0. */}
                 <em>{p.fig.gmv > 0 ? `${usd(p.fig.gmv)} GMV` : 'no GMV'}</em>
-                {/* What she has made for this brand from videos posted so far THIS
+                {/* What she has made for this brand by sales date so far THIS
                     month, whichever month she was hired in. */}
                 <strong className={p.now.gmv > 0 ? 'wx-cmp-now' : 'wx-cmp-now none'}>
                   {nowMonth} {p.now.gmv > 0 ? usd(p.now.gmv) : '–'}
@@ -338,48 +339,38 @@ const anchorMonth = ({ month, allTime, periodRange }) => {
  * so it falls back to the real current month.
  * Laid out side by side, oldest to newest, so the page reads left to right.
  */
-export function BrandMonthCompare({ brand, month, allTime, periodRange, rows, budgets, helpers, monthLabel, liveSource }) {
+export function BrandMonthCompare({ brand, month, allTime, periodRange, rows, budgets, helpers, monthLabel }) {
   const [open, setOpen] = useState(true);
   const anchor = anchorMonth({ month, allTime, periodRange });
 
-  /* Euka's videos for the whole month, by handle. Only for brands whose videos
-     come from Euka (Reacher brands keep what the sync files). If it cannot be
-     had, the card falls back to what our own rows hold. */
-  const [live, setLive] = useState(null);
-  useEffect(() => {
-    setLive(null);
-    if (liveSource !== 'euka' || !MONTH_KEY.test(anchor)) return undefined;
-    let alive = true;
-    (async () => {
-      try {
-        const meta = await eukaJson();
-        const store = meta && helpers && helpers.eukaStoreForBrand ? helpers.eukaStoreForBrand(meta.stores, brand) : null;
-        if (!store) return;
-        const [y, m] = anchor.split('-').map(Number);
-        const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
-        const today = new Date().toISOString().slice(0, 10);
-        const d = await eukaJson({ store: store.id, type: 'videos', from: `${anchor}-01`, to: last < today ? last : today });
-        if (!alive || !d || !d.videos) return;
-        const byHandle = new Map();
-        Object.entries(d.videos).forEach(([h, vids]) => {
-          let gmv = 0;
-          let n = 0;
-          (vids || []).forEach((v) => {
-            if (String(v.date || '').slice(0, 7) !== anchor) return;
-            gmv += Number(v.revenue) || 0;
-            n += 1;
-          });
-          if (n) byHandle.set(handleKey(h), { gmv, videos: n });
-        });
-        setLive({ byHandle });
-      } catch {
-        /* the card keeps the stored figure */
+  /* WHAT EACH CREATOR MADE FOR THIS BRAND IN THE MONTH, BY SALES DATE, whenever
+     she was hired. `collab-gmv-sync` copies it from Euka or Reacher every six
+     hours into `collab_creator_month_gmv` (the same table the Brand GMV column
+     reads), so it is the figure TikTok Shop shows, not a total of the videos we
+     happen to hold. If it cannot be read, the card keeps the stored figure. */
+  const liveQ = useQuery({
+    queryKey: ['cmp-month-gmv', brand, anchor],
+    enabled: MONTH_KEY.test(anchor) && !!brand,
+    staleTime: 60_000,
+    retry: 1,
+    queryFn: async () => {
+      const byHandle = new Map();
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await getSupabase()
+          .from('collab_creator_month_gmv')
+          .select('handle, gmv')
+          .eq('month', anchor)
+          .eq('brand', String(brand).trim())
+          .order('handle')
+          .range(from, from + 999);
+        if (error) throw new Error(error.message);
+        (data || []).forEach((r) => byHandle.set(handleKey(r.handle), { gmv: Number(r.gmv) || 0, videos: 0 }));
+        if (!data || data.length < 1000) break;
       }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [liveSource, anchor, brand, helpers]);
+      return { byHandle };
+    },
+  });
+  const live = liveQ.data || null;
 
   const cmp = useMemo(
     () => compareMonths(rows || [], anchor, budgets, brand, helpers, live),
@@ -459,7 +450,7 @@ export function BrandMonthCompare({ brand, month, allTime, periodRange, rows, bu
               Each creator is listed once, under the latest month they were hired. On the right:
               videos delivered out of committed, then the GMV they made for this brand so far in
               the month they are listed under. The last line is what they have made for this brand
-              from videos posted so far in {short(c2.month)}, whenever they were hired. "No GMV" means none reported. Same TikTok handle means same creator.
+              so far in {short(c2.month)} by sales date, whenever they were hired. "No GMV" means none reported. Same TikTok handle means same creator.
             </p>
           </>
         ))}
