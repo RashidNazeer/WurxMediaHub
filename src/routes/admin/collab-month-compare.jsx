@@ -201,7 +201,7 @@ const thisMonthKey = () => {
 };
 
 /** One column: a title, a count, and the creators placed under that month. */
-function Column({ title, sub, tone, people, Face }) {
+function Column({ title, sub, tone, people, Face, gmvMonth }) {
   const [all, setAll] = useState(false);
   const shown = all ? people : people.slice(0, FIRST);
   return (
@@ -227,10 +227,17 @@ function Column({ title, sub, tone, people, Face }) {
                 <b>{p.name}</b>
                 {p.handle && <em>@{p.handle}</em>}
               </span>
-              <span className="wx-cmp-fig">
+              <span
+                className="wx-cmp-fig"
+                title={`${gmvMonth} contract with this brand: ${p.fig.delivered} of ${p.fig.videos} videos delivered, ${
+                  p.fig.gmv > 0 ? `${usd(p.fig.gmv)} GMV so far` : 'no GMV reported'
+                }`}
+              >
                 <b>{p.fig.videos > 0 ? `${p.fig.delivered}/${p.fig.videos}` : '–'}</b>
-                {/* No GMV reported is a dash, never $0. */}
-                <em>{p.fig.gmv > 0 ? usd(p.fig.gmv) : '–'}</em>
+                {/* GMV made so far for this brand in the month they are listed under,
+                    so the team can see what a creator earned us before re-onboarding
+                    them. No GMV reported is a dash, never $0. */}
+                <em>{p.fig.gmv > 0 ? `${usd(p.fig.gmv)} GMV` : 'no GMV'}</em>
               </span>
             </li>
           ))}
@@ -311,6 +318,7 @@ export function BrandMonthCompare({ brand, month, allTime, periodRange, rows, bu
                 tone="dropped"
                 people={c0.people}
                 Face={Face}
+                gmvMonth={short(c0.month)}
               />
               <Column
                 title={`Left after ${short(c1.month)}`}
@@ -318,6 +326,7 @@ export function BrandMonthCompare({ brand, month, allTime, periodRange, rows, bu
                 tone="dropped"
                 people={c1.people}
                 Face={Face}
+                gmvMonth={short(c1.month)}
               />
               <Column
                 title={`Back in ${short(c2.month)}`}
@@ -325,6 +334,7 @@ export function BrandMonthCompare({ brand, month, allTime, periodRange, rows, bu
                 tone="stayed"
                 people={c2.people}
                 Face={Face}
+                gmvMonth={short(c2.month)}
               />
               <Column
                 title={`New in ${short(c2.month)}`}
@@ -332,12 +342,13 @@ export function BrandMonthCompare({ brand, month, allTime, periodRange, rows, bu
                 tone="fresh"
                 people={c3.people}
                 Face={Face}
+                gmvMonth={short(c2.month)}
               />
             </div>
             <p className="wx-cmp-foot">
               Each creator is listed once, under the latest month they were hired. On the right:
-              videos delivered out of committed, then GMV, both for the month they are listed
-              under. A dash means none reported. Same TikTok handle means same creator.
+              videos delivered out of committed, then the GMV they made for this brand so far in
+              the month they are listed under. "No GMV" means none reported. Same TikTok handle means same creator.
             </p>
           </>
         ))}
