@@ -3742,8 +3742,8 @@ function BrandDrilldown({ brand, creators, brandCreators, allCreators, budgets, 
           own file; see collab-month-compare.jsx. WURX-END */}
       <BrandMonthCompare
         brand={brand.brand} month={month} allTime={allTime} periodRange={periodRange}
-        rows={brandCreators || creators} budgets={budgets} monthLabel={monthLabel}
-        helpers={{ parseDealAmount, parseDealVideos, deliveredVideoCount, wxVideoTotals, CreatorFace }}
+        rows={brandCreators || creators} budgets={budgets} monthLabel={monthLabel} liveSource={wxSource}
+        helpers={{ parseDealAmount, parseDealVideos, deliveredVideoCount, wxVideoTotals, CreatorFace, eukaStoreForBrand }}
       />
 
       {/* ── EUKA-style top videos strip · this brand's best performers ── */}
