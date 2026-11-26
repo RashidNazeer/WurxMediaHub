@@ -26,7 +26,8 @@
  * NOTHING IS INVENTED. A month with no creators shows dashes, not zeros, and a
  * change against a month of nothing is "new", not "+∞%".
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { eukaJson } from '@/vendor/wurxbase/supabaseClient';
 
 export const prevMonthKey = (month) => {
   const m = /^(\d{4})-(\d{2})$/.exec(String(month || ''));
@@ -104,7 +105,7 @@ export function summarise(rows, helpers) {
  * having left after Sep. Someone hired only in Aug sits under Aug. Reading the
  * columns left to right is reading who stayed and who dropped off, month by month.
  */
-export function compareMonths(rows, month, budgets, brand, helpers) {
+export function compareMonths(rows, month, budgets, brand, helpers, live) {
   const m1 = prevMonthKey(month);
   const m2 = prevMonthKey(m1);
   const months = [m2, m1, month];
@@ -143,6 +144,65 @@ export function compareMonths(rows, month, budgets, brand, helpers) {
     return { videos: s.videos, delivered: s.delivered, gmv: s.gmv };
   };
 
+  /* WHAT EACH PERSON HAS MADE THIS MONTH, WHENEVER THEY WERE HIRED.
+     Rashid, 2026-11-25: a creator hired in October and dropped from the roster
+     can still be one of the brand's top sellers in November, because her
+     October videos keep selling and she posts more. So this reads every row the
+     brand holds for her, not only the rows hired in the column's month, and
+     keeps the videos POSTED in the current month. As everywhere on this page, a
+     video's GMV is its running total to date (see lib/admin/collab-period.ts).
+     A video with no usable date cannot be placed in a month, so it is left out. */
+  const postedMonth = (r) => {
+    const raw = String((r && r.date) || '').trim();
+    if (/^\d{4}-\d{2}/.test(raw)) return raw.slice(0, 7);
+    const d = raw ? new Date(raw) : null;
+    return d && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 7) : '';
+  };
+  const everyone = index(rows);
+  const thisMonthFor = (p) => {
+    const seen = new Set();
+    const mine = [];
+    p.rows.forEach((row) =>
+      identitiesOf(row).forEach((i) => {
+        const hit = everyone.byId.get(i);
+        if (hit && !seen.has(hit)) {
+          seen.add(hit);
+          mine.push(...hit.rows);
+        }
+      })
+    );
+    const clipped = [...new Set(mine)].map((c) => ({
+      ...c,
+      video_codes: (Array.isArray(c.video_codes) ? c.video_codes : []).filter((r) => postedMonth(r) === month),
+    }));
+    const t = helpers.wxVideoTotals(clipped);
+    let gmv = t.gmv;
+    let videos = t.all.length;
+    /* THE LIVE FIGURE, WHEN WE HAVE ONE. Our own rows only keep a video posted
+       inside the month that creator was hired for, so a creator hired in October
+       who keeps posting in November has her November videos in Euka but not
+       here. Euka's month, summed by handle, is the whole of it. The larger of
+       the two is shown, because both only ever grow. */
+    if (live && live.byHandle) {
+      const handles = new Set();
+      mine.forEach((c) => [c.tiktok_account, c.tiktok_account_2].map(handleKey).filter(Boolean).forEach((h) => handles.add(h)));
+      let lg = 0;
+      let lv = 0;
+      handles.forEach((h) => {
+        const e = live.byHandle.get(h);
+        if (e) {
+          lg += e.gmv;
+          lv += e.videos;
+        }
+      });
+      if (lg > gmv) {
+        gmv = lg;
+        videos = Math.max(videos, lv);
+      }
+    }
+    return { gmv, videos };
+  };
+
   /* Totally new: no hire in any earlier month at all (not only the two shown),
      so someone back after a long gap is not "new". */
   const before = index(
@@ -165,6 +225,7 @@ export function compareMonths(rows, month, budgets, brand, helpers) {
         returning: trail.slice(0, i).some(Boolean),
         fresh: i === 2 && !matchIn(before, p),
         fig: figures(p),
+        now: thisMonthFor(p),
         /* What they did in each of the three months, or null where not hired. */
         figs: idx.map((ix, j) => (trail[j] ? figures(j === i ? p : matchIn(ix, p)) : null)),
       });
@@ -201,7 +262,7 @@ const thisMonthKey = () => {
 };
 
 /** One column: a title, a count, and the creators placed under that month. */
-function Column({ title, sub, tone, people, Face, gmvMonth }) {
+function Column({ title, sub, tone, people, Face, gmvMonth, nowMonth }) {
   const [all, setAll] = useState(false);
   const shown = all ? people : people.slice(0, FIRST);
   return (
@@ -230,14 +291,19 @@ function Column({ title, sub, tone, people, Face, gmvMonth }) {
               <span
                 className="wx-cmp-fig"
                 title={`${gmvMonth} contract with this brand: ${p.fig.delivered} of ${p.fig.videos} videos delivered, ${
-                  p.fig.gmv > 0 ? `${usd(p.fig.gmv)} GMV so far` : 'no GMV reported'
-                }`}
+                  p.fig.gmv > 0 ? `${usd(p.fig.gmv)} GMV` : 'no GMV reported'
+                }. Videos posted so far in ${nowMonth}: ${p.now.gmv > 0 ? `${usd(p.now.gmv)} GMV from ${p.now.videos}` : 'none with GMV'}.`}
               >
                 <b>{p.fig.videos > 0 ? `${p.fig.delivered}/${p.fig.videos}` : '–'}</b>
                 {/* GMV made so far for this brand in the month they are listed under,
                     so the team can see what a creator earned us before re-onboarding
                     them. No GMV reported is a dash, never $0. */}
                 <em>{p.fig.gmv > 0 ? `${usd(p.fig.gmv)} GMV` : 'no GMV'}</em>
+                {/* What she has made for this brand from videos posted so far THIS
+                    month, whichever month she was hired in. */}
+                <strong className={p.now.gmv > 0 ? 'wx-cmp-now' : 'wx-cmp-now none'}>
+                  {nowMonth} {p.now.gmv > 0 ? usd(p.now.gmv) : '–'}
+                </strong>
               </span>
             </li>
           ))}
@@ -272,12 +338,52 @@ const anchorMonth = ({ month, allTime, periodRange }) => {
  * so it falls back to the real current month.
  * Laid out side by side, oldest to newest, so the page reads left to right.
  */
-export function BrandMonthCompare({ brand, month, allTime, periodRange, rows, budgets, helpers, monthLabel }) {
+export function BrandMonthCompare({ brand, month, allTime, periodRange, rows, budgets, helpers, monthLabel, liveSource }) {
   const [open, setOpen] = useState(true);
   const anchor = anchorMonth({ month, allTime, periodRange });
+
+  /* Euka's videos for the whole month, by handle. Only for brands whose videos
+     come from Euka (Reacher brands keep what the sync files). If it cannot be
+     had, the card falls back to what our own rows hold. */
+  const [live, setLive] = useState(null);
+  useEffect(() => {
+    setLive(null);
+    if (liveSource !== 'euka' || !MONTH_KEY.test(anchor)) return undefined;
+    let alive = true;
+    (async () => {
+      try {
+        const meta = await eukaJson();
+        const store = meta && helpers && helpers.eukaStoreForBrand ? helpers.eukaStoreForBrand(meta.stores, brand) : null;
+        if (!store) return;
+        const [y, m] = anchor.split('-').map(Number);
+        const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+        const today = new Date().toISOString().slice(0, 10);
+        const d = await eukaJson({ store: store.id, type: 'videos', from: `${anchor}-01`, to: last < today ? last : today });
+        if (!alive || !d || !d.videos) return;
+        const byHandle = new Map();
+        Object.entries(d.videos).forEach(([h, vids]) => {
+          let gmv = 0;
+          let n = 0;
+          (vids || []).forEach((v) => {
+            if (String(v.date || '').slice(0, 7) !== anchor) return;
+            gmv += Number(v.revenue) || 0;
+            n += 1;
+          });
+          if (n) byHandle.set(handleKey(h), { gmv, videos: n });
+        });
+        setLive({ byHandle });
+      } catch {
+        /* the card keeps the stored figure */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [liveSource, anchor, brand, helpers]);
+
   const cmp = useMemo(
-    () => compareMonths(rows || [], anchor, budgets, brand, helpers),
-    [rows, anchor, budgets, brand, helpers]
+    () => compareMonths(rows || [], anchor, budgets, brand, helpers, live),
+    [rows, anchor, budgets, brand, helpers, live]
   );
 
   const lbl = (k) => (monthLabel ? monthLabel(k) : k);
@@ -319,6 +425,7 @@ export function BrandMonthCompare({ brand, month, allTime, periodRange, rows, bu
                 people={c0.people}
                 Face={Face}
                 gmvMonth={short(c0.month)}
+                nowMonth={short(c2.month)}
               />
               <Column
                 title={`Left after ${short(c1.month)}`}
@@ -327,6 +434,7 @@ export function BrandMonthCompare({ brand, month, allTime, periodRange, rows, bu
                 people={c1.people}
                 Face={Face}
                 gmvMonth={short(c1.month)}
+                nowMonth={short(c2.month)}
               />
               <Column
                 title={`Back in ${short(c2.month)}`}
@@ -335,6 +443,7 @@ export function BrandMonthCompare({ brand, month, allTime, periodRange, rows, bu
                 people={c2.people}
                 Face={Face}
                 gmvMonth={short(c2.month)}
+                nowMonth={short(c2.month)}
               />
               <Column
                 title={`New in ${short(c2.month)}`}
@@ -343,12 +452,14 @@ export function BrandMonthCompare({ brand, month, allTime, periodRange, rows, bu
                 people={c3.people}
                 Face={Face}
                 gmvMonth={short(c2.month)}
+                nowMonth={short(c2.month)}
               />
             </div>
             <p className="wx-cmp-foot">
               Each creator is listed once, under the latest month they were hired. On the right:
               videos delivered out of committed, then the GMV they made for this brand so far in
-              the month they are listed under. "No GMV" means none reported. Same TikTok handle means same creator.
+              the month they are listed under. The last line is what they have made for this brand
+              from videos posted so far in {short(c2.month)}, whenever they were hired. "No GMV" means none reported. Same TikTok handle means same creator.
             </p>
           </>
         ))}
