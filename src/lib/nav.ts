@@ -176,7 +176,7 @@ const ADMIN: NavGroup[] = [
     label: 'People',
     items: [
       {
-        label: 'Creators',
+        label: 'Creator Hub',
         icon: Users,
         to: '/admin/creators',
         activePrefixes: ['/admin/creators'],
