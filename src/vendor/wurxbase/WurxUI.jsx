@@ -2222,7 +2222,8 @@ export default function WurxUI({
         {tab === 'history' && (
           <CollabHistory
             creators={creators}
-            helpers={{ deliveredVideoCount, CreatorFace }}
+            eukaL30={eukaL30}
+            helpers={{ deliveredVideoCount, parseDealAmount, parseDealVideos, CreatorFace, creatorL30: (row) => creatorL30(row, eukaL30), creatorTier: (row) => creatorTier(row, eukaL30) }}
           />
         )}
         {tab === 'creators' && (
