@@ -514,12 +514,16 @@ Deno.serve(async (req) => {
       }
 
       const q = new URLSearchParams({ storeId });
+      /* Euka requires brandId on every GMV Max call (400 "brandId: Invalid UUID format" without it,
+         from 2026-10-27). Omitted when no brand matches the store, as the data exports do. */
+      const gmvBrandId = await storeBrandPair(auth, storeId, storeName);
+      if (gmvBrandId) q.set('brandId', gmvBrandId);
       if (body.advertiserId) q.set('advertiserId', body.advertiserId);
       if (body.campaignId) q.set('campaignId', body.campaignId);
       /* The default campaign list may hold only live campaigns, and a paused
          or deleted one can still have spent inside the month being read. */
       if (op === 'campaigns' && body.primaryStatus) q.set('primaryStatus', body.primaryStatus);
-      if (op === 'creatives' || op === 'item') {
+      if (op === 'creatives' || op === 'item' || op === 'campaigns') {
         q.set('startDate', isDay(body.from) ? (body.from as string) : range.start);
         q.set('endDate', isDay(body.to) ? (body.to as string) : range.end);
       }

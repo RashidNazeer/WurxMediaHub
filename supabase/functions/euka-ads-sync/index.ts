@@ -153,8 +153,35 @@ async function getJson(url: string, auth: EukaAuth, ms: number): Promise<{ statu
   }
 }
 
-const errText = (r: { status: number; body: any }) =>
-  `${r.status} ${String(r.body?.error?.message ?? r.body?.error ?? r.body?.message ?? r.body?.raw ?? '').slice(0, 200)}`.trim();
+/* The message alone said "Input validation failed" for a month and nothing about WHICH input. Euka
+   puts the reason in `details` / `errors` / `issues`, so the whole body goes in, trimmed. */
+/*
+ * EUKA NOW REQUIRES `brandId` ON EVERY GMV MAX CALL. From 2026-10-27 each of them answered
+ * 400 "Input validation failed" with `issues: ["brandId: Invalid UUID format"]` for every store,
+ * and this sync stopped writing that day. The brand is found the way the data exports find it
+ * (its name matched to the store's), once per store per run. A store with no matching brand
+ * sends no brandId, as before.
+ */
+const brandIdMemo = new Map<string, Promise<string>>();
+const brandOf = (auth: EukaAuth, storeId: string, name: string): Promise<string> => {
+  let p = brandIdMemo.get(storeId);
+  if (!p) brandIdMemo.set(storeId, (p = storeBrandPair(auth, storeId, name).catch(() => '')));
+  return p;
+};
+const withBrand = (q: URLSearchParams, brandId: string): URLSearchParams => {
+  if (brandId) q.set('brandId', brandId);
+  return q;
+};
+
+const errText = (r: { status: number; body: any }) => {
+  const msg = String(r.body?.error?.message ?? r.body?.error ?? r.body?.message ?? r.body?.raw ?? '').slice(0, 200);
+  let more = '';
+  try {
+    const extra = r.body?.error?.details ?? r.body?.details ?? r.body?.errors ?? r.body?.issues ?? r.body?.error;
+    if (extra && typeof extra === 'object') more = ' ' + JSON.stringify(extra).slice(0, 400);
+  } catch { /* an odd body must never break the sync */ }
+  return `${r.status} ${msg}${more}`.trim();
+};
 
 /* Current month: every day. A month closed less than eight days ago: every day,
    because TikTok restates spend for about a week. Older: done. */
@@ -206,7 +233,8 @@ async function discover(db: Db, index: StoreIndex) {
     const auth = index.ownerOf.get(s.id)!;
     /* 50s: Penetrex's lookup ran past 30s on the first live run, and a timeout here left the
        whole store unqueued. */
-    const adv = await getJson(`${EUKA_V1}/gmv-max/advertisers?storeId=${encodeURIComponent(s.id)}`, auth, 50_000);
+    const brandId = await brandOf(auth, s.id, s.name);
+    const adv = await getJson(`${EUKA_V1}/gmv-max/advertisers?${withBrand(new URLSearchParams({ storeId: s.id }), brandId)}`, auth, 50_000);
 
     /* "TikTok Ads is not connected for this store" is an ANSWER, not an error. */
     if (adv.status === 404) {
@@ -245,7 +273,12 @@ async function discover(db: Db, index: StoreIndex) {
          at up to 50s each, a slow store kept a run past the gateway's 150s
          limit, and the cut-off run left the units it had claimed leased. */
       const lists = await Promise.all([null, 'STATUS_DISABLE', 'STATUS_DELETE'].map(async (status) => {
-        const q = new URLSearchParams({ storeId: s.id, advertiserId });
+        const q = withBrand(new URLSearchParams({ storeId: s.id, advertiserId }), brandId);
+        /* Euka now also REQUIRES a date window on the campaign list (400 "startDate: expected string,
+           received undefined", 2026-11-27). The whole backfill window (under the 365 days Euka allows), so a campaign that spent in any
+           month being read is listed. */
+        q.set('startDate', months[0]!);
+        q.set('endDate', todayUtc());
         if (status) q.set('primaryStatus', status);
         return { status, r: await getJson(`${EUKA_V1}/gmv-max/campaigns?${q}`, auth, 25_000) };
       }));
@@ -369,10 +402,10 @@ async function processDayUnit(db: Db, index: StoreIndex, u: any, deadline: numbe
     return true;
   }
 
-  const q = new URLSearchParams({
+  const q = withBrand(new URLSearchParams({
     storeId: u.store_id, advertiserId: u.advertiser_id, campaignId: u.campaign_id,
     startDate: day, endDate: day,
-  });
+  }), await brandOf(auth, u.store_id, index.stores.find((st) => st.id === u.store_id)?.name ?? ''));
   const url = `${EUKA_V1}/gmv-max/reports/item?${q}`;
   const before = deadline - Date.now();
   if (before < 12_000) return fail('time ran out before the call could be made', true);
@@ -478,10 +511,10 @@ async function processUnit(db: Db, index: StoreIndex, u: any, deadline: number):
   const allRows: any[] = [];
   for (let w = 0; w < windows.length; w++) {
     const [ws, we] = windows[w]!;
-    const q = new URLSearchParams({
+    const q = withBrand(new URLSearchParams({
       storeId: u.store_id, advertiserId: u.advertiser_id, campaignId: u.campaign_id,
       startDate: ws, endDate: we,
-    });
+    }), await brandOf(auth, u.store_id, index.stores.find((st) => st.id === u.store_id)?.name ?? ''));
     const url = `${EUKA_V1}/gmv-max/reports/item?${q}`;
     const before = deadline - Date.now();
     if (w > 0 && before < 15_000) {
