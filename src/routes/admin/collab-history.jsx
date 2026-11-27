@@ -256,7 +256,37 @@ export function CollabHistory({ creators, helpers }) {
   const q = useQuery({ queryKey: ['history-monthly-gmv'], queryFn: readMonthlyGmv, staleTime: 5 * 60_000, retry: 1 });
   const gmvStore = q.data || new Map();
   const Face = helpers && helpers.CreatorFace;
+  /* WHAT EUKA SAYS ABOUT HER ACROSS ALL OF TIKTOK SHOP, not just for this brand: her last-30-day
+     GMV and her level (L2, L3 and so on). The same figures the Creators tab shows, read through its
+     own helpers so the two screens cannot disagree. A dash is "Euka has no record", not $0. */
+  /* HER LAST DEAL WITH THIS BRAND: the price and the number of videos, read off her latest hire row
+     the way the rest of Paid Collabs reads a deal ("$1020 for 5"). A deal that cannot be read shows
+     as typed; no deal at all is a dash. */
+  const lastDealOf = (p) => {
+    const row = [...p.rows].reverse().find((r) => String(r.deal || '').trim()) || null;
+    if (!row) return null;
+    const price = helpers && helpers.parseDealAmount ? helpers.parseDealAmount(row.deal) : 0;
+    const vids = helpers && helpers.parseDealVideos ? helpers.parseDealVideos(row.deal) : 0;
+    return {
+      price,
+      vids,
+      raw: String(row.deal).trim(),
+      hired: String(row.hiring_date || '').slice(0, 10),
+    };
+  };
+  const eukaOf = (p) => {
+    if (!helpers || !helpers.creatorL30 || !helpers.creatorTier) return { l30: null, tier: '' };
+    let l30 = null;
+    let tier = '';
+    for (const row of [...p.rows].reverse()) {
+      if (l30 === null) l30 = helpers.creatorL30(row);
+      if (!tier) tier = helpers.creatorTier(row) || '';
+      if (l30 !== null && tier) break;
+    }
+    return { l30, tier };
+  };
 
+  const deliveredFn = helpers && helpers.deliveredVideoCount;
   const brands = useMemo(() => {
     const by = new Map();
     (creators || []).forEach((c) => {
@@ -264,7 +294,7 @@ export function CollabHistory({ creators, helpers }) {
       if (b) (by.get(b) || by.set(b, []).get(b)).push(c);
     });
     return [...by.entries()].map(([name, rows]) => {
-      const people = groupPeople(rows, helpers && helpers.deliveredVideoCount);
+      const people = groupPeople(rows, deliveredFn);
       const months = gmvStore.get(name) || new Map();
       const monthKeys = [...months.keys()].sort();
       const series = monthKeys.map((m) => ({
@@ -285,7 +315,7 @@ export function CollabHistory({ creators, helpers }) {
         last: rows.reduce((m, c) => (String(c.hiring_date || '') > m ? String(c.hiring_date) : m), ''),
       };
     });
-  }, [creators, gmvStore, helpers]);
+  }, [creators, gmvStore, deliveredFn]);
 
   const cur = brand ? brands.find((b) => b.name === brand) : null;
   const person = cur && personKey ? cur.people.find((p) => p.key === personKey) : null;
@@ -298,10 +328,6 @@ export function CollabHistory({ creators, helpers }) {
     const monthKeys = [...new Set([...months.keys(), nowKey()])].sort();
     const cells = monthKeys.map((m) => gmvIn(months, m, person.handles));
     const lifetime = cells.reduce((t, c) => t + (c.state === 'value' ? c.v : 0), 0);
-    const latest = [...monthKeys].reverse().find((m) => {
-      const c = gmvIn(months, m, person.handles);
-      return c.state === 'value' && c.v > 0;
-    });
     return (
       <div className="wx-hist">
         <button type="button" className="wx-hist-back" onClick={() => setPersonKey('')}>
@@ -323,7 +349,14 @@ export function CollabHistory({ creators, helpers }) {
           <div className="wx-hist-stats">
             <Stat label="GMV for this brand" value={usd(lifetime)} sub={cur.firstMonth ? `since ${monthLabel(cur.firstMonth)}` : 'no months read'} />
             <Stat label="Videos" value={person.videos.length} sub={`${person.delivered} delivered`} />
-            <Stat label="Latest GMV" value={latest ? monthLabel(latest) : '–'} />
+            <Stat
+              label="Last 30 days, any brand"
+              value={(() => {
+                const e = eukaOf(person);
+                return e.l30 === null ? '–' : usd(e.l30);
+              })()}
+              sub={eukaOf(person).tier ? `Euka level ${eukaOf(person).tier}` : 'level not known'}
+            />
           </div>
         </section>
 
@@ -436,11 +469,7 @@ export function CollabHistory({ creators, helpers }) {
           const c = gmvIn(months, m, p.handles);
           return t + (c.state === 'value' ? c.v : 0);
         }, 0);
-        const latest = [...months.keys()].sort().reverse().find((m) => {
-          const c = gmvIn(months, m, p.handles);
-          return c.state === 'value' && c.v > 0;
-        });
-        return { p, cell, life, latest };
+        return { p, cell, life, euka: eukaOf(p) };
       });
     rows.sort((a, b) =>
       sort === 'name'
@@ -530,7 +559,7 @@ export function CollabHistory({ creators, helpers }) {
             <input type="search" placeholder="Search creator or @handle" value={search} onChange={(e) => setSearch(e.target.value)} />
             <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
               <option value="gmv">Sort: {monthLabel(gmvMonth)} GMV</option>
-              <option value="life">Sort: lifetime GMV</option>
+              <option value="life">Sort: Brand GMV</option>
               <option value="recent">Sort: latest hire</option>
               <option value="name">Sort: name</option>
             </select>
@@ -542,15 +571,15 @@ export function CollabHistory({ creators, helpers }) {
                   <th>Creator</th>
                   <th>Collaborated</th>
                   <th>Status</th>
-                  <th>Products</th>
+                  <th>Last deal</th>
                   <th className="r">Videos</th>
                   <th className="r">{monthLabel(gmvMonth)} GMV</th>
-                  <th className="r">Lifetime GMV</th>
-                  <th>Latest GMV</th>
+                  <th className="r">Brand GMV</th>
+                  <th className="r">Last 30 days, any brand</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ p, cell, life, latest }) => (
+                {rows.map(({ p, cell, life, euka }) => (
                   <tr key={p.key} className="click" onClick={() => setPersonKey(p.key)}>
                     <td>
                       <span className="wx-hist-who-cell">
@@ -566,15 +595,25 @@ export function CollabHistory({ creators, helpers }) {
                       {(p.last && p.last.payment_status) || '–'}
                       {p.last && p.last.videos ? ` · ${p.last.videos}` : ''}
                     </td>
-                    <td className="clip" title={p.products.join(', ')}>
-                      {p.products[0] ? p.products[0] + (p.products.length > 1 ? ` +${p.products.length - 1}` : '') : '–'}
+                    <td title={(() => { const d = lastDealOf(p); return d ? `${d.raw}${d.hired ? ` · hired ${d.hired}` : ''}` : 'No deal on record'; })()}>
+                      {(() => {
+                        const d = lastDealOf(p);
+                        if (!d) return <span className="wx-hist-nodata">–</span>;
+                        if (!(d.price > 0) && !(d.vids > 0)) return d.raw;
+                        return [d.price > 0 ? usd(d.price) : null, d.vids > 0 ? `${d.vids} video${d.vids === 1 ? '' : 's'}` : null]
+                          .filter(Boolean)
+                          .join(' · ');
+                      })()}
                     </td>
                     <td className="r">{p.videos.length || '–'}</td>
                     <td className="r">
                       <Cell cell={cell} />
                     </td>
                     <td className="r">{months.size ? usd(life) : '–'}</td>
-                    <td>{latest ? monthLabel(latest) : '–'}</td>
+                    <td className="r" title="Her GMV in the last 30 days across all of TikTok Shop, any brand, and her Euka level">
+                      {euka.tier && <em className="wx-hist-tier">{euka.tier}</em>}
+                      {euka.l30 === null ? <span className="wx-hist-nodata">–</span> : usd(euka.l30)}
+                    </td>
                   </tr>
                 ))}
                 {rows.length === 0 && (

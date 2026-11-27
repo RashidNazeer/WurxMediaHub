@@ -4441,3 +4441,4 @@
 .wurxbase-root .wx-hist .wx-hist-table td b { font-weight: 700; }
 .wurxbase-root .wx-hist .wx-hist-who-cell b { font-size: 13px; }
 .wurxbase-root .wx-hist .wx-hist-who a { color: var(--wx-text-muted); }
+.wurxbase-root .wx-hist .wx-hist-table td em.wx-hist-tier { font-style: normal; font-size: 11px; font-weight: 800; padding: 1px 7px; margin-right: 8px; border-radius: 999px; color: var(--wx-text) !important; background: color-mix(in srgb, var(--wx-text) 9%, transparent); }
