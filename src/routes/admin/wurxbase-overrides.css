@@ -4372,3 +4372,72 @@
 .wurxbase-root.wurxbase-root .pc-mx-input.mx-auto {
   box-shadow: inset 0 -1px 0 0 color-mix(in srgb, currentColor 35%, transparent);
 }
+
+/* ─── History tab: every brand, every creator ever paid, GMV by sales month ─── */
+.wurxbase-root .wx-hist { margin-top: 14px; display: flex; flex-direction: column; gap: 14px; }
+.wurxbase-root .wx-hist h2 { margin: 0; font-size: 20px; font-weight: 800; color: var(--wx-text); }
+.wurxbase-root .wx-hist h3 { margin: 0; flex: 1; font-size: 15px; font-weight: 800; color: var(--wx-text); }
+.wurxbase-root .wx-hist-card {
+  border-radius: var(--radius-xl, 16px); background: var(--wx-surface-1); border: 1px solid var(--wx-glass-line);
+  padding: 16px 18px; color: var(--wx-text); text-align: left;
+}
+.wurxbase-root .wx-hist-note { margin: 6px 0; font-size: 12.5px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-hist-back { all: unset; cursor: pointer; align-self: flex-start; font-size: 13px; font-weight: 700; color: var(--wx-text); padding: 4px 2px; }
+.wurxbase-root .wx-hist-back:hover { text-decoration: underline; }
+.wurxbase-root .wx-hist-back:focus-visible { outline: 2px solid var(--wx-text); outline-offset: 2px; }
+.wurxbase-root .wx-hist-bar-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.wurxbase-root .wx-hist-bar-head input, .wurxbase-root .wx-hist-bar-head select, .wurxbase-root .wx-hist-filters select {
+  height: 34px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--wx-glass-line);
+  background: var(--wx-surface-1); color: var(--wx-text); font-size: 13px;
+}
+.wurxbase-root .wx-hist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.wurxbase-root .wx-hist-brand { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 12px;
+  border-radius: var(--radius-xl, 16px); background: var(--wx-surface-1); border: 1px solid var(--wx-glass-line); padding: 16px 18px; color: var(--wx-text); }
+.wurxbase-root .wx-hist-brand:hover { border-color: color-mix(in srgb, var(--wx-text) 35%, var(--wx-glass-line)); }
+.wurxbase-root .wx-hist-brand:focus-visible { outline: 2px solid var(--wx-text); outline-offset: 2px; }
+.wurxbase-root .wx-hist-brand header { display: flex; align-items: center; gap: 12px; }
+.wurxbase-root .wx-hist-brand header span { display: flex; flex-direction: column; min-width: 0; }
+.wurxbase-root .wx-hist-brand header b { font-size: 15px; font-weight: 800; }
+.wurxbase-root .wx-hist-brand header em, .wurxbase-root .wx-hist-who p, .wurxbase-root .wx-hist-who-cell em { font-style: normal; font-size: 12px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-hist-brand dl { margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.wurxbase-root .wx-hist-brand dt { font-size: 11px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-hist-brand dd { margin: 0; font-size: 15px; font-weight: 800; }
+.wurxbase-root .wx-hist-logo { border-radius: 12px; object-fit: contain; background: var(--wx-glass-well, transparent); flex-shrink: 0; }
+.wurxbase-root .wx-hist-logo.init { display: inline-flex; align-items: center; justify-content: center; font-weight: 800; color: var(--wx-text); }
+.wurxbase-root .wx-hist-who { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.wurxbase-root .wx-hist-who > div:not(.wx-hist-stats):not(.wx-hist-filters) { flex: 1; min-width: 180px; }
+.wurxbase-root .wx-hist-who p { margin: 2px 0 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.wurxbase-root .wx-hist a { color: var(--wx-text); text-decoration: underline; text-underline-offset: 2px; }
+.wurxbase-root .wx-hist-filters { display: flex; gap: 10px; flex-wrap: wrap; }
+.wurxbase-root .wx-hist-filters label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-hist-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.wurxbase-root .wx-hist-stats.wide { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 10px 0; }
+.wurxbase-root .wx-hist-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wurxbase-root .wx-hist-stat span { font-size: 12px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-hist-stat b { font-size: 22px; font-weight: 800; }
+.wurxbase-root .wx-hist-stat em { font-style: normal; font-size: 12px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-hist-bars { display: flex; align-items: flex-end; gap: 6px; height: 84px; margin: 8px 0 4px; }
+.wurxbase-root .wx-hist-bar { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
+.wurxbase-root .wx-hist-bar i { display: block; width: 100%; max-width: 28px; border-radius: 4px 4px 0 0; background: var(--wx-accent, #4f7cff); min-height: 0; }
+.wurxbase-root .wx-hist-bar i.none, .wurxbase-root .wx-hist-bar i.under, .wurxbase-root .wx-hist-bar i.zero { height: 0 !important; }
+.wurxbase-root .wx-hist-bar span { font-size: 10px; color: var(--wx-text-muted); }
+.wurxbase-root .wx-hist-scroll { overflow-x: auto; }
+.wurxbase-root .wx-hist-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.wurxbase-root .wx-hist-table.compact { max-width: 340px; margin-top: 8px; }
+.wurxbase-root .wx-hist-table th { text-align: left; font-size: 11.5px; font-weight: 700; color: var(--wx-text-muted); padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid var(--wx-glass-line); }
+.wurxbase-root .wx-hist-table td { padding: 9px 10px; border-bottom: 1px solid color-mix(in srgb, var(--wx-glass-line) 60%, transparent); vertical-align: middle; }
+.wurxbase-root .wx-hist-table .r { text-align: right; font-variant-numeric: tabular-nums; }
+.wurxbase-root .wx-hist-table td.clip { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wurxbase-root .wx-hist-table tr.click { cursor: pointer; }
+.wurxbase-root .wx-hist-table tr.click:hover td { background: color-mix(in srgb, var(--wx-text) 4%, transparent); }
+.wurxbase-root .wx-hist-who-cell { display: flex; align-items: center; gap: 10px; }
+.wurxbase-root .wx-hist-who-cell > span { display: flex; flex-direction: column; min-width: 0; }
+.wurxbase-root .wx-hist-nodata { color: var(--wx-text-muted); }
+@media (max-width: 720px) { .wurxbase-root .wx-hist-stats.wide { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.wurxbase-root .wx-hist .wx-hist-table th, .wurxbase-root .wx-hist .wx-hist-table td { border-left: 0 !important; border-right: 0 !important; background: transparent !important; box-shadow: none !important; }
+.wurxbase-root .wx-hist .wx-hist-table td, .wurxbase-root .wx-hist .wx-hist-table td b, .wurxbase-root .wx-hist .wx-hist-table td span, .wurxbase-root .wx-hist .wx-hist-table td a { color: var(--wx-text) !important; }
+.wurxbase-root .wx-hist .wx-hist-table th { color: var(--wx-text-muted) !important; }
+.wurxbase-root .wx-hist .wx-hist-table td em, .wurxbase-root .wx-hist .wx-hist-table td .wx-hist-nodata { color: var(--wx-text-muted) !important; }
+.wurxbase-root .wx-hist .wx-hist-table td b { font-weight: 700; }
+.wurxbase-root .wx-hist .wx-hist-who-cell b { font-size: 13px; }
+.wurxbase-root .wx-hist .wx-hist-who a { color: var(--wx-text-muted); }

@@ -41,6 +41,7 @@ import { godGet, godMoney, godDateParts, colTemplate, colStyle,
   visibleCols } from './godSettings';
 import { generateContractPdf, defaultContractFields, CONTRACT_SECTIONS, renderContractPdf } from './contractPdf';
 import { BrandMonthCompare } from '@/routes/admin/collab-month-compare'; /* WURX-ADDED */
+import { CollabHistory } from '@/routes/admin/collab-history'; /* WURX-ADDED */
 import { CreatorHitRate, HitCriteriaPanel, HitRateCell, useAppliedBrand, useAppliedCriteria, useHitDefaults, useHitRateByCreator } from '@/routes/admin/collab-hit-rate'; /* WURX-ADDED */
 import { describe as describeHitCriteria } from '@/lib/admin/hit-criteria'; /* WURX-ADDED */
 import { mergeContract, getBrandContract, saveBrandContract,
@@ -1902,6 +1903,7 @@ export default function WurxUI({
       { id: 'reporting',   label: 'Reporting',   cap: 'tabReporting' },
       { id: 'leaderboard', label: 'Leaderboard', cap: 'tabLeaderboard' },
       { id: 'discovery',   label: 'Discovery',   cap: 'tabDiscovery' },
+      { id: 'history',     label: 'History',     cap: 'tabBrands' }, /* WURX-ADDED · same people as Brands */
     ].filter(t => can(currentUser, t.cap));
     let g = {};
     try { g = JSON.parse(localStorage.getItem('wurx_godmode_v1')) || {}; } catch (e) {}
@@ -2099,8 +2101,8 @@ export default function WurxUI({
           </div>
           )}
 
-          {/* Right-side filter cluster: month nav + All Time */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {/* Right-side filter cluster: month nav + All Time. WURX-ADJUSTED · hidden on History, which has its own month filters. WURX-END */}
+          <div style={{ display: tab === 'history' ? 'none' : 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, opacity: allTime ? 0.6 : 1, pointerEvents: allTime ? 'none' : 'auto', transition: 'opacity 0.2s ease' }}>
                 {/* WURX-ADDED · step a month without opening the calendar.
                     Styled inline, like the All Time button beside it, and NOT
@@ -2215,6 +2217,13 @@ export default function WurxUI({
                clickable, and threw a ReferenceError into the console that
                nobody would ever read. WURX-END */
             onPickMonth={(m) => { setAllTime(false); setMonth(m); }} />
+        )}
+        {/* WURX-ADDED · every brand and creator ever paid, with GMV by sales month. WURX-END */}
+        {tab === 'history' && (
+          <CollabHistory
+            creators={creators}
+            helpers={{ deliveredVideoCount, CreatorFace }}
+          />
         )}
         {tab === 'creators' && (
           <CreatorsTab
