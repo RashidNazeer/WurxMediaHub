@@ -4447,3 +4447,5 @@
 .wurxbase-root .wx-hist .wx-hist-who-cell { justify-content: center; }
 .wurxbase-root .wx-hist .wx-hist-who-cell > span { align-items: flex-start; text-align: left; }
 .wurxbase-root .wx-hist .wx-hist-table th { text-align: center !important; }
+.wurxbase-root .wx-hist .wx-hist-table th:first-child, .wurxbase-root .wx-hist .wx-hist-table td:first-child { text-align: left !important; }
+.wurxbase-root .wx-hist .wx-hist-who-cell { justify-content: flex-start; }
