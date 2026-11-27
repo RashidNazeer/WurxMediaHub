@@ -173,12 +173,62 @@ const withBrand = (q: URLSearchParams, brandId: string): URLSearchParams => {
   return q;
 };
 
+/*
+ * THE ITEM REPORT IS GONE. Euka's customer API (spec at https://api.euka.ai/openapi.json) no longer has
+ * /gmv-max/reports/item: it answers 404 "Route not found". Its replacement for "every video in one
+ * campaign for a window" is GET /gmv-max/creatives, keyed by brandId, paged at 100 and carrying the same
+ * figures inside `metrics` (cost, grossRevenue, orders). This reads every page and hands back the shape
+ * the item report had ({ rows: [{ itemId, cost, orders, grossRevenue, currency }], truncated }), so the
+ * code that stores the figures does not change.
+ *
+ * `compare=none` leaves the previous-period figures out; `sortBy` is left at its default (cost).
+ */
+const CREATIVE_PAGES = 30; // 3,000 creatives in one campaign and window is past anything real; beyond it, say so
+async function getCreativeReport(
+  auth: EukaAuth, brandId: string, advertiserId: string, campaignId: string, start: string, end: string, ms: number,
+): Promise<{ status: number; body: any }> {
+  const endAt = Date.now() + ms;
+  const rows: any[] = [];
+  let currency: string | null = null;
+  for (let page = 1; page <= CREATIVE_PAGES; page++) {
+    const left = endAt - Date.now();
+    if (left < 3_000) return { status: 599, body: { error: `no answer within ${ms / 1000}s` } };
+    const q = new URLSearchParams({
+      brandId, advertiserId, campaignId, startDate: start, endDate: end,
+      compare: 'none', page: String(page), pageSize: '100',
+    });
+    let r = await getJson(`${EUKA_V1}/gmv-max/creatives?${q}`, auth, left);
+    /* Euka's per-minute limit answers 429 "Wait N seconds before the next call". Waiting that long and asking
+       again, when the run has the time, finishes the unit now instead of leaving it for a later run. */
+    for (let tries = 0; r.status === 429 && tries < 3; tries++) {
+      const wait = Number(/Wait (\d+) seconds/i.exec(String(r.body?.message ?? r.body?.error ?? ''))?.[1] ?? 0);
+      if (!(wait > 0 && wait <= 45) || endAt - Date.now() < (wait + 6) * 1000) break;
+      await new Promise((res) => setTimeout(res, (wait + 1) * 1000));
+      r = await getJson(`${EUKA_V1}/gmv-max/creatives?${q}`, auth, Math.max(3_000, endAt - Date.now()));
+    }
+    if (r.status !== 200) return r;
+    currency = r.body?.currency ?? currency;
+    for (const row of Array.isArray(r.body?.rows) ? r.body.rows : []) {
+      rows.push({
+        itemId: row?.itemId,
+        cost: row?.metrics?.cost,
+        orders: row?.metrics?.orders,
+        grossRevenue: row?.metrics?.grossRevenue,
+        currency,
+      });
+    }
+    if (!r.body?.hasMore) return { status: 200, body: { rows, truncated: false } };
+  }
+  return { status: 200, body: { rows, truncated: true } };
+}
+
 const errText = (r: { status: number; body: any }) => {
   const msg = String(r.body?.error?.message ?? r.body?.error ?? r.body?.message ?? r.body?.raw ?? '').slice(0, 200);
   let more = '';
   try {
     const extra = r.body?.error?.details ?? r.body?.details ?? r.body?.errors ?? r.body?.issues ?? r.body?.error;
     if (extra && typeof extra === 'object') more = ' ' + JSON.stringify(extra).slice(0, 400);
+    else if (r.status >= 400 && r.status < 500 && r.body && typeof r.body === 'object') more = ' ' + JSON.stringify(r.body).slice(0, 300);
   } catch { /* an odd body must never break the sync */ }
   return `${r.status} ${msg}${more}`.trim();
 };
@@ -402,20 +452,17 @@ async function processDayUnit(db: Db, index: StoreIndex, u: any, deadline: numbe
     return true;
   }
 
-  const q = withBrand(new URLSearchParams({
-    storeId: u.store_id, advertiserId: u.advertiser_id, campaignId: u.campaign_id,
-    startDate: day, endDate: day,
-  }), await brandOf(auth, u.store_id, index.stores.find((st) => st.id === u.store_id)?.name ?? ''));
-  const url = `${EUKA_V1}/gmv-max/reports/item?${q}`;
+  const brandId = await brandOf(auth, u.store_id, index.stores.find((st) => st.id === u.store_id)?.name ?? '');
+  if (!brandId) return fail('no Euka brand matches this store, and Euka now needs one for every ad report');
   const before = deadline - Date.now();
   if (before < 12_000) return fail('time ran out before the call could be made', true);
 
-  let r = await getJson(url, auth, Math.min(CALL_MS, Math.max(10_000, before - 2_000)));
+  let r = await getCreativeReport(auth, brandId, u.advertiser_id, u.campaign_id, day, day, Math.min(CALL_MS, Math.max(10_000, before - 2_000)));
   /* Same warm-retry rule as the month path: Euka keeps working after it gives
      up on us and keeps the answer, so one immediate retry is worth it when a
      slow second answer still fits inside this run. */
   const left = deadline - Date.now();
-  if (r.status >= 500 && left > 50_000) r = await getJson(url, auth, Math.min(CALL_MS, left - 2_000));
+  if (r.status >= 500 && left > 50_000) r = await getCreativeReport(auth, brandId, u.advertiser_id, u.campaign_id, day, day, Math.min(CALL_MS, left - 2_000));
   if (r.status !== 200) return fail(`item report (${day}): ${errText(r)}`, r.status >= 500);
   if (r.body?.truncated) {
     return fail(`item report (${day}): Euka marked the rows truncated, so they are not the whole day; nothing was stored`);
@@ -511,16 +558,13 @@ async function processUnit(db: Db, index: StoreIndex, u: any, deadline: number):
   const allRows: any[] = [];
   for (let w = 0; w < windows.length; w++) {
     const [ws, we] = windows[w]!;
-    const q = withBrand(new URLSearchParams({
-      storeId: u.store_id, advertiserId: u.advertiser_id, campaignId: u.campaign_id,
-      startDate: ws, endDate: we,
-    }), await brandOf(auth, u.store_id, index.stores.find((st) => st.id === u.store_id)?.name ?? ''));
-    const url = `${EUKA_V1}/gmv-max/reports/item?${q}`;
+    const brandId = await brandOf(auth, u.store_id, index.stores.find((st) => st.id === u.store_id)?.name ?? '');
+    if (!brandId) return fail('no Euka brand matches this store, and Euka now needs one for every ad report');
     const before = deadline - Date.now();
     if (w > 0 && before < 15_000) {
       return fail(`item report: time ran out after ${w} of ${windows.length} weeks; nothing stored, due again shortly`, true);
     }
-    let r = await getJson(url, auth, Math.min(CALL_MS, Math.max(10_000, before - 2_000)));
+    let r = await getCreativeReport(auth, brandId, u.advertiser_id, u.campaign_id, ws, we, Math.min(CALL_MS, Math.max(10_000, before - 2_000)));
     /*
      * WHEN AN IMMEDIATE RETRY IS WORTH MAKING. Measured on dev: a 504 at ~49s,
      * the identical request straight after answered 200 in 45.7s, and requests
@@ -530,7 +574,7 @@ async function processUnit(db: Db, index: StoreIndex, u: any, deadline: number):
      * minutes on, when it will be warm.
      */
     const left = deadline - Date.now();
-    if (r.status >= 500 && left > 50_000) r = await getJson(url, auth, Math.min(CALL_MS, left - 2_000));
+    if (r.status >= 500 && left > 50_000) r = await getCreativeReport(auth, brandId, u.advertiser_id, u.campaign_id, ws, we, Math.min(CALL_MS, left - 2_000));
     if (r.status !== 200) {
       const which = windows.length > 1 ? ` (week ${w + 1} of ${windows.length}, ${ws} to ${we})` : '';
       return fail(`item report${which}: ${errText(r)}`, r.status >= 500);
@@ -736,12 +780,16 @@ Deno.serve(async (req) => {
       throw new Error(`no Euka account answered (${index.unavailable} of ${index.total} unavailable)`);
     }
 
+    /* ONLY STORES EUKA STILL LISTS. A row for a store that has left the list (Biostime, which failed once on
+       2026-10-29 and was never looked at again) stayed "unresolved" for ever, so every run re-ran discovery
+       and stopped before doing any work, and nothing synced for a month. */
+    const liveIds = index.stores.map((st) => st.id);
     const { data: oldest } = await db.from('euka_ad_sync_stores')
-      .select('checked_at').order('checked_at', { ascending: true }).limit(1);
+      .select('checked_at').in('store_id', liveIds).order('checked_at', { ascending: true }).limit(1);
     /* A store whose lookup FAILED (connected unknown) is looked at again on the next run, not in six
        hours: otherwise one slow answer leaves a connected brand with nothing queued all afternoon. */
     const { count: unresolved } = await db.from('euka_ad_sync_stores')
-      .select('*', { count: 'exact', head: true }).is('connected', null);
+      .select('*', { count: 'exact', head: true }).is('connected', null).in('store_id', liveIds);
     const stale = !oldest?.length || (unresolved ?? 0) > 0 ||
       Date.now() - Date.parse(oldest[0].checked_at) > DISCOVER_EVERY_MS;
     const discovered = parsed.data.discover || stale ? await discover(db, index) : null;
