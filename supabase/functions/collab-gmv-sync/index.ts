@@ -68,7 +68,7 @@ const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 const Body = z.object({
   /** Months to read, `YYYY-MM`. Default: the last six, including this one. */
-  months: z.array(z.string().regex(MONTH)).max(36).optional(),
+  months: z.array(z.string().regex(MONTH)).max(60).optional(),
   /** Only these brands (as named in Paid Collabs). Default: every brand there. */
   brands: z.array(z.string().min(1).max(120)).max(100).optional(),
   /** Read even what is fresh. */
@@ -90,7 +90,15 @@ const Body = z.object({
 
 type Db = SupabaseClient;
 
-const MONTHS_BACK = 14; // the Performance sheet reaches back about a year
+/*
+ * LIFETIME, NOT A WINDOW. Rashid, 2026-11-27: the History tab needs what a creator has made
+ * for a brand over her whole time with us, not the last year. A brand-month is read from the
+ * month of the brand's FIRST HIRE on the roster, so nothing before a brand existed is asked
+ * for and nothing after is missed. MONTHS_BACK is only the ceiling: four years, which is
+ * longer than any brand here has been running. A month already read and settled is never
+ * read again, so widening this costs one pass per brand-month, newest first, a few per run.
+ */
+const MONTHS_BACK = 48;
 const REACHER_MAX_PAGES = 60;
 const AD_PAGES = 60; // 6,000 creatives that spent in one brand-month
 const ORDER_PAGES_MONTH = 80; // 8,000 orders for one brand-month is more than any brand here sells
@@ -512,12 +520,17 @@ Deno.serve(async (req: Request) => {
 
     /* our brands, as Paid Collabs names them */
     const names = new Set<string>();
+    /* the month of each brand's first hire: where its history starts */
+    const firstHire = new Map<string, string>();
     for (let from = 0; ; from += 1000) {
-      const { data, error } = await db.schema('wurxbase').from('creators').select('brand').range(from, from + 999);
+      const { data, error } = await db.schema('wurxbase').from('creators').select('brand, hiring_date').range(from, from + 999);
       if (error) throw new Error(error.message);
       for (const r of data ?? []) {
         const b = String((r as { brand?: unknown }).brand ?? '').trim();
-        if (b) names.add(b);
+        if (!b) continue;
+        names.add(b);
+        const hm = String((r as { hiring_date?: unknown }).hiring_date ?? '').slice(0, 7);
+        if (/^\d{4}-\d{2}$/.test(hm) && (!firstHire.has(b) || hm < firstHire.get(b)!)) firstHire.set(b, hm);
       }
       if (!data || data.length < 1000) break;
     }
@@ -573,6 +586,9 @@ Deno.serve(async (req: Request) => {
     const units: { month: string; brand: string }[] = [];
     for (const m of [...months].sort().reverse()) {
       for (const b of owner.keys()) {
+        /* no months before the brand's first hire, unless someone asked for these months by name */
+        const fh = firstHire.get(b);
+        if (!parsed.data.months && fh && m < fh) continue;
         if (force || unchecked.has(`${m}\u0000${b}`) || needsRead(m, fetched.get(`${m}\u0000${b}`) ?? null, now)) units.push({ month: m, brand: b });
       }
     }
