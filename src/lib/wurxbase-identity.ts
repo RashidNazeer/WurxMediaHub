@@ -139,6 +139,8 @@ export const WURXBASE_TABS = [
   { slug: 'reporting', cap: 'tabReporting' },
   { slug: 'leaderboard', cap: 'tabLeaderboard' },
   { slug: 'discovery', cap: 'tabDiscovery' },
+  /* History is gated by the Brands capability: the same people see both. */
+  { slug: 'history', cap: 'tabBrands' },
 ] as const;
 
 /**

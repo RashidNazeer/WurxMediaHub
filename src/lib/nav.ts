@@ -3,6 +3,7 @@ import {
   BarChart3,
   Building2,
   Compass,
+  History as HistoryIcon,
   DatabaseBackup,
   FileBarChart,
   Gift,
@@ -249,6 +250,7 @@ const ADMIN: NavGroup[] = [
       },
       { label: 'Leaderboard', icon: Award, to: '/admin/collabs/leaderboard' },
       { label: 'Discovery', icon: Compass, to: '/admin/collabs/discovery' },
+      { label: 'History', icon: HistoryIcon, to: '/admin/collabs/history' },
       {
         label: 'Client links',
         icon: Link2,
