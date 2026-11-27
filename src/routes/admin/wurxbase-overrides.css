@@ -4424,9 +4424,9 @@
 .wurxbase-root .wx-hist-scroll { overflow-x: auto; }
 .wurxbase-root .wx-hist-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .wurxbase-root .wx-hist-table.compact { max-width: 340px; margin-top: 8px; }
-.wurxbase-root .wx-hist-table th { text-align: left; font-size: 11.5px; font-weight: 700; color: var(--wx-text-muted); padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid var(--wx-glass-line); }
+.wurxbase-root .wx-hist-table th { text-align: center; font-size: 11.5px; font-weight: 700; color: var(--wx-text-muted); padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid var(--wx-glass-line); }
 .wurxbase-root .wx-hist-table td { padding: 9px 10px; border-bottom: 1px solid color-mix(in srgb, var(--wx-glass-line) 60%, transparent); vertical-align: middle; }
-.wurxbase-root .wx-hist-table .r { text-align: right; font-variant-numeric: tabular-nums; }
+.wurxbase-root .wx-hist-table .r { text-align: center; font-variant-numeric: tabular-nums; }
 .wurxbase-root .wx-hist-table td.clip { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wurxbase-root .wx-hist-table tr.click { cursor: pointer; }
 .wurxbase-root .wx-hist-table tr.click:hover td { background: color-mix(in srgb, var(--wx-text) 4%, transparent); }
@@ -4442,3 +4442,8 @@
 .wurxbase-root .wx-hist .wx-hist-who-cell b { font-size: 13px; }
 .wurxbase-root .wx-hist .wx-hist-who a { color: var(--wx-text-muted); }
 .wurxbase-root .wx-hist .wx-hist-table td em.wx-hist-tier { font-style: normal; font-size: 11px; font-weight: 800; padding: 1px 7px; margin-right: 8px; border-radius: 999px; color: var(--wx-text) !important; background: color-mix(in srgb, var(--wx-text) 9%, transparent); }
+.wurxbase-root .wx-hist .wx-hist-table td { text-align: center; }
+.wurxbase-root .wx-hist .wx-hist-table td.clip { margin: 0 auto; }
+.wurxbase-root .wx-hist .wx-hist-who-cell { justify-content: center; }
+.wurxbase-root .wx-hist .wx-hist-who-cell > span { align-items: flex-start; text-align: left; }
+.wurxbase-root .wx-hist .wx-hist-table th { text-align: center !important; }
