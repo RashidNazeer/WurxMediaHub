@@ -259,6 +259,21 @@ export function CollabHistory({ creators, helpers }) {
   /* WHAT EUKA SAYS ABOUT HER ACROSS ALL OF TIKTOK SHOP, not just for this brand: her last-30-day
      GMV and her level (L2, L3 and so on). The same figures the Creators tab shows, read through its
      own helpers so the two screens cannot disagree. A dash is "Euka has no record", not $0. */
+  /* HER LAST DEAL WITH THIS BRAND: the price and the number of videos, read off her latest hire row
+     the way the rest of Paid Collabs reads a deal ("$1020 for 5"). A deal that cannot be read shows
+     as typed; no deal at all is a dash. */
+  const lastDealOf = (p) => {
+    const row = [...p.rows].reverse().find((r) => String(r.deal || '').trim()) || null;
+    if (!row) return null;
+    const price = helpers && helpers.parseDealAmount ? helpers.parseDealAmount(row.deal) : 0;
+    const vids = helpers && helpers.parseDealVideos ? helpers.parseDealVideos(row.deal) : 0;
+    return {
+      price,
+      vids,
+      raw: String(row.deal).trim(),
+      hired: String(row.hiring_date || '').slice(0, 10),
+    };
+  };
   const eukaOf = (p) => {
     if (!helpers || !helpers.creatorL30 || !helpers.creatorTier) return { l30: null, tier: '' };
     let l30 = null;
@@ -544,7 +559,7 @@ export function CollabHistory({ creators, helpers }) {
             <input type="search" placeholder="Search creator or @handle" value={search} onChange={(e) => setSearch(e.target.value)} />
             <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
               <option value="gmv">Sort: {monthLabel(gmvMonth)} GMV</option>
-              <option value="life">Sort: lifetime GMV</option>
+              <option value="life">Sort: Brand GMV</option>
               <option value="recent">Sort: latest hire</option>
               <option value="name">Sort: name</option>
             </select>
@@ -556,6 +571,7 @@ export function CollabHistory({ creators, helpers }) {
                   <th>Creator</th>
                   <th>Collaborated</th>
                   <th>Status</th>
+                  <th>Last deal</th>
                   <th className="r">Videos</th>
                   <th className="r">{monthLabel(gmvMonth)} GMV</th>
                   <th className="r">Brand GMV</th>
@@ -579,6 +595,16 @@ export function CollabHistory({ creators, helpers }) {
                       {(p.last && p.last.payment_status) || '–'}
                       {p.last && p.last.videos ? ` · ${p.last.videos}` : ''}
                     </td>
+                    <td title={(() => { const d = lastDealOf(p); return d ? `${d.raw}${d.hired ? ` · hired ${d.hired}` : ''}` : 'No deal on record'; })()}>
+                      {(() => {
+                        const d = lastDealOf(p);
+                        if (!d) return <span className="wx-hist-nodata">–</span>;
+                        if (!(d.price > 0) && !(d.vids > 0)) return d.raw;
+                        return [d.price > 0 ? usd(d.price) : null, d.vids > 0 ? `${d.vids} video${d.vids === 1 ? '' : 's'}` : null]
+                          .filter(Boolean)
+                          .join(' · ');
+                      })()}
+                    </td>
                     <td className="r">{p.videos.length || '–'}</td>
                     <td className="r">
                       <Cell cell={cell} />
@@ -592,7 +618,7 @@ export function CollabHistory({ creators, helpers }) {
                 ))}
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="wx-hist-note">
+                    <td colSpan={8} className="wx-hist-note">
                       No creators match.
                     </td>
                   </tr>
